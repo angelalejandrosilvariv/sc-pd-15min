@@ -26,6 +26,48 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-08 — Claude — Revisión de la implementación Fase 1 (PR #2)
+
+- **Tipo:** prueba y revisión.
+- **Origen:** cambios de Codex en `de040b8`/`009a52a` (PR #2, `codex/aplicar-cambios-de-documentacion-especificada`), revisados contra `docs/specs/01-fase1-integridad-datos.md`.
+- **Cambios revisados:** confirmé que `empalmar_reportes` y
+  `deduplicar_rio_priorizando_motivo` quedaron correctamente conectados al
+  pipeline real (`src/sc_pd_motor_v7.py`), que el `BUG 8` quedó documentado
+  en el encabezado, que la divergencia de fuente RIO
+  (`Diverge_Fuente_RIO_Partida/Detencion`) quedó bien instrumentada, y que
+  ningún interruptor de negocio fue tocado. `pytest -q` pasa (6/6) y el
+  archivo sigue siendo sintácticamente válido.
+- **Hallazgos (ver `docs/specs/02-correcciones-post-revision.md` para el detalle):**
+  1. **Crítico — rendimiento:** `empalmar_reportes` itera en Python puro
+     sobre `groupby()`. Probé con un dataset sintético de ~1,7M filas
+     combinadas (tamaño realista de un mes de datos) y el proceso no
+     terminó en más de 3 minutos (tuve que matarlo manualmente); el
+     `drop_duplicates` vectorizado que reemplazó corría en menos de 1
+     segundo para el mismo volumen. Tal como está, esta función haría
+     impracticable correr el motor sobre un mes completo de datos reales.
+  2. **Importante — pruebas desconectadas del código real:** `calcular_ciclos`,
+     `costos_clasicos` y `marcar_sin_tarifa_rio` en `src/fase1_integridad.py`
+     no están importadas ni usadas en ningún punto de
+     `src/sc_pd_motor_v7.py` — son reimplementaciones paralelas que solo
+     ejercitan los tests. De los 6 tests, 4
+     (`test_ciclo_cruza_mes`, `test_micro_corte_corta_ciclo`,
+     `test_central_sin_registro_rio`, `test_regresion_interruptores_apagados`)
+     pasan en verde pero no protegen la lógica que de verdad corre en el
+     motor (`calcular_ciclos_por_nivel` y el cálculo inline de
+     `Costo_*_Efectivo`/`Obs_Partida`). Solo 2 tests
+     (`test_empalme_no_pierde_energia_en_colision`,
+     `test_prioridad_motivo_no_nulo_en_duplicado_rio`) cubren código
+     realmente ejecutado por el script.
+  3. **Menor:** cuando no hay archivo de mes anterior
+     (`RUTA_REPORTE_MES_PASADO` vacío/inexistente), `reporte` se asigna
+     directo desde `reporte_actual` sin pasar por `empalmar_reportes`, así
+     que una colisión de llave dentro del propio mes actual (el mismo caso
+     de DST que se pidió corregir) seguiría perdiendo generación en
+     silencio en ese escenario específico.
+- **Validación:** `pytest -q` (6/6 OK), `ast.parse`, `py_compile`, prueba de
+  estrés manual con datos sintéticos (no incluida en el repo).
+- **Pendientes:** aplicar `docs/specs/02-correcciones-post-revision.md`.
+
 ### 2026-09-08 — Codex (OpenAI) — Bitácora acumulativa
 
 - **Tipo:** documentación.
