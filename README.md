@@ -26,19 +26,32 @@ El motor espera archivos como:
 
 ```text
 sc-pd-15min/
-├── .github/
-│   └── workflows/
-│       └── tests.yml
+├── docs/
+│   └── specs/
+│       ├── 00-restaurar-motor-v7.md
+│       └── 01-fase1-integridad-datos.md
 ├── src/
 │   └── sc_pd_motor_v7.py
-├── tests/
-│   ├── test_cycle_detection.py
-│   └── test_source_regressions.py
-├── .gitignore
-├── pyproject.toml
 ├── requirements.txt
 └── README.md
 ```
+
+`tests/`, `.github/workflows/` y `pyproject.toml` todavía no existen; se
+crean a medida que las specs de `docs/specs/` los requieran (ver más abajo).
+
+## Cómo se generan los cambios en este repo
+
+Este proyecto usa dos agentes con roles separados:
+
+- **Claude** (planificador/testeador): audita el motor, diseña casos de
+  prueba y escribe especificaciones en `docs/specs/*.md` — no escribe
+  código de `src/` directamente.
+- **ChatGPT** (implementador): lee las specs de `docs/specs/` y aplica los
+  cambios de código correspondientes.
+
+Cada spec indica si toca código (`Toca código: sí/no`) y, si corresponde,
+un commit sugerido. Las specs quedan numeradas en el orden en que deben
+aplicarse.
 
 ## Instalación
 
