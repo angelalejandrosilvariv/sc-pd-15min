@@ -64,3 +64,13 @@ def test_regresion_interruptores_apagados():
     resultado = costos_clasicos(fixture)
     assert resultado.loc[0, 'Costo_Partida_Efectivo'] == 0
     assert resultado.loc[0, 'Costo_Detencion_Efectivo'] == 40
+
+
+def test_empalme_sin_mes_anterior_no_pierde_energia():
+    actual = pd.DataFrame([
+        _fila('2026-04-05 00:00', 2),
+        _fila('2026-04-05 00:00', 3),
+    ])
+    resultado = empalmar_reportes(actual.iloc[0:0], actual)
+    assert resultado['GENERACION'].sum() == 5
+    assert len(resultado) == 1

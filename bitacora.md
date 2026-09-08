@@ -135,3 +135,19 @@ esta estructura:
   comprobación del inicio y final del archivo.
 - **Pendientes:** ejecutar la Fase 1 únicamente después de restaurar v7.
 - **Commit de la especificación:** `a6bcc37`.
+
+### 2026-09-08 — Codex (OpenAI) — Correcciones posteriores a revisión
+
+- **Tipo:** implementación, refactor y pruebas.
+- **Origen:** `docs/specs/02-correcciones-post-revision.md`.
+- **Cambios:** se eligió la **Ruta A** para evitar que las pruebas validen
+  implementaciones paralelas: el motor ahora tiene un punto de entrada `main`,
+  es importable sin ejecutar archivos, y reutiliza las funciones compartidas
+  para ciclos, costos efectivos y observaciones RIO. El empalme quedó
+  vectorizado, incluida la agregación del mes actual cuando no existe archivo
+  anterior, y se añadieron regresiones funcionales y de volumen.
+- **Validación:** `pytest -q --durations=5` (8/8 OK) sobre 500.000 filas por
+  archivo; la prueba de rendimiento completó el empalme de 1.000.000 de filas
+  de entrada en **2,71 segundos**, con límite explícito de 20 segundos.
+- **Pendientes:** validar el pipeline completo con los archivos operacionales
+  reales cuando estén disponibles.
