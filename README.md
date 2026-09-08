@@ -124,11 +124,17 @@ pytest -q
 
 El propio código deja explícitos asuntos que todavía requieren validación de negocio o regulatoria, por ejemplo:
 
-- `CODIGOS_EO_VALIDOS = ['PDO']` está marcado como pendiente de confirmar;
 - la tolerancia de corte de ciclo queda en `0`, de acuerdo con la definición entregada para el proyecto;
 - la regla de margen usa solo margen positivo;
 - no se debe sustituir la regla física de ciclo por un puente heurístico de horas de cero;
 - el repositorio no contiene los Excel/CSV operacionales.
+
+`CODIGOS_EO_VALIDOS = ['PDO']` ya no es un pendiente: se verificó contra la
+fórmula de Excel original (coincide celda por celda) y contra un RIO real
+que sí contiene el valor `"PDO"` — ver `docs/specs/03-confirmar-codigos-eo-validos.md`.
+
+Sigue pendiente compartir `Costos_de_P-D_Consolidado.xlsx` para poder
+validar de forma independiente el tramo de tarifas Fría/Tibia/Caliente.
 
 ## Principio de cambios
 

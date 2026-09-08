@@ -26,6 +26,29 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-08 — Claude — `CODIGOS_EO_VALIDOS` confirmado, cierra pendiente de negocio
+
+- **Tipo:** decisión (documentación, sin cambio de comportamiento).
+- **Origen:** `docs/specs/03-confirmar-codigos-eo-validos.md`, a partir de
+  la fórmula de Excel original que compartió el dueño del proyecto.
+- **Cambios:** se verificó celda por celda la fórmula de Excel que este
+  motor reemplaza (`P2`=`MOTIVO`, `Z2`=chequeo SSCC/CTF/CSF/CPF,
+  `N2`=`Etiqueta_Relacionada`, `Q2`=`BUSCARV` directo contra la columna
+  `ESTADO OPERACIONAL` del RIO comparado contra `"PDO"`). Coincide
+  exactamente con `CODIGOS_EO_VALIDOS = ['PDO']` del motor — no hay bug de
+  mapeo de columnas. El dueño del proyecto confirmó además, revisando un
+  RIO real, que la columna `ESTADO OPERACIONAL` sí contiene el valor
+  `"PDO"` (no aparecía en la muestra de julio 2026 usada en la auditoría
+  original por ser un estado poco frecuente). README actualizado para
+  quitar este ítem de la lista de pendientes.
+- **Validación:** revisión manual de la fórmula de Excel contra
+  `calcular_filtros` en `src/sc_pd_motor_v7.py`, confirmación del dueño del
+  proyecto sobre datos reales de RIO.
+- **Pendientes:** que Codex actualice el comentario junto a
+  `CODIGOS_EO_VALIDOS` en `src/sc_pd_motor_v7.py` (spec 03) — el valor
+  `['PDO']` no cambia, solo el comentario que lo marcaba como pendiente.
+  Sigue abierto compartir `Costos_de_P-D_Consolidado.xlsx`.
+
 ### 2026-09-08 — Claude — Revisión de la implementación Fase 1 (PR #2)
 
 - **Tipo:** prueba y revisión.
