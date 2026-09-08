@@ -136,6 +136,60 @@ esta estructura:
 - **Pendientes:** ejecutar la Fase 1 únicamente después de restaurar v7.
 - **Commit de la especificación:** `a6bcc37`.
 
+### 2026-09-08 — Claude — Revisión de las correcciones post-revisión (PR #4)
+
+- **Tipo:** prueba y revisión.
+- **Origen:** cambios de Codex en `6163f47` (PR #4,
+  `codex/confirmar-archivo-y-aplicar-cambios`), revisados contra
+  `docs/specs/02-correcciones-post-revision.md`.
+- **Cambios verificados (los 3 puntos de la spec 02, cada uno con prueba
+  independiente, no solo lectura de código):**
+  1. **Rendimiento:** confirmé con `ast`/`grep` que `empalmar_reportes`
+     quedó reescrito de forma vectorizada (sin loop de Python por grupo).
+     Repetí mi prueba de estrés original del caso más adverso (864.000
+     filas por archivo, **100% de colisión de llave** — peor caso posible,
+     más duro que el test de volumen incluido en el repo, que usa
+     solapamiento realista de 96 filas): terminó en **5,74 segundos**
+     conservando el total de `GENERACION` esperado. Antes de este fix, el
+     mismo caso no terminaba en más de 3 minutos.
+  2. **Cobertura de pruebas:** confirmé con `ast.walk` que todo el pipeline
+     (secciones 1 a 15) quedó anidado dentro de una función `main(rutas,
+     panel=None)`, con `if __name__ == "__main__": main({})` al final
+     (comportamiento idéntico al de antes al correr el script). Confirmé
+     con `grep` que `calcular_ciclos_por_nivel` ahora delega en
+     `calcular_ciclos`, y que `costos_clasicos`/`marcar_sin_tarifa_rio` se
+     invocan directamente sobre `df_compacto` en el lugar exacto donde
+     antes vivía la lógica duplicada — no quedó lógica inline duplicada
+     (verificado que el bloque `Costo_Partida_Efectivo] = (df_compacto...`
+     original ya no existe). Los 8 tests ahora sí ejercitan código
+     realmente conectado al motor.
+  3. **Caso sin mes anterior:** confirmé que la rama `else` (sin
+     `RUTA_REPORTE_MES_PASADO`) ahora llama a
+     `empalmar_reportes(reporte_actual.iloc[0:0].copy(), reporte_actual,
+     _audit_log)`, aplicando la misma protección contra colisión de llave
+     también en ese escenario. Cubierto por el nuevo test
+     `test_empalme_sin_mes_anterior_no_pierde_energia`.
+  - Reconfirmé que ningún interruptor de negocio fue tocado
+    (`USAR_CONFIG_DOMINANTE=0`, `USAR_TARIFA_RIO_INSTRUIDA=1`,
+    `REGLA_EXENCION='sin_historia'`, `TOLERANCIA_CORTES_BLOQUES=0`,
+    `CODIGOS_EO_VALIDOS=['PDO']` sin cambios).
+- **Nota menor, no bloqueante:** `main()` usa `globals().update(rutas or
+  {}, panel or {})` para inyectar configuración — funciona bien para el
+  uso actual (un solo `main()` por proceso), pero si en el futuro se llama
+  `main()` más de una vez en el mismo proceso con overrides parciales, los
+  valores de una llamada anterior podrían quedar pegados. No requiere
+  acción ahora.
+- **Validación:** `pytest -q -m ""` (8/8 OK, incluye el test de
+  rendimiento marcado `slow`), `ast.parse`, `py_compile`, prueba de estrés
+  propia con datos sintéticos (peor caso, no incluida en el repo).
+- **Conclusión:** Fase 1 (integridad de datos) queda cerrada. Los 3
+  hallazgos de la revisión anterior están resueltos y verificados de forma
+  independiente.
+- **Pendientes:** ninguno de integridad de datos. Siguen abiertos los
+  pendientes de negocio ya documentados (`CODIGOS_EO_VALIDOS`,
+  `Costos_de_P-D_Consolidado.xlsx`) y la validación con datos operacionales
+  reales cuando estén disponibles.
+
 ### 2026-09-08 — Codex (OpenAI) — Correcciones posteriores a revisión
 
 - **Tipo:** implementación, refactor y pruebas.
