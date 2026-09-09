@@ -454,7 +454,7 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida):
     return columnas
 
 
-def main(rutas: dict, panel: dict | None = None):
+def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = False):
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
     globals().update(panel or {})
@@ -1868,6 +1868,14 @@ def main(rutas: dict, panel: dict | None = None):
                 ws.set_column(idx, idx, min(ancho, 50))
 
     print("Listo. Proceso finalizado.")
+
+    if devolver_diagnostico:
+        return {
+            'RIO': rio_subset,
+            'Reporte_Crudo': reporte_actual,
+            'Detalle_15Min': detalle_mes,
+            'Resumen_Ciclos_PD': df_compacto,
+        }
 
 
 if __name__ == "__main__":
