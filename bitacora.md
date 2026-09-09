@@ -26,6 +26,40 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Segunda corrida real del prorrateo, muestra más rica (79 suministradores)
+
+- **Tipo:** prueba de integración end-to-end adicional con datos reales.
+- **Origen:** continuación de la revisión de la spec 11 (entrada
+  siguiente) — el dueño del proyecto no pudo subir el parquet completo de
+  retiros (~1GB), así que le pasé un script para extraer, desde su propio
+  archivo, solo una muestra chica (columnas mínimas + primeros 20 cuartos
+  de hora del mes, comprimida en `.csv.gz`).
+- **Cambios:** ninguno en el repositorio — es una corrida de verificación
+  adicional, no una implementación.
+- **Validación:** la muestra recibida trae **79 suministradores reales**
+  distintos (vs. 1 en la muestra original de la spec 11), en los primeros
+  20 cuartos de hora del mes (`Cuarto de Hora` entre 1 y 20). Corrí
+  `scripts/prorratear_pagos_15min.py` de punta a punta contra esta
+  muestra y el mismo Excel real de junio 2026 ya usado:
+  - 25 de 1.034 ciclos cruzaron con retiros (coherente con que la muestra
+    solo cubre 20 de ~2.976 cuartos de hora del mes).
+  - **Cuadratura perfecta** de nuevo: delta máximo `2,3e-10` en los 25
+    ciclos, incluido un ciclo con 1.553 filas de detalle (79
+    suministradores x hasta 20 cuartos), confirmando que el reparto entre
+    múltiples suministradores concurrentes funciona igual de bien que con
+    un solo suministrador.
+  - Nota de robustez: a nivel de medidor individual (no de
+    `Suministrador` agregado) hay un 0,5% de filas con `Medida_kWh`
+    positivo (inyección) mezcladas con retiros negativos — no afecta el
+    resultado, la cuadratura sigue exacta, porque el prorrateo opera
+    sobre la suma agregada por `Suministrador`+cuarto, no por medidor.
+- **Pendiente sin cambios:** la validación de la convención exacta de
+  `Cuarto de Hora` contra el mes completo (`max == días_mes * 96`) sigue
+  abierta — esta muestra solo llega hasta el cuarto 20, insuficiente para
+  probar el cruce de día (ej. cuarto 96 -> 97). Falta que el dueño del
+  proyecto comparta el diagnóstico que imprime la primera parte del
+  script de validación (corrido contra el parquet completo).
+
 ### 2026-09-09 — Claude — Revisión del prorrateo de pagos a 15 minutos (spec 11, PR #24)
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión.
