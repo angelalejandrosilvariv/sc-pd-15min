@@ -26,6 +26,75 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión del prorrateo de pagos a 15 minutos (spec 11, PR #24)
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión.
+- **Origen:** implementación de Codex en `67362cd` (PR #24,
+  `codex/implementar-prorrateo-de-pagos`) de
+  `docs/specs/11-prorrateo-pagos-15min.md`.
+- **Revisión del código:** `src/prorrateo_15min.py` implementa las 4
+  funciones puras pedidas (`calcular_cuarto_hora_mensual`,
+  `construir_membresia_ciclos`, `agrupar_retiros`/`prorratear_retiros`,
+  `auditar_cuadratura`), separadas del wrapper de I/O
+  (`scripts/prorratear_pagos_15min.py`), igual que el patrón
+  `fase1_integridad.py`/`sc_pd_motor_v7.py`. La fórmula de
+  `Cuarto_Hora_Mensual` es exactamente la propuesta en la spec. El cruce
+  con retiros usa `merge` por `Cuarto_Hora_Mensual` solamente (no por
+  central), replicando fielmente que un mismo retiro del sistema se
+  reparte entre todos los ciclos concurrentes activos en ese cuarto de
+  hora — igual que el script horario original. El caso de ciclo con
+  `Total_kWh_Ciclo == 0` (sin retiros, o retiros que se cancelan) se
+  excluye del reparto sin lanzar excepción y queda listado explícitamente
+  en la auditoría, tal como pedía la spec.
+- **Validación con datos reales — corrida completa:**
+  1. Reconstruí el Excel del motor con datos reales de junio 2026 (mismo
+     insumo usado para confirmar la spec 10), usando el `src/` actual del
+     repo (`main` ya con specs 00-10 aplicadas). El `Total SC_PD` agregado
+     coincidió con el total ya confirmado antes: **1.180.652.295,52 CLP**
+     (vs. 1.180.652.296 CLP reportado en la revisión de la spec 10 —
+     diferencia de redondeo de centavos, no un cambio real).
+  2. Corrí `scripts/prorratear_pagos_15min.py` de punta a punta contra ese
+     Excel y la única muestra de retiros 15-minutales disponible
+     (`prueba_de_retiros_15min.csv`, ~100 filas, un solo
+     `Suministrador`/`nombre_barra`, cubre solo cuartos de hora 1 a 147 —
+     es decir, apenas los 2 primeros días del mes de un único
+     suministrador). Con esa muestra tan acotada, **894 de 1.034 ciclos**
+     del mes quedaron marcados `sin retiros para prorratear` (esperado:
+     casi ningún ciclo del mes cae dentro de esa ventana de 2 días de un
+     solo suministrador) y solo se repartieron 77,6M de los 1.180,6M CLP
+     totales — comportamiento correcto dado el tamaño de la muestra, no
+     un bug.
+  3. **Cuadratura, verificada de forma independiente:** de los 140 ciclos
+     que sí tuvieron al menos un retiro cruzado, recalculé
+     `Monetario_Repartido` por ciclo desde el CSV de detalle exportado y
+     lo comparé contra `Precio_Ciclo` — la diferencia máxima encontrada
+     fue `9,3e-10` (ruido de punto flotante), es decir, cuadratura
+     perfecta en los 140/140 ciclos.
+  4. **Convención de `Cuarto de Hora` — validación parcial:** los valores
+     de la muestra van de 1 a 147, consistentes con la hipótesis de
+     índice 1-indexado del script (día 1 = 1-96, día 2 = 97-192). No pude
+     confirmar el límite superior real de un mes completo (`días_mes *
+     96`) porque no hay un archivo de retiros de 15 minutos con el mes
+     completo disponible en este entorno — la muestra entregada por el
+     dueño del proyecto solo cubre ~2 días. **Queda pendiente confirmar
+     esto contra el archivo real de producción cuando esté disponible**,
+     tal como ya advertía la spec.
+- **Tests:** `pytest -q -m ""` — 25/25 OK (los 4 nuevos de
+  `tests/test_prorrateo_15min.py` cubren exactamente los casos de
+  aceptación de la spec: fórmula del cuarto de hora, deduplicación de
+  membresía, ciclos concurrentes + ciclo sin retiros, y robustez de
+  signo). `ast.parse` sobre `scripts/prorratear_pagos_15min.py` sin
+  error.
+- **Conclusión:** la implementación es correcta y fiel a la spec; la
+  cuadratura cierra exactamente contra datos reales para todo ciclo que
+  tuvo retiros que cruzar. No se encontraron hallazgos que bloqueen el
+  cierre de esta spec.
+- **Pendientes:** validar la convención exacta de `Cuarto de Hora` (punto
+  4 de arriba) en cuanto el dueño del proyecto tenga el archivo de
+  retiros de 15 minutos de un mes completo — si el índice real no calzara
+  con la hipótesis 1-indexada, ajustar `calcular_cuarto_hora_mensual` en
+  consecuencia.
+
 ### 2026-09-09 — Claude — Revisión del fallback de empresa por configuración (spec 10, PR #21)
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión.
