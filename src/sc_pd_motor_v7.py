@@ -134,6 +134,9 @@ RUTA_SALIDA              = r"Reporte_Sobrecostos_PD_Final.xlsx"
 # --- Logica de negocio ---
 ACTIVAR_BUSQUEDA_RELAJADA = 1   # 1 = busca el registro RIO mas conveniente en una ventana
 VENTANA_CUARTOS_HORA      = 2   # +/- 2 cuartos = +/- 30 min
+ACTIVAR_CORRECCION_MEZCLA_CONFIG_RIO = 1  # 1 = en los limites, restringe el RIO a
+                                           # la configuracion exacta de la fila dentro
+                                           # de +/- VENTANA_CUARTOS_HORA.
 FILTRAR_CICLOS_BAJA_GEN   = 1   # Rechaza ciclos con generacion <= UMBRAL_RUIDO_MWH
 UMBRAL_RUIDO_MWH          = 1.0
 RENUMERAR_CICLOS_DEL_MES  = 1   # 1 = etiquetas del reporte parten en 1 cada mes
@@ -306,6 +309,53 @@ def rescatar_config_rio_en_limites(resumen, rio_subset, activar, ventana_cuartos
     return resultado
 
 
+def corregir_mezcla_configuraciones_rio(resumen, rio_subset, activar,
+                                         ventana_cuartos_hora):
+    """Restringe el RIO de los limites a la configuracion exacta de la fila.
+
+    A diferencia del rescate anterior, este paso puede reemplazar una
+    configuracion ya informada por el cruce maestro. Solo lo hace cuando hay un
+    registro de ``Central`` para la misma central relacionada dentro de la
+    ventana; en caso contrario conserva la fila sin cambios.
+    """
+    resultado = resumen.copy()
+    resultado['Config_RIO_Corregida_Mezcla'] = False
+    if activar != 1 or resultado.empty or rio_subset.empty:
+        return resultado
+
+    es_limite = ((resultado['FECHA_HORA'] == resultado['Inicio_Ciclo_Global'])
+                 | (resultado['FECHA_HORA'] == resultado['Termino_Ciclo_Global']))
+    candidatos_indices = resultado.index[es_limite]
+    if candidatos_indices.empty:
+        return resultado
+
+    rio_valido = rio_subset.dropna(
+        subset=['FECHA_HORA_RIO', 'Central_Relacionada_RIO', 'NOMBRE CONFIGURACIÓN'])
+    por_central = {central: grupo for central, grupo in
+                   rio_valido.groupby('Central_Relacionada_RIO', sort=False)}
+    tolerancia = pd.Timedelta(minutes=ventana_cuartos_hora * 15)
+
+    for indice in candidatos_indices:
+        fila = resultado.loc[indice]
+        candidatos = por_central.get(fila['Central_Relacionada'])
+        if candidatos is None:
+            continue
+        misma_config = candidatos[candidatos['NOMBRE CONFIGURACIÓN'] == fila['Central']]
+        if misma_config.empty:
+            continue
+        diferencias = (misma_config['FECHA_HORA_RIO'] - fila['FECHA_HORA']).abs()
+        dentro = diferencias <= tolerancia
+        if not dentro.any():
+            continue
+        mejor_indice = diferencias[dentro].idxmin()
+        mejor = misma_config.loc[mejor_indice]
+        resultado.at[indice, 'Configuracion RIO'] = mejor['NOMBRE CONFIGURACIÓN']
+        resultado.at[indice, 'Fuente_Config_RIO'] = mejor['FECHA_HORA_RIO']
+        resultado.at[indice, 'Config_RIO_Corregida_Mezcla'] = True
+
+    return resultado
+
+
 def listar_secuencia_rio_ventana(momentos, rio_subset, ventana_cuartos_hora):
     """Lista todas las instrucciones RIO cercanas a cada momento por central.
 
@@ -386,6 +436,7 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida):
         'Estado_Op_Partida': ('ESTADO OPERACIONAL', 'first'),
         'Fuente_Config_RIO_Partida': ('Fuente_Config_RIO', 'first'),
         'Config_RIO_Rescatada_Ventana_Partida': ('Config_RIO_Rescatada_Ventana', 'first'),
+        'Config_RIO_Corregida_Mezcla_Partida': ('Config_RIO_Corregida_Mezcla', 'first'),
         'Filtro_Conf_Detencion': ('Conf despachada RIO', 'last'),
         'Filtro_Disp_Detencion': ('Disponible (1) / Pruebas (0)', 'last'),
         'Filtro_Op_Detencion': ('Filtro_Operacional', 'last'),
@@ -394,6 +445,7 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida):
         'Estado_Op_Detencion': ('ESTADO OPERACIONAL', 'last'),
         'Fuente_Config_RIO_Detencion': ('Fuente_Config_RIO', 'last'),
         'Config_RIO_Rescatada_Ventana_Detencion': ('Config_RIO_Rescatada_Ventana', 'last'),
+        'Config_RIO_Corregida_Mezcla_Detencion': ('Config_RIO_Corregida_Mezcla', 'last'),
         'Estado_Ciclo_Mes': ('Estado_Ciclo_Mes', 'first'),
     }
     if usar_tarifa_rio_instruida == 1:
@@ -471,6 +523,7 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida):
         'Inicio_Ciclo', 'Termino_Ciclo', 'Horas_Detenida_Ciclo',
         'Generacion_Suma_Ciclo', 'Margen_Suma_Ciclo',
         'Config_RIO_Rescatada_Ventana_Partida', 'Config_RIO_Rescatada_Ventana_Detencion',
+        'Config_RIO_Corregida_Mezcla_Partida', 'Config_RIO_Corregida_Mezcla_Detencion',
         'Estado_Op_Partida', 'Consigna_Partida', 'Motivo_Partida',
         'Tipo_Partida',
         'Filtro_Conf_Partida', 'Filtro_Disp_Partida', 'Filtro_Op_Partida', 'Filtro_CostoCero_Partida',
@@ -1073,6 +1126,9 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     resumen_relacionada = rescatar_config_rio_en_limites(
         resumen_relacionada, rio_subset, ACTIVAR_BUSQUEDA_RELAJADA,
         VENTANA_CUARTOS_HORA)
+    resumen_relacionada = corregir_mezcla_configuraciones_rio(
+        resumen_relacionada, rio_subset, ACTIVAR_CORRECCION_MEZCLA_CONFIG_RIO,
+        VENTANA_CUARTOS_HORA)
     rescatadas = resumen_relacionada['Config_RIO_Rescatada_Ventana']
     n_rescatadas_partida = int((
         rescatadas
@@ -1637,6 +1693,11 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         monto_rescatado = df_compacto.loc[rescatada, f'Costo_{prefijo}_Efectivo'].sum()
         print(f"  Configuracion RIO rescatada {prefijo.lower()}: {int(rescatada.sum()):,} ciclos, "
               f"{monto_rescatado:,.0f} CLP efectivos.")
+
+        corregida = df_compacto[f'Config_RIO_Corregida_Mezcla_{prefijo}']
+        monto_corregido = df_compacto.loc[corregida, f'Costo_{prefijo}_Efectivo'].sum()
+        print(f"  Mezcla de configuraciones RIO corregida {prefijo.lower()}: "
+              f"{int(corregida.sum()):,} ciclos, {monto_corregido:,.0f} CLP efectivos.")
 
 
     # ==========================================
