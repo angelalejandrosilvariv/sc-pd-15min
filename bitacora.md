@@ -26,6 +26,75 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión spec 15 con datos reales (PR #32): baja el Total SC_PD, no sube
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión,
+  con 1 hallazgo de calidad de auditoría (no bloqueante) y una
+  corrección importante a mi propia predicción de la spec.
+- **Origen:** implementación de Codex en `45c3773` (PR #32,
+  `codex/implementar-configuracion-rio-fisica-en-ventana`) de
+  `docs/specs/15-preferir-config-rio-fisica-en-ventana.md` (nota: el PR
+  de la spec en sí, #31, no se había mergeado todavía cuando Codex
+  implementó — el código llegó a `main` antes que el documento).
+- **Revisión del código:** `corregir_mezcla_configuraciones_rio` sigue
+  exactamente el diseño de la spec — restringe el RIO de los límites de
+  ciclo a la configuración exacta de la fila, dentro de
+  `±VENTANA_CUARTOS_HORA`, con fallback intacto si no hay coincidencia.
+  `pytest -q -m ""`: 39/39 OK (incluye `test_correccion_mezcla_config_rio.py`,
+  4 tests cubriendo el caso base real de `KELAR-TG12&7`, casos sin
+  candidato válido, interruptor apagado, y el caso "ya coincidía").
+- **Validación con datos reales (junio 2026):**
+  - **Re-corrí la comparación completa** (config física vs.
+    `Config_RIO_Usada_Partida/Detencion`) contra el resultado real: la
+    spec cerró **los 43 casos de partida a 0 mismatches**, y dejó
+    **1 solo residual en detención** — exactamente
+    `NUEVARENCA_TG1+TV1&1`, el caso genuino sin coincidencia en la
+    ventana ya identificado antes de implementar. Confirma que el
+    mecanismo funciona tal como se diseñó.
+  - **Corrección a mi propia predicción:** la spec decía "se espera que
+    suba" el `Total SC_PD` — estaba equivocado, fue una suposición sin
+    verificar. El resultado real es una **baja** de
+    **1.180.652.296 → 1.037.795.695 CLP (-142.856.600 CLP, -12,1%)**.
+    31 ciclos de partida (-228.517.940 CLP) y 14 de detención
+    (-25.107.594 CLP) tuvieron cambio real de costo — la razón: varias
+    configuraciones "combinadas" (turbina+vapor) que se usaban por
+    error tenían tarifas más altas que las configuraciones "simples"
+    correctas, así que corregir bajó el costo en más casos de los que
+    subió. Verificado puntualmente: `KELAR-TG12&7` ahora usa
+    `KELAR-TG1_TG1_DIESEL` (config correcta) y
+    `NUEVARENCA_TG1+TV1&1` quedó intacto.
+- **Hallazgo (calidad de auditoría, no bloqueante):** el mensaje
+  impreso ("Mezcla de configuraciones RIO corregida partida: 976
+  ciclos, 780.931.028 CLP efectivos") es engañoso — de los 976 ciclos
+  marcados `Config_RIO_Corregida_Mezcla_Partida=True`, solo **31
+  tuvieron cambio real de costo**. El resto son ciclos donde la
+  configuración ya coincidía y la función encontró un registro RIO
+  duplicado (mismo nombre) dentro de la ventana, marcándolo como
+  "corregido" sin que cambiara ningún valor. El monto de 780M CLP que
+  imprime es la suma de `Costo_Partida_Efectivo` de TODOS los marcados,
+  no el impacto real. Pendiente: decidir si vale la pena una spec
+  chica para que la auditoría cuente/sume solo los casos con cambio
+  real (el dueño del proyecto no se ha pronunciado aún sobre si
+  aplicarlo).
+- **Entregable adicional (fuera de specs, análisis ad-hoc a pedido del
+  dueño del proyecto):** `Partidas_Detenciones_Negadas_202606.xlsx` —
+  detalle completo de partidas/detenciones negadas por filtro o falta
+  de tarifa, usando las clasificaciones `Obs_Partida`/`Obs_Detencion`
+  que el motor ya calcula (sin lógica nueva). Total no cobrado por
+  negación: ~386M CLP (302,1M partida + 84,0M detención), concentrado
+  en "Máquina en Pruebas (EP)" (294,7M CLP, partida) y "Sin Motivo ni
+  SSCC en RIO" (79,1M CLP, detención).
+- **Pendientes:**
+  1. Mergear PR #31 (el documento de la spec 15 en sí — el código ya
+     está en `main` pero el `.md` todavía no).
+  2. Decidir si se ajusta el mensaje de auditoría de
+     `Config_RIO_Corregida_Mezcla_*` para no sobrestimar el impacto.
+  3. Investigar el caso residual `NUEVARENCA_TG1+TV1&1` (GN_A vs GNL_C)
+     si el dueño del proyecto lo considera prioritario.
+  4. Revisar los 40 ciclos "Revisar manualmente: config RIO sin
+     tarifa" (33 partida + 7 detención) — podría ser un vacío en
+     `Costos_de_P-D_Consolidado.xlsx`, no evaluado todavía.
+
 ### 2026-09-09 — Claude — Confirmación specs 13 y 14 con datos reales (PR #29) — ambas cerradas
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión.
