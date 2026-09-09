@@ -102,13 +102,43 @@ def calcular_ciclos(df, grupo=('Central',), tolerancia_cortes=0,
 
 
 def costos_clasicos(df):
-    """Calcula costos efectivos con los tres filtros historicos."""
+    """Calcula costos efectivos con filtros historicos y de costo cero."""
     out = df.copy()
     for tipo in ['Partida', 'Detencion']:
+        filtro_costo_cero = out.get(f'Filtro_CostoCero_{tipo}', 1)
         out[f'Costo_{tipo}_Efectivo'] = (out[f'Costo_{tipo}_Base']
             * out[f'Filtro_Conf_{tipo}'] * out[f'Filtro_Disp_{tipo}']
-            * out[f'Filtro_Op_{tipo}'])
+            * out[f'Filtro_Op_{tipo}'] * filtro_costo_cero)
     return out
+
+
+def clasificar_partida(df, sufijo=''):
+    """Clasifica y valoriza los cuatro tramos de partida de una politica."""
+    out = df.copy()
+    horas = out['Horas_Detenida_Ciclo']
+    fria = out[f'Fria_Num1_M{sufijo}']
+    tibia2 = out[f'Tibia_Num2_N{sufijo}']
+    caliente = out[f'Caliente_Num1_P{sufijo}']
+    sin_tarifa = out.get('Config_RIO_Sin_Tarifa', False) if sufijo else False
+    tipo = f'Tipo_Partida{sufijo}'
+    costo = f'Costo_Partida{sufijo}'
+    out[tipo] = np.select(
+        [horas.isna() | sin_tarifa, horas > fria, horas > tibia2, horas < caliente],
+        ['No_Aplica', 'Fria', 'Tibia_2', 'Caliente'], default='Tibia')
+    out[costo] = pd.to_numeric(pd.Series(np.select(
+        [out[tipo].eq('Fria'), out[tipo].eq('Tibia_2'),
+         out[tipo].eq('Caliente'), out[tipo].eq('Tibia')],
+        [out[f'Partida_Fria{sufijo}'], out[f'Partida_Tibia_2{sufijo}'],
+         out[f'Partida_Caliente{sufijo}'], out[f'Partida_Tibia{sufijo}']], default=0),
+        index=out.index), errors='coerce').fillna(0)
+    return out
+
+
+def filtro_costo_cero(costo_cero, centrales):
+    """Devuelve 0 solo para politicas ``SI`` o COGEN; faltantes no son exentos."""
+    exento = costo_cero.astype(str).str.strip().str.upper().eq('SI')
+    cogen = centrales.astype(str).str.contains('COGEN', case=False, na=False)
+    return (~(exento | cogen)).astype(int)
 
 
 def marcar_sin_tarifa_rio(df, configuracion='Configuracion RIO'):
@@ -124,12 +154,14 @@ def marcar_sin_tarifa_rio(df, configuracion='Configuracion RIO'):
 
     for tipo in ['Partida', 'Detencion']:
         out[f'Obs_{tipo}'] = np.select(
-            [out[f'Config_RIO_Sin_Tarifa_{tipo}'],
+            [out.get(f'Filtro_CostoCero_{tipo}', 1) == 0,
+             out[f'Config_RIO_Sin_Tarifa_{tipo}'],
              out[f'Filtro_Conf_{tipo}'] == 0,
              out[f'Filtro_Disp_{tipo}'] == 0,
              out[f'Filtro_Op_{tipo}'] == 0,
              out[f'Costo_{tipo}_Base'] == 0],
-            ['Revisar manualmente: config RIO sin tarifa',
+            [f'Exento: Costo_Cero=SI en la fecha de {tipo.lower()}',
+             'Revisar manualmente: config RIO sin tarifa',
              'Rechazo: Configuracion RIO distinta',
              'Rechazo: Maquina en Pruebas (EP)',
              'Rechazo: Sin Motivo ni SSCC en RIO',
