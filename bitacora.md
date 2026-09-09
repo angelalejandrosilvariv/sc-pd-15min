@@ -26,6 +26,34 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Convención de `Cuarto de Hora` confirmada contra el mes completo — spec 11 cerrada
+
+- **Tipo:** validación final con datos reales, cierre de spec.
+- **Origen:** el dueño del proyecto corrió la primera parte del script de
+  validación (`validar_retiros_15min.py`) contra su parquet completo de
+  retiros de 15 minutos (~1GB, junio 2026) y compartió el diagnóstico
+  impreso por consola.
+- **Resultado:**
+  ```
+  Clave_Anio_Mes=2606 (30 dias) -> min=1, max=2880, esperado max=2880  [OK]
+  ```
+  El máximo real de `Cuarto de Hora` (2.880) coincide exacto con
+  `días_del_mes * 96` (30 × 96 = 2.880) para junio 2026. Confirma, contra
+  el mes completo (no solo la muestra parcial de 20 cuartos usada antes),
+  que `calcular_cuarto_hora_mensual` — 1-indexado, día 1 cuarto 1 =
+  `[00:00,00:15)` — es la convención correcta del archivo real de
+  producción. **No se requiere ningún ajuste a la fórmula.**
+- **Conclusión:** con esto se cierra el único pendiente que quedaba
+  abierto de la spec 11 (`docs/specs/11-prorrateo-pagos-15min.md`). Junto
+  con la cuadratura perfecta ya verificada en las dos corridas reales
+  anteriores (muestra de 1 suministrador y muestra de 79
+  suministradores), la implementación del prorrateo de pagos a 15
+  minutos queda completamente validada de punta a punta.
+- **Pendientes:** ninguno de esta spec. Cuando el dueño del proyecto
+  tenga el archivo de retiros completo listo para producción, puede
+  correr `scripts/prorratear_pagos_15min.py` directo contra él (acepta
+  `.parquet` sin conversión previa).
+
 ### 2026-09-09 — Claude — Segunda corrida real del prorrateo, muestra más rica (79 suministradores)
 
 - **Tipo:** prueba de integración end-to-end adicional con datos reales.
