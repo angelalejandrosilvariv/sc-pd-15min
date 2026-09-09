@@ -217,6 +217,52 @@ AUDITAR_LIMITES_CICLOS       = 1
 AUDITAR_ENERGIA_INTER_CICLOS = 1
 
 
+def validar_meses_reporte(df, etiqueta, fecha_hora_original=None):
+    """Aborta si un reporte nominalmente mensual se dispersa en varios meses."""
+    meses = df['FECHA_HORA'].dt.to_period('M')
+    conteos = meses.value_counts().sort_index()
+    if len(conteos) <= 2:
+        return
+
+    originales = (fecha_hora_original.reindex(df.index) if fecha_hora_original is not None
+                  else df['FECHA_HORA'].astype(str))
+    mes_principal = conteos.idxmax()
+    indices_problematicos = df.index[meses != mes_principal][:12]
+    muestra = pd.DataFrame({
+        'FECHA_HORA_original': originales.loc[indices_problematicos],
+        'FECHA_HORA_parseada': df.loc[indices_problematicos, 'FECHA_HORA'],
+    })
+
+    print("\n" + "!" * 78)
+    print(f"  ALERTA CRITICA: {etiqueta} contiene {len(conteos)} meses-calendario")
+    print("  Filas por mes:")
+    for mes, cantidad in conteos.items():
+        print(f"    {mes}: {cantidad:,} filas")
+    print("  Muestra de filas fuera del mes principal "
+          f"({mes_principal}; original -> parseada):")
+    print(muestra.to_string(index=False))
+    print("!" * 78)
+    sys.exit(
+        f"ERROR: {etiqueta} contiene fechas en {len(conteos)} meses-calendario; "
+        "revisa el formato de FECHA_HORA."
+    )
+
+
+def leer_reporte(ruta, etiqueta):
+    """Carga un CSV de 15 minutos y normaliza FECHA_HORA como mes-primero."""
+    df = pd.read_csv(ruta, sep=",", low_memory=False)
+    fecha_hora_original = df['FECHA_HORA'].astype(str).str.strip()
+    df['FECHA_HORA'] = pd.to_datetime(
+        fecha_hora_original, format='mixed', dayfirst=False, errors='coerce'
+    )
+    nulas = df['FECHA_HORA'].isna().sum()
+    if nulas:
+        print(f"  [!] {etiqueta}: {nulas:,} filas con FECHA_HORA ilegible fueron descartadas.")
+        df = df.dropna(subset=['FECHA_HORA'])
+    validar_meses_reporte(df, etiqueta, fecha_hora_original)
+    return df
+
+
 def main(rutas: dict, panel: dict | None = None):
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
@@ -257,19 +303,6 @@ def main(rutas: dict, panel: dict | None = None):
         for r in _audit_log:
             print(f"  {r['paso']:<40} {r['filas']:>8,}  {r['gen_MWh']:>14,.2f}  {r['delta_gen']:>+14,.2f}  {r['pct_perdida']:>8.2f}%")
         print("=" * 78)
-
-
-    def leer_reporte(ruta, etiqueta):
-        """Carga un CSV de 15 minutos y normaliza FECHA_HORA."""
-        df = pd.read_csv(ruta, sep=",", low_memory=False)
-        df['FECHA_HORA'] = pd.to_datetime(
-            df['FECHA_HORA'].astype(str).str.strip(), format='mixed', dayfirst=True, errors='coerce'
-        )
-        nulas = df['FECHA_HORA'].isna().sum()
-        if nulas:
-            print(f"  [!] {etiqueta}: {nulas:,} filas con FECHA_HORA ilegible fueron descartadas.")
-            df = df.dropna(subset=['FECHA_HORA'])
-        return df
 
 
     # ==========================================
