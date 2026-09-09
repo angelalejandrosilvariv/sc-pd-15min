@@ -263,6 +263,49 @@ def leer_reporte(ruta, etiqueta):
     return df
 
 
+def rescatar_config_rio_en_limites(resumen, rio_subset, activar, ventana_cuartos_hora):
+    """Rescata la configuracion RIO de los limites de ciclo dentro de una ventana.
+
+    Este cruce es deliberadamente independiente del cruce maestro y de la
+    busqueda relajada de filtros: solo completa configuraciones ausentes en los
+    bloques globales de partida/detencion y conserva la fecha RIO usada.
+    """
+    resultado = resumen.copy()
+    resultado['Config_RIO_Rescatada_Ventana'] = False
+    if activar != 1 or resultado.empty or rio_subset.empty:
+        return resultado
+
+    es_limite = ((resultado['FECHA_HORA'] == resultado['Inicio_Ciclo_Global'])
+                 | (resultado['FECHA_HORA'] == resultado['Termino_Ciclo_Global']))
+    pendientes = resultado.index[
+        es_limite & resultado['Configuracion RIO'].eq('Sin_Registro_RIO')]
+    if pendientes.empty:
+        return resultado
+
+    rio_valido = rio_subset.dropna(
+        subset=['FECHA_HORA_RIO', 'Central_Relacionada_RIO', 'NOMBRE CONFIGURACIÓN'])
+    por_central = {central: grupo for central, grupo in
+                   rio_valido.groupby('Central_Relacionada_RIO', sort=False)}
+    tolerancia = pd.Timedelta(minutes=ventana_cuartos_hora * 15)
+
+    for indice in pendientes:
+        fila = resultado.loc[indice]
+        candidatos = por_central.get(fila['Central_Relacionada'])
+        if candidatos is None:
+            continue
+        diferencias = (candidatos['FECHA_HORA_RIO'] - fila['FECHA_HORA']).abs()
+        dentro = diferencias <= tolerancia
+        if not dentro.any():
+            continue
+        mejor_indice = diferencias[dentro].idxmin()
+        mejor = candidatos.loc[mejor_indice]
+        resultado.at[indice, 'Configuracion RIO'] = mejor['NOMBRE CONFIGURACIÓN']
+        resultado.at[indice, 'Fuente_Config_RIO'] = mejor['FECHA_HORA_RIO']
+        resultado.at[indice, 'Config_RIO_Rescatada_Ventana'] = True
+
+    return resultado
+
+
 def main(rutas: dict, panel: dict | None = None):
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
@@ -818,6 +861,24 @@ def main(rutas: dict, panel: dict | None = None):
         resumen_relacionada[col] = resumen_relacionada[col].fillna('Sin_Registro_RIO')
     resumen_relacionada['COMENTARIO'] = resumen_relacionada['COMENTARIO'].fillna('')
 
+    # El cruce maestro solo mira hacia atras. En los limites de ciclo, rescata
+    # una configuracion registrada pocos minutos despues (o antes), sin alterar
+    # ni ese cruce general ni la busqueda relajada posterior de filtros RIO.
+    resumen_relacionada = rescatar_config_rio_en_limites(
+        resumen_relacionada, rio_subset, ACTIVAR_BUSQUEDA_RELAJADA,
+        VENTANA_CUARTOS_HORA)
+    rescatadas = resumen_relacionada['Config_RIO_Rescatada_Ventana']
+    n_rescatadas_partida = int((
+        rescatadas
+        & (resumen_relacionada['FECHA_HORA'] == resumen_relacionada['Inicio_Ciclo_Global'])
+    ).sum())
+    n_rescatadas_detencion = int((
+        rescatadas
+        & (resumen_relacionada['FECHA_HORA'] == resumen_relacionada['Termino_Ciclo_Global'])
+    ).sum())
+    print(f"  Configuracion RIO rescatada en ventana: {n_rescatadas_partida:,} bloques de partida, "
+          f"{n_rescatadas_detencion:,} bloques de detencion.")
+
 
     # ==========================================
     # 10.1 LLAVE DE TARIFA SEGUN CONFIGURACION INSTRUIDA POR RIO (v6)
@@ -1040,12 +1101,14 @@ def main(rutas: dict, panel: dict | None = None):
         Consigna_Partida=('CONSIGNAS', 'first'), Motivo_Partida=('MOTIVO', 'first'),
         Estado_Op_Partida=('ESTADO OPERACIONAL', 'first'),
         Fuente_Config_RIO_Partida=('Fuente_Config_RIO', 'first'),
+        Config_RIO_Rescatada_Ventana_Partida=('Config_RIO_Rescatada_Ventana', 'first'),
         Filtro_Conf_Detencion=('Conf despachada RIO', 'last'),
         Filtro_Disp_Detencion=('Disponible (1) / Pruebas (0)', 'last'),
         Filtro_Op_Detencion=('Filtro_Operacional', 'last'),
         Consigna_Detencion=('CONSIGNAS', 'last'), Motivo_Detencion=('MOTIVO', 'last'),
         Estado_Op_Detencion=('ESTADO OPERACIONAL', 'last'),
         Fuente_Config_RIO_Detencion=('Fuente_Config_RIO', 'last'),
+        Config_RIO_Rescatada_Ventana_Detencion=('Config_RIO_Rescatada_Ventana', 'last'),
         Estado_Ciclo_Mes=('Estado_Ciclo_Mes', 'first')
     )
 
@@ -1373,6 +1436,11 @@ def main(rutas: dict, panel: dict | None = None):
         print(f"  Divergencia fuente RIO {prefijo.lower()}: {int(diverge.sum()):,} ciclos, "
               f"{monto:,.0f} CLP efectivos.")
 
+        rescatada = df_compacto[f'Config_RIO_Rescatada_Ventana_{prefijo}']
+        monto_rescatado = df_compacto.loc[rescatada, f'Costo_{prefijo}_Efectivo'].sum()
+        print(f"  Configuracion RIO rescatada {prefijo.lower()}: {int(rescatada.sum()):,} ciclos, "
+              f"{monto_rescatado:,.0f} CLP efectivos.")
+
 
     # ==========================================
     # 14.2 RENUMERACION DE CICLOS PARA EL REPORTE  [BUG 5]
@@ -1590,6 +1658,7 @@ def main(rutas: dict, panel: dict | None = None):
         'Etiqueta_Relacionada', 'Central_Relacionada', 'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
         'Inicio_Ciclo', 'Termino_Ciclo', 'Horas_Detenida_Ciclo',
         'Generacion_Suma_Ciclo', 'Margen_Suma_Ciclo',
+        'Config_RIO_Rescatada_Ventana_Partida', 'Config_RIO_Rescatada_Ventana_Detencion',
         'Estado_Op_Partida', 'Consigna_Partida', 'Motivo_Partida', 'Costo_Partida_Efectivo', 'Obs_Partida',
         'Estado_Op_Detencion', 'Consigna_Detencion', 'Motivo_Detencion', 'Costo_Detencion_Efectivo', 'Obs_Detencion',
         'Costos_Totales_PD', 'Total SC_PD', 'Obs_Liquidacion_Final', 'Etiqueta_Original']
