@@ -26,6 +26,65 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Investigación de casos "Sin_Registro_RIO" y corrección sobre NUEVARENCA
+
+- **Tipo:** análisis ad-hoc con datos reales, a pedido del dueño del
+  proyecto, más una corrección a una conclusión propia anterior.
+- **Origen:** continuación de la revisión de la spec 15 — se pidió
+  investigar los 30 ciclos (25 partida + 5 detención) de junio 2026
+  marcados `Obs_Partida`/`Obs_Detencion = "Revisar manualmente: config
+  RIO sin tarifa"` con `Config_RIO_Usada = Sin_Registro_RIO`.
+- **Resultado de la categorización** (ver
+  `Analisis_Sin_Registro_RIO_202606.xlsx`, entregado al dueño del
+  proyecto, no versionado en el repo):
+  - **16 casos**: ciclo arranca exactamente el 01-jun 00:00:00 —
+    consistente con un ciclo que empezó en mayo, artefacto de que este
+    entorno de prueba no tiene `RUTA_REPORTE_MES_PASADO`/
+    `RUTA_RIO_MES_PASADO` cargados. No aplica a producción.
+  - **4 casos** ("cerca hacia adelante", ≤60min): `CHUYACA_DIESEL&1`
+    (registro real a 34 min de `Inicio_Ciclo`, confirmado con el RIO
+    crudo — el dueño del proyecto señaló correctamente que sí existía
+    RIO para esa central/fecha) y `UJINA-2/3/4&1` (38 min cada una,
+    mismo instante). Caso límite real: el registro correcto existe,
+    pero cae fuera de `±VENTANA_CUARTOS_HORA` (30 min) por poco.
+  - **8 casos** ("lejos en ambas direcciones", >60min):
+    `CONSTITUCION_DIESEL&9`, `CORONEL&1`, `EMELDA-1_DIESEL&1`,
+    `TRINCAO_DIESEL&16`, `TOCOPILLA-TG3&19` — sin nada cercano en el
+    RIO real, posible vacío genuino de reporte, sin patrón técnico
+    común identificado.
+  - **NEHUENCO-9B** (partida y detención): **cero registros RIO en
+    todo el mes**, confirmado revisando las 10 configuraciones
+    posibles que el diccionario le asocia (`_GN_A`, `_GNL_A` a `_G`,
+    `_GNL_INFLEX`, `_GN_B`) — ninguna aparece en `RIO_06_2026.xlsx`. No
+    es un problema de mapeo de nombres; es un vacío real de datos que
+    valdría la pena consultar directamente con el CEN/CDC.
+- **Corrección importante:** al investigar por qué
+  `NUEVARENCA_TG1+TV1&1` (el residual de detención de la spec 15)
+  nunca coincidía, encontramos que la caracterización original en la
+  spec 15 ("no existe ningún registro de la configuración exacta en la
+  ventana") **estaba mal**. Sí existe: `NUEVARENCA_TG1+TV1_GN_A` (la
+  config física correcta) tiene un registro `EP` a **36 minutos** de
+  `Termino_Ciclo` — apenas 6 minutos fuera de la ventana `±30min`. Es
+  el mismo patrón que `CHUYACA_DIESEL&1` y las 3 `UJINA` — no un
+  "vacío genuino" como se dijo. Corregido el texto de
+  `docs/specs/15-preferir-config-rio-fisica-en-ventana.md`.
+- **Conclusión con implicancia concreta:** 5 casos reales
+  (`CHUYACA_DIESEL&1`, `UJINA-2/3/4&1`, `NUEVARENCA_TG1+TV1&1`
+  detención) comparten el mismo patrón — el registro RIO correcto
+  existe, a 34-38 minutos del límite del ciclo, justo fuera de
+  `VENTANA_CUARTOS_HORA=2` (±30min). Ampliar a `VENTANA_CUARTOS_HORA=3`
+  (±45min) resolvería los 5 en una sola pasada. No se implementó nada
+  todavía — queda como candidato a spec futura, pendiente de que el
+  dueño del proyecto decida si quiere ese cambio (afecta el mismo
+  interruptor que usan `rescatar_config_rio_en_limites` y la búsqueda
+  relajada, así que ampliar el valor tiene alcance más amplio que solo
+  estos 5 casos — hay que evaluarlo con cuidado, no es un cambio
+  aislado).
+- **Pendientes:** ninguna acción de código todavía — el dueño del
+  proyecto pasa a hacer pruebas reales en su propio computador; queda
+  pendiente si en algún momento quiere una spec para ampliar la
+  ventana.
+
 ### 2026-09-09 — Claude — Revisión spec 15 con datos reales (PR #32): baja el Total SC_PD, no sube
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión,
