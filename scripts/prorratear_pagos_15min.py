@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""CLI para prorratear pagos SC P-D usando retiros de 15 minutos."""
+"""Prorratea pagos SC P-D usando retiros de 15 minutos."""
 
 from __future__ import annotations
 
-import argparse
 import sys
 from pathlib import Path
 
@@ -19,6 +18,13 @@ from src.prorrateo_15min import (  # noqa: E402
     construir_membresia_ciclos,
     prorratear_retiros,
 )
+
+
+# Variables editables para ejecución directa desde Spyder (F5).
+RUTA_EXCEL_MOTOR = r"Reporte_Sobrecostos_PD_Final.xlsx"
+RUTA_RETIROS = r"Retiros_y_prorrata_por_medidor.parquet"
+RUTA_SALIDA_EXCEL = r"Prorrateo_15Min.xlsx"
+RUTA_SALIDA_CSV = r"Prorrateo_15Min_Detalle.csv"
 
 
 def leer_retiros(ruta: Path) -> pd.DataFrame:
@@ -62,13 +68,10 @@ def ejecutar(ruta_motor: Path, ruta_retiros: Path, salida_excel: Path, salida_cs
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("excel_motor", type=Path, help="Excel generado por sc_pd_motor_v7.py")
-    parser.add_argument("retiros", type=Path, help="Retiros de 15 minutos (.csv o .parquet)")
-    parser.add_argument("--salida-excel", type=Path, default=Path("Prorrateo_15Min.xlsx"))
-    parser.add_argument("--salida-csv", type=Path, default=Path("Prorrateo_15Min_Detalle.csv"))
-    args = parser.parse_args()
-    ejecutar(args.excel_motor, args.retiros, args.salida_excel, args.salida_csv)
+    ejecutar(
+        Path(RUTA_EXCEL_MOTOR), Path(RUTA_RETIROS),
+        Path(RUTA_SALIDA_EXCEL), Path(RUTA_SALIDA_CSV),
+    )
 
 
 if __name__ == "__main__":
