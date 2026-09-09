@@ -25,6 +25,7 @@ def test_resumen_ciclo_exporta_insumos_base_y_rio(tmp_path):
         'Filtro_Operacional': 1, 'CONSIGNAS': 'SSCC', 'MOTIVO': 'Operacion',
         'ESTADO OPERACIONAL': 'PDO', 'Fuente_Config_RIO': tiempos[0],
         'Config_RIO_Rescatada_Ventana': False, 'Estado_Ciclo_Mes': 'Completo',
+        'Config_RIO_Corregida_Mezcla': False,
         'Tipo_Partida_RIO': 'Tibia_2', 'Fria_Num1_M_RIO': 22,
         'Tibia_Num2_N_RIO': 9, 'Caliente_Num1_P_RIO': 3,
         'Partida_Fria_RIO': 110, 'Partida_Tibia_RIO': 90,
@@ -77,6 +78,7 @@ def test_compactacion_sin_tarifa_rio_no_exige_columnas_rio():
             'Filtro_CostoCero_Partida', 'Filtro_CostoCero_Detencion', 'Conf despachada RIO',
             'Disponible (1) / Pruebas (0)', 'Filtro_Operacional', 'CONSIGNAS', 'MOTIVO',
             'ESTADO OPERACIONAL', 'Fuente_Config_RIO', 'Config_RIO_Rescatada_Ventana',
+            'Config_RIO_Corregida_Mezcla',
             'Estado_Ciclo_Mes',
         }
     }
