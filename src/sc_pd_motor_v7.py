@@ -217,6 +217,90 @@ AUDITAR_LIMITES_CICLOS       = 1
 AUDITAR_ENERGIA_INTER_CICLOS = 1
 
 
+def validar_meses_reporte(df, etiqueta, fecha_hora_original=None):
+    """Aborta si un reporte nominalmente mensual se dispersa en varios meses."""
+    meses = df['FECHA_HORA'].dt.to_period('M')
+    conteos = meses.value_counts().sort_index()
+    if len(conteos) <= 2:
+        return
+
+    originales = (fecha_hora_original.reindex(df.index) if fecha_hora_original is not None
+                  else df['FECHA_HORA'].astype(str))
+    mes_principal = conteos.idxmax()
+    indices_problematicos = df.index[meses != mes_principal][:12]
+    muestra = pd.DataFrame({
+        'FECHA_HORA_original': originales.loc[indices_problematicos],
+        'FECHA_HORA_parseada': df.loc[indices_problematicos, 'FECHA_HORA'],
+    })
+
+    print("\n" + "!" * 78)
+    print(f"  ALERTA CRITICA: {etiqueta} contiene {len(conteos)} meses-calendario")
+    print("  Filas por mes:")
+    for mes, cantidad in conteos.items():
+        print(f"    {mes}: {cantidad:,} filas")
+    print("  Muestra de filas fuera del mes principal "
+          f"({mes_principal}; original -> parseada):")
+    print(muestra.to_string(index=False))
+    print("!" * 78)
+    sys.exit(
+        f"ERROR: {etiqueta} contiene fechas en {len(conteos)} meses-calendario; "
+        "revisa el formato de FECHA_HORA."
+    )
+
+
+def leer_reporte(ruta, etiqueta):
+    """Carga un CSV de 15 minutos y normaliza FECHA_HORA como mes-primero."""
+    df = pd.read_csv(ruta, sep=",", low_memory=False)
+    fecha_hora_original = df['FECHA_HORA'].astype(str).str.strip()
+    df['FECHA_HORA'] = pd.to_datetime(
+        fecha_hora_original, format='mixed', dayfirst=False, errors='coerce'
+    )
+    nulas = df['FECHA_HORA'].isna().sum()
+    if nulas:
+        print(f"  [!] {etiqueta}: {nulas:,} filas con FECHA_HORA ilegible fueron descartadas.")
+        df = df.dropna(subset=['FECHA_HORA'])
+    validar_meses_reporte(df, etiqueta, fecha_hora_original)
+    return df
+
+
+def rescatar_config_rio_ventana(resumen, rio_subset, activar, ventana_cuartos_hora):
+    """Rescata la configuracion RIO mas cercana solo en fronteras de ciclo."""
+    resultado = resumen.copy()
+    resultado['Config_RIO_Rescatada_Ventana'] = False
+    if activar != 1 or resultado.empty or rio_subset.empty:
+        return resultado
+
+    es_frontera = ((resultado['FECHA_HORA'] == resultado['Inicio_Ciclo_Global'])
+                   | (resultado['FECHA_HORA'] == resultado['Termino_Ciclo_Global']))
+    sin_config = resultado['Configuracion RIO'].eq('Sin_Registro_RIO')
+    indices_pendientes = resultado.index[es_frontera & sin_config]
+    if indices_pendientes.empty:
+        return resultado
+
+    pendientes = (resultado.loc[indices_pendientes, ['FECHA_HORA', 'Central_Relacionada']]
+                  .assign(_indice_original=indices_pendientes)
+                  .sort_values('FECHA_HORA'))
+    candidatos = (rio_subset[['FECHA_HORA_RIO', 'Central_Relacionada_RIO',
+                              'NOMBRE CONFIGURACIÓN']]
+                  .dropna(subset=['FECHA_HORA_RIO', 'Central_Relacionada_RIO'])
+                  .rename(columns={'Central_Relacionada_RIO': 'Central_Relacionada'})
+                  .sort_values('FECHA_HORA_RIO'))
+    encontrados = pd.merge_asof(
+        pendientes, candidatos,
+        left_on='FECHA_HORA', right_on='FECHA_HORA_RIO', by='Central_Relacionada',
+        direction='nearest',
+        tolerance=pd.Timedelta(minutes=ventana_cuartos_hora * MINUTOS_BLOQUE))
+    encontrados = encontrados.dropna(subset=['FECHA_HORA_RIO', 'NOMBRE CONFIGURACIÓN'])
+    if encontrados.empty:
+        return resultado
+
+    indices = encontrados['_indice_original'].astype(int)
+    resultado.loc[indices, 'Configuracion RIO'] = encontrados['NOMBRE CONFIGURACIÓN'].to_numpy()
+    resultado.loc[indices, 'Fuente_Config_RIO'] = encontrados['FECHA_HORA_RIO'].to_numpy()
+    resultado.loc[indices, 'Config_RIO_Rescatada_Ventana'] = True
+    return resultado
+
+
 def main(rutas: dict, panel: dict | None = None):
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
@@ -257,19 +341,6 @@ def main(rutas: dict, panel: dict | None = None):
         for r in _audit_log:
             print(f"  {r['paso']:<40} {r['filas']:>8,}  {r['gen_MWh']:>14,.2f}  {r['delta_gen']:>+14,.2f}  {r['pct_perdida']:>8.2f}%")
         print("=" * 78)
-
-
-    def leer_reporte(ruta, etiqueta):
-        """Carga un CSV de 15 minutos y normaliza FECHA_HORA."""
-        df = pd.read_csv(ruta, sep=",", low_memory=False)
-        df['FECHA_HORA'] = pd.to_datetime(
-            df['FECHA_HORA'].astype(str).str.strip(), format='mixed', dayfirst=True, errors='coerce'
-        )
-        nulas = df['FECHA_HORA'].isna().sum()
-        if nulas:
-            print(f"  [!] {etiqueta}: {nulas:,} filas con FECHA_HORA ilegible fueron descartadas.")
-            df = df.dropna(subset=['FECHA_HORA'])
-        return df
 
 
     # ==========================================
@@ -785,6 +856,13 @@ def main(rutas: dict, panel: dict | None = None):
         resumen_relacionada[col] = resumen_relacionada[col].fillna('Sin_Registro_RIO')
     resumen_relacionada['COMENTARIO'] = resumen_relacionada['COMENTARIO'].fillna('')
 
+    # El cruce maestro mira hacia atras a proposito. Solo para los bloques que
+    # fijan el precio se permite rescatar una configuracion registrada pocos
+    # minutos despues (o antes), usando la misma ventana del mecanismo relajado.
+    resumen_relacionada = rescatar_config_rio_ventana(
+        resumen_relacionada, rio_subset, ACTIVAR_BUSQUEDA_RELAJADA,
+        VENTANA_CUARTOS_HORA)
+
 
     # ==========================================
     # 10.1 LLAVE DE TARIFA SEGUN CONFIGURACION INSTRUIDA POR RIO (v6)
@@ -1007,12 +1085,14 @@ def main(rutas: dict, panel: dict | None = None):
         Consigna_Partida=('CONSIGNAS', 'first'), Motivo_Partida=('MOTIVO', 'first'),
         Estado_Op_Partida=('ESTADO OPERACIONAL', 'first'),
         Fuente_Config_RIO_Partida=('Fuente_Config_RIO', 'first'),
+        Config_RIO_Rescatada_Ventana_Partida=('Config_RIO_Rescatada_Ventana', 'first'),
         Filtro_Conf_Detencion=('Conf despachada RIO', 'last'),
         Filtro_Disp_Detencion=('Disponible (1) / Pruebas (0)', 'last'),
         Filtro_Op_Detencion=('Filtro_Operacional', 'last'),
         Consigna_Detencion=('CONSIGNAS', 'last'), Motivo_Detencion=('MOTIVO', 'last'),
         Estado_Op_Detencion=('ESTADO OPERACIONAL', 'last'),
         Fuente_Config_RIO_Detencion=('Fuente_Config_RIO', 'last'),
+        Config_RIO_Rescatada_Ventana_Detencion=('Config_RIO_Rescatada_Ventana', 'last'),
         Estado_Ciclo_Mes=('Estado_Ciclo_Mes', 'first')
     )
 
@@ -1333,6 +1413,12 @@ def main(rutas: dict, panel: dict | None = None):
     df_compacto['Costos_Totales_PD'] = df_compacto['Costo_Partida_Efectivo'] + df_compacto['Costo_Detencion_Efectivo']
     df_compacto['Total SC_PD'] = np.maximum(0, df_compacto['Costos_Totales_PD'] - df_compacto['Margen_Suma_Ciclo'])
 
+    for prefijo in ['Partida', 'Detencion']:
+        rescatada = df_compacto[f'Config_RIO_Rescatada_Ventana_{prefijo}'].astype(bool)
+        monto = df_compacto.loc[rescatada, f'Costo_{prefijo}_Efectivo'].sum()
+        print(f"  Config RIO rescatada en ventana ({prefijo.lower()}): "
+              f"{int(rescatada.sum()):,} bloques, {monto:,.0f} CLP efectivos.")
+
 
     for prefijo in ['Partida', 'Detencion']:
         diverge = df_compacto[f'Diverge_Fuente_RIO_{prefijo}']
@@ -1565,7 +1651,9 @@ def main(rutas: dict, panel: dict | None = None):
                             'Central_Detencion', 'Central_Detencion_Original']
     if USAR_TARIFA_RIO_INSTRUIDA == 1:
         columnas_finales += ['Config_RIO_Usada_Partida', 'Config_RIO_Usada_Detencion',
-                            'Costo_Partida_Base_Original', 'Costo_Detencion_Base_Original']
+                            'Costo_Partida_Base_Original', 'Costo_Detencion_Base_Original',
+                            'Config_RIO_Rescatada_Ventana_Partida',
+                            'Config_RIO_Rescatada_Ventana_Detencion']
     df_compacto = df_compacto[columnas_finales]
 
 
