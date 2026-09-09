@@ -26,6 +26,63 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión de specs 04-06 (PR #8)
+
+- **Tipo:** prueba y revisión.
+- **Origen:** cambios de Codex en `60c1f63` (PR #8,
+  `codex/revisar-y-aplicar-especificaciones-en-orden`), revisados contra
+  `docs/specs/04-costo-cero-por-fecha.md`,
+  `docs/specs/05-script-consolidacion-tibia2.md` y
+  `docs/specs/06-motor-cuarto-tramo-tibia2.md`.
+- **Cambios verificados (con prueba propia, no solo lectura de código):**
+  1. **`scripts/consolidar_politicas.py`**: coincide con la spec 05. Lo
+     corrí contra el archivo PO real (`PO260609_20.xlsx`): `GUACOLDA-3_CAR`
+     produce `Partida_Tibia_2 = 31.963,694` (valor correcto), y la
+     auditoría de consistencia nueva detectó automáticamente el caso
+     `GUACOLDA-5_CAR` (precio de Tibia 2 sin rango de horas informado) tal
+     como se esperaba.
+  2. **`Costo_Cero` por fecha**: el pre-filtro temprano ahora usa "¿alguna
+     vez `NO`?" (vectorizado, sin loop) en vez de "última fila", y el
+     `Costo_Cero` real se resuelve por `Llave_FHC_Inicio`/`Llave_FHC_Fin`,
+     igual que las tarifas. Reproduce correctamente el caso
+     `CHUYACA_DIESEL` en el test nuevo. Observación distinguible
+     (`"Exento: Costo_Cero=SI en la fecha de partida"`) agregada en
+     `Obs_Partida`/`Obs_Detencion`.
+  3. **4 tramos de partida**: implementado con una función compartida
+     `clasificar_partida()` reutilizada por la rama clásica y la rama
+     `_RIO` (mejor que la duplicación que pedía la spec). Confirmado con
+     el caso real `GUACOLDA-3_CAR` (100h → Tibia_2 a 31.963,694; 50h →
+     Tibia a 30.838,528; 200h → Fría; 10h → Caliente) y con la regresión
+     obligatoria: unidades sin `Tibia_Num2_N` (la mayoría) dan resultado
+     idéntico al de antes de esta spec.
+  - `pytest -q -m ""`: 11/11 OK (incluye el test de rendimiento). Ningún
+    interruptor de negocio fue tocado.
+- **Nota de proceso:** esta implementación no agregó su propia entrada a
+  esta bitácora — la agrego yo para no perder la trazabilidad del cambio.
+- **Pendientes:** validar con datos operacionales reales de un mes
+  completo cuando estén disponibles. Sigue abierto confirmar si el patrón
+  "Tibia 2" existe en otras centrales/meses más allá de las `GUACOLDA`
+  encontradas hasta ahora (no bloquea nada, es solo cobertura de muestra).
+
+### 2026-09-09 — Codex (OpenAI) — Costo_Cero por fecha y tramo "Tibia 2"
+
+- **Tipo:** implementación, refactor y pruebas.
+- **Origen:** `docs/specs/04-costo-cero-por-fecha.md`,
+  `docs/specs/05-script-consolidacion-tibia2.md`,
+  `docs/specs/06-motor-cuarto-tramo-tibia2.md`.
+- **Cambios:** agregado `scripts/consolidar_politicas.py` (con captura de
+  `Partida_Tibia_2`/`Tiempo_Partida_Tibia_2` y auditoría de consistencia
+  contra `Tibia_Num2_N`/`Fria_Num1_M`); `Costo_Cero` resuelto por fecha vía
+  `Llave_FHC` en vez de un valor único por central; clasificación de
+  partida extendida a 4 tramos (`clasificar_partida()` en
+  `fase1_integridad.py`, reutilizada por la rama clásica y la rama RIO
+  instruida); `[BUG 9]` documentado en el encabezado del motor.
+- **Validación declarada:** `pytest -q` en verde.
+- **Commit:** `60c1f63` (`Implementar costo cero por fecha y tramo Tibia 2`).
+- **Nota:** entrada reconstruida por Claude en la revisión posterior — esta
+  implementación no dejó su propia entrada en la bitácora (ver entrada de
+  arriba).
+
 ### 2026-09-08 — Claude — `CODIGOS_EO_VALIDOS` confirmado, cierra pendiente de negocio
 
 - **Tipo:** decisión (documentación, sin cambio de comportamiento).
