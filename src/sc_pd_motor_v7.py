@@ -71,6 +71,10 @@ Correcciones acumuladas:
           cero exacto. Un grupo con consumo auxiliar que cancelaba su
           generacion podia desaparecer aunque contuviera bloques activos.
           -> La seccion 2 evalua (s.fillna(0) != 0).any() bloque a bloque.
+  [BUG 9] La consolidacion no leia "Partida Tibia 2" y el motor clasificaba
+          solo tres tramos, subcobrando detenciones entre Tibia_Num2_N y
+          Fria_Num1_M. Ahora el consolidado y ambas ramas tarifarias usan los
+          cuatro tramos confirmados.
   [v6]    Cambio de diseno, no un bug: hasta v5, si la configuracion propia
           (la que genero, o la dominante) no calzaba con lo que el RIO
           reportaba como despachado, el costo de partida/detencion se
@@ -102,9 +106,9 @@ import sys
 import pandas as pd
 import numpy as np
 
-from fase1_integridad import (calcular_ciclos, costos_clasicos,
+from fase1_integridad import (calcular_ciclos, clasificar_partida, costos_clasicos,
                               deduplicar_rio_priorizando_motivo,
-                              empalmar_reportes, marcar_sin_tarifa_rio)
+                              empalmar_reportes, filtro_costo_cero, marcar_sin_tarifa_rio)
 
 # ==========================================
 # 0. PANEL DE CONTROL Y RUTAS DE ARCHIVOS
@@ -366,7 +370,8 @@ def main(rutas: dict, panel: dict | None = None):
         df_externo = df_externo_act.copy()
 
     cols_costos = ['Llave_Concatenada', 'Fria_Num1_M', 'Tibia_Num1_O', 'Tibia_Num2_N',
-                   'Caliente_Num1_P', 'Partida_Fria', 'Partida_Tibia', 'Partida_Caliente', 'Detencion']
+                   'Caliente_Num1_P', 'Partida_Fria', 'Partida_Tibia', 'Partida_Tibia_2',
+                   'Partida_Caliente', 'Detencion', 'Costo_Cero']
     faltan = [c for c in cols_costos if c not in df_externo.columns]
     if faltan:
         sys.exit(f"ERROR: faltan columnas en {RUTA_COSTOS_PD}: {faltan}")
@@ -374,11 +379,12 @@ def main(rutas: dict, panel: dict | None = None):
     df_costos_pd = df_externo[cols_costos].drop_duplicates(subset=['Llave_Concatenada'], keep='last')
 
     # --- Filtro Costo_Cero ---
-    diccionario_busqueda = df_externo.drop_duplicates(subset=['UNIDAD'], keep='last') \
-                                     .set_index('UNIDAD')['Costo_Cero'].to_dict()
-    resultado_buscarx = reporte_sin_ceros['Central'].map(diccionario_busqueda)
+    tiene_costo = (df_externo['Costo_Cero'].astype(str).str.strip().str.upper().eq('NO')
+                   .groupby(df_externo['UNIDAD']).transform('any'))
+    unidades_facturables = set(df_externo.loc[tiene_costo, 'UNIDAD'])
+    resultado_buscarx = reporte_sin_ceros['Central'].isin(unidades_facturables)
     mask_no_cogen = ~reporte_sin_ceros['Central'].astype(str).str.contains('COGEN', case=False, na=False)
-    reporte_sin_ceros['Costo_Final'] = np.where(mask_no_cogen, resultado_buscarx.fillna('No_Aplica'), 'No_Aplica')
+    reporte_sin_ceros['Costo_Final'] = np.where(mask_no_cogen & resultado_buscarx, 'NO', 'No_Aplica')
 
     filtro_seguro = reporte_sin_ceros['Costo_Final'].astype(str).str.strip().str.upper()
     reporte_sin_ceros = reporte_sin_ceros[filtro_seguro == 'NO'].copy()
@@ -918,28 +924,20 @@ def main(rutas: dict, panel: dict | None = None):
         df_costos_pd, left_on='Llave_FHC_Inicio', right_on='Llave_Concatenada', how='left'
     ).drop(columns=['Llave_Concatenada'])
 
-    resumen_relacionada['Tipo_Partida'] = np.select(
-        [resumen_relacionada['Horas_Detenida_Ciclo'].isna(),
-         resumen_relacionada['Horas_Detenida_Ciclo'] > resumen_relacionada['Fria_Num1_M'],
-         resumen_relacionada['Horas_Detenida_Ciclo'] < resumen_relacionada['Caliente_Num1_P']],
-        ['No_Aplica', 'Fria', 'Caliente'], default='Tibia')
-
-    resumen_relacionada['Costo_Partida'] = pd.to_numeric(pd.Series(np.select(
-        [resumen_relacionada['Tipo_Partida'] == 'Fria',
-         resumen_relacionada['Tipo_Partida'] == 'Caliente',
-         resumen_relacionada['Tipo_Partida'] == 'Tibia'],
-        [resumen_relacionada['Partida_Fria'],
-         resumen_relacionada['Partida_Caliente'],
-         resumen_relacionada['Partida_Tibia']], default=0
-    ), index=resumen_relacionada.index), errors='coerce').fillna(0)
+    resumen_relacionada = clasificar_partida(resumen_relacionada)
+    resumen_relacionada['Filtro_CostoCero_Partida'] = filtro_costo_cero(
+        resumen_relacionada['Costo_Cero'], resumen_relacionada['Central'])
 
     # --- Tarifas de detencion ---
     resumen_relacionada = resumen_relacionada.merge(
-        df_costos_pd[['Llave_Concatenada', 'Detencion']].rename(columns={'Detencion': 'Costo_Detencion'}),
+        df_costos_pd[['Llave_Concatenada', 'Detencion', 'Costo_Cero']].rename(
+            columns={'Detencion': 'Costo_Detencion', 'Costo_Cero': 'Costo_Cero_Detencion'}),
         left_on='Llave_FHC_Fin', right_on='Llave_Concatenada', how='left'
     ).drop(columns=['Llave_Concatenada'])
     resumen_relacionada['Costo_Detencion'] = pd.to_numeric(
         resumen_relacionada['Costo_Detencion'], errors='coerce').fillna(0)
+    resumen_relacionada['Filtro_CostoCero_Detencion'] = filtro_costo_cero(
+        resumen_relacionada['Costo_Cero_Detencion'], resumen_relacionada['Central'])
 
     # --- Paso a moneda local ---
     maestro_dolar = (reporte[['FECHA_HORA', 'Dolar']].dropna(subset=['Dolar'])
@@ -956,9 +954,12 @@ def main(rutas: dict, panel: dict | None = None):
     # En paralelo a la tarifa segun Central propia de arriba. Columnas con
     # sufijo _RIO para no chocar con las que ya existen.
     if USAR_TARIFA_RIO_INSTRUIDA == 1:
-        cols_tarifa_rio = {'Fria_Num1_M': 'Fria_Num1_M_RIO', 'Caliente_Num1_P': 'Caliente_Num1_P_RIO',
+        cols_tarifa_rio = {'Fria_Num1_M': 'Fria_Num1_M_RIO', 'Tibia_Num2_N': 'Tibia_Num2_N_RIO',
+                           'Caliente_Num1_P': 'Caliente_Num1_P_RIO',
                            'Partida_Fria': 'Partida_Fria_RIO', 'Partida_Tibia': 'Partida_Tibia_RIO',
-                           'Partida_Caliente': 'Partida_Caliente_RIO', 'Detencion': 'Detencion_RIO'}
+                           'Partida_Tibia_2': 'Partida_Tibia_2_RIO',
+                           'Partida_Caliente': 'Partida_Caliente_RIO', 'Detencion': 'Detencion_RIO',
+                           'Costo_Cero': 'Costo_Cero_RIO'}
         tabla_rio = df_costos_pd[['Llave_Concatenada'] + list(cols_tarifa_rio.keys())].rename(columns=cols_tarifa_rio)
 
         resumen_relacionada = resumen_relacionada.merge(
@@ -971,19 +972,9 @@ def main(rutas: dict, panel: dict | None = None):
         # caso que se marca para revision manual, no se paga automatico.
         resumen_relacionada['Config_RIO_Sin_Tarifa'] = resumen_relacionada['Fria_Num1_M_RIO'].isna()
 
-        resumen_relacionada['Tipo_Partida_RIO'] = np.select(
-            [resumen_relacionada['Horas_Detenida_Ciclo'].isna() | resumen_relacionada['Config_RIO_Sin_Tarifa'],
-             resumen_relacionada['Horas_Detenida_Ciclo'] > resumen_relacionada['Fria_Num1_M_RIO'],
-             resumen_relacionada['Horas_Detenida_Ciclo'] < resumen_relacionada['Caliente_Num1_P_RIO']],
-            ['No_Aplica', 'Fria', 'Caliente'], default='Tibia')
-
-        resumen_relacionada['Costo_Partida_RIO'] = pd.to_numeric(pd.Series(np.select(
-            [resumen_relacionada['Tipo_Partida_RIO'] == 'Fria',
-             resumen_relacionada['Tipo_Partida_RIO'] == 'Caliente',
-             resumen_relacionada['Tipo_Partida_RIO'] == 'Tibia'],
-            [resumen_relacionada['Partida_Fria_RIO'], resumen_relacionada['Partida_Caliente_RIO'],
-             resumen_relacionada['Partida_Tibia_RIO']], default=0
-        ), index=resumen_relacionada.index), errors='coerce').fillna(0)
+        resumen_relacionada = clasificar_partida(resumen_relacionada, '_RIO')
+        resumen_relacionada['Filtro_CostoCero_RIO'] = filtro_costo_cero(
+            resumen_relacionada['Costo_Cero_RIO'], resumen_relacionada['Configuracion RIO'])
 
         resumen_relacionada['Costo_Detencion_RIO'] = pd.to_numeric(
             resumen_relacionada['Detencion_RIO'], errors='coerce').fillna(0)
@@ -1008,6 +999,8 @@ def main(rutas: dict, panel: dict | None = None):
         Flag_Exencion=('Flag_Exencion', 'first'),
         Central_Partida=('Central', 'first'), Central_Detencion=('Central', 'last'),
         Costo_Partida_Base=('Costo_Partida_ML', 'first'), Costo_Detencion_Base=('Costo_Detencion_ML', 'last'),
+        Filtro_CostoCero_Partida=('Filtro_CostoCero_Partida', 'first'),
+        Filtro_CostoCero_Detencion=('Filtro_CostoCero_Detencion', 'last'),
         Filtro_Conf_Partida=('Conf despachada RIO', 'first'),
         Filtro_Disp_Partida=('Disponible (1) / Pruebas (0)', 'first'),
         Filtro_Op_Partida=('Filtro_Operacional', 'first'),
@@ -1114,19 +1107,19 @@ def main(rutas: dict, panel: dict | None = None):
         cierre['Filtro_Conf_Bloque'] = cierre['Filtro_Conf_Bloque'].fillna(cierre['Conf despachada RIO'])
 
         apertura_sel = apertura[['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Central',
-                                 'Costo_Partida_ML', 'Filtro_Conf_Bloque',
+                                 'Costo_Partida_ML', 'Filtro_CostoCero_Partida', 'Filtro_Conf_Bloque',
                                  'Disponible (1) / Pruebas (0)', 'Filtro_Operacional',
                                  'CONSIGNAS', 'MOTIVO', 'ESTADO OPERACIONAL']].copy()
         apertura_sel.columns = ['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Central_Partida',
-                                'Costo_Partida_Base', 'Filtro_Conf_Partida', 'Filtro_Disp_Partida',
+                                'Costo_Partida_Base', 'Filtro_CostoCero_Partida', 'Filtro_Conf_Partida', 'Filtro_Disp_Partida',
                                 'Filtro_Op_Partida', 'Consigna_Partida', 'Motivo_Partida', 'Estado_Op_Partida']
 
         cierre_sel = cierre[['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Central',
-                             'Costo_Detencion_ML', 'Filtro_Conf_Bloque',
+                             'Costo_Detencion_ML', 'Filtro_CostoCero_Detencion', 'Filtro_Conf_Bloque',
                              'Disponible (1) / Pruebas (0)', 'Filtro_Operacional',
                              'CONSIGNAS', 'MOTIVO', 'ESTADO OPERACIONAL']].copy()
         cierre_sel.columns = ['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Central_Detencion',
-                              'Costo_Detencion_Base', 'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion',
+                              'Costo_Detencion_Base', 'Filtro_CostoCero_Detencion', 'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion',
                               'Filtro_Op_Detencion', 'Consigna_Detencion', 'Motivo_Detencion', 'Estado_Op_Detencion']
 
         # Se conserva el valor original para trazabilidad y para el resumen de auditoria.
@@ -1198,18 +1191,20 @@ def main(rutas: dict, panel: dict | None = None):
             resumen_relacionada['FECHA_HORA'] == resumen_relacionada['Inicio_Ciclo_Global']]
         apertura_rio = apertura_rio.drop_duplicates(subset=['Central_Relacionada', 'Ciclo_ID_Relacionada'])
         apertura_rio = apertura_rio[['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Configuracion RIO',
-                                     'Costo_Partida_RIO_ML', 'Config_RIO_Sin_Tarifa']].rename(columns={
+                                     'Costo_Partida_RIO_ML', 'Filtro_CostoCero_RIO', 'Config_RIO_Sin_Tarifa']].rename(columns={
             'Configuracion RIO': 'Config_RIO_Usada_Partida',
             'Costo_Partida_RIO_ML': 'Costo_Partida_Base_Nuevo',
+            'Filtro_CostoCero_RIO': 'Filtro_CostoCero_Partida_Nuevo',
             'Config_RIO_Sin_Tarifa': 'Config_RIO_Sin_Tarifa_Partida'})
 
         cierre_rio = resumen_relacionada[
             resumen_relacionada['FECHA_HORA'] == resumen_relacionada['Termino_Ciclo_Global']]
         cierre_rio = cierre_rio.drop_duplicates(subset=['Central_Relacionada', 'Ciclo_ID_Relacionada'])
         cierre_rio = cierre_rio[['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Configuracion RIO',
-                                 'Costo_Detencion_RIO_ML', 'Config_RIO_Sin_Tarifa']].rename(columns={
+                                 'Costo_Detencion_RIO_ML', 'Filtro_CostoCero_RIO', 'Config_RIO_Sin_Tarifa']].rename(columns={
             'Configuracion RIO': 'Config_RIO_Usada_Detencion',
             'Costo_Detencion_RIO_ML': 'Costo_Detencion_Base_Nuevo',
+            'Filtro_CostoCero_RIO': 'Filtro_CostoCero_Detencion_Nuevo',
             'Config_RIO_Sin_Tarifa': 'Config_RIO_Sin_Tarifa_Detencion'})
 
         df_compacto['Costo_Partida_Base_Original'] = df_compacto['Costo_Partida_Base']
@@ -1220,7 +1215,11 @@ def main(rutas: dict, panel: dict | None = None):
 
         df_compacto['Costo_Partida_Base'] = df_compacto['Costo_Partida_Base_Nuevo']
         df_compacto['Costo_Detencion_Base'] = df_compacto['Costo_Detencion_Base_Nuevo']
-        df_compacto = df_compacto.drop(columns=['Costo_Partida_Base_Nuevo', 'Costo_Detencion_Base_Nuevo'])
+        df_compacto['Filtro_CostoCero_Partida'] = df_compacto['Filtro_CostoCero_Partida_Nuevo']
+        df_compacto['Filtro_CostoCero_Detencion'] = df_compacto['Filtro_CostoCero_Detencion_Nuevo']
+        df_compacto = df_compacto.drop(columns=['Costo_Partida_Base_Nuevo', 'Costo_Detencion_Base_Nuevo',
+                                                'Filtro_CostoCero_Partida_Nuevo',
+                                                'Filtro_CostoCero_Detencion_Nuevo'])
 
         # El filtro de configuracion deja de existir bajo este mecanismo.
         df_compacto['Filtro_Conf_Partida'] = 1
