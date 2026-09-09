@@ -306,6 +306,136 @@ def rescatar_config_rio_en_limites(resumen, rio_subset, activar, ventana_cuartos
     return resultado
 
 
+def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida):
+    """Resume los bloques por ciclo sin perder los insumos de su liquidacion."""
+    agregaciones = {
+        'Inicio_Ciclo': ('FECHA_HORA', 'min'),
+        'Termino_Ciclo': ('FECHA_HORA', 'max'),
+        'Generacion_Suma_Ciclo': ('GENERACION', 'sum'),
+        'Margen_Suma_Ciclo': ('Margen', 'sum'),
+        'Horas_Detenida_Ciclo': ('Horas_Detenida_Ciclo', 'first'),
+        'Flag_Exencion': ('Flag_Exencion', 'first'),
+        'Central_Partida': ('Central', 'first'),
+        'Central_Detencion': ('Central', 'last'),
+        'Tipo_Partida': ('Tipo_Partida', 'first'),
+        'Fria_Num1_M': ('Fria_Num1_M', 'first'),
+        'Tibia_Num1_O': ('Tibia_Num1_O', 'first'),
+        'Tibia_Num2_N': ('Tibia_Num2_N', 'first'),
+        'Caliente_Num1_P': ('Caliente_Num1_P', 'first'),
+        'Partida_Fria': ('Partida_Fria', 'first'),
+        'Partida_Tibia': ('Partida_Tibia', 'first'),
+        'Partida_Tibia_2': ('Partida_Tibia_2', 'first'),
+        'Partida_Caliente': ('Partida_Caliente', 'first'),
+        'Detencion_Tarifa': ('Detencion', 'last'),
+        'Costo_Partida_Base': ('Costo_Partida_ML', 'first'),
+        'Costo_Detencion_Base': ('Costo_Detencion_ML', 'last'),
+        'Filtro_CostoCero_Partida': ('Filtro_CostoCero_Partida', 'first'),
+        'Filtro_CostoCero_Detencion': ('Filtro_CostoCero_Detencion', 'last'),
+        'Filtro_Conf_Partida': ('Conf despachada RIO', 'first'),
+        'Filtro_Disp_Partida': ('Disponible (1) / Pruebas (0)', 'first'),
+        'Filtro_Op_Partida': ('Filtro_Operacional', 'first'),
+        'Consigna_Partida': ('CONSIGNAS', 'first'),
+        'Motivo_Partida': ('MOTIVO', 'first'),
+        'Estado_Op_Partida': ('ESTADO OPERACIONAL', 'first'),
+        'Fuente_Config_RIO_Partida': ('Fuente_Config_RIO', 'first'),
+        'Config_RIO_Rescatada_Ventana_Partida': ('Config_RIO_Rescatada_Ventana', 'first'),
+        'Filtro_Conf_Detencion': ('Conf despachada RIO', 'last'),
+        'Filtro_Disp_Detencion': ('Disponible (1) / Pruebas (0)', 'last'),
+        'Filtro_Op_Detencion': ('Filtro_Operacional', 'last'),
+        'Consigna_Detencion': ('CONSIGNAS', 'last'),
+        'Motivo_Detencion': ('MOTIVO', 'last'),
+        'Estado_Op_Detencion': ('ESTADO OPERACIONAL', 'last'),
+        'Fuente_Config_RIO_Detencion': ('Fuente_Config_RIO', 'last'),
+        'Config_RIO_Rescatada_Ventana_Detencion': ('Config_RIO_Rescatada_Ventana', 'last'),
+        'Estado_Ciclo_Mes': ('Estado_Ciclo_Mes', 'first'),
+    }
+    if usar_tarifa_rio_instruida == 1:
+        agregaciones.update({
+            'Tipo_Partida_RIO': ('Tipo_Partida_RIO', 'first'),
+            'Fria_Num1_M_RIO': ('Fria_Num1_M_RIO', 'first'),
+            'Tibia_Num2_N_RIO': ('Tibia_Num2_N_RIO', 'first'),
+            'Caliente_Num1_P_RIO': ('Caliente_Num1_P_RIO', 'first'),
+            'Partida_Fria_RIO': ('Partida_Fria_RIO', 'first'),
+            'Partida_Tibia_RIO': ('Partida_Tibia_RIO', 'first'),
+            'Partida_Tibia_2_RIO': ('Partida_Tibia_2_RIO', 'first'),
+            'Partida_Caliente_RIO': ('Partida_Caliente_RIO', 'first'),
+            'Detencion_Tarifa_RIO': ('Detencion_RIO', 'last'),
+        })
+    return resumen_relacionada.groupby(
+        ['Etiqueta_Relacionada', 'Central_Relacionada', 'Ciclo_ID_Relacionada'],
+        as_index=False,
+    ).agg(**agregaciones)
+
+
+def crear_guia_lectura():
+    """Construye el glosario y las formulas que permiten auditar cada ciclo."""
+    filas = [
+        ('Tipo_Partida', 'Tramo de partida determinado con las horas detenidas y los umbrales base.'),
+        ('Filtros de Partida', 'Filtro_Conf_Partida, Filtro_Disp_Partida, Filtro_Op_Partida y Filtro_CostoCero_Partida: 1 acepta y 0 rechaza el costo.'),
+        ('Costo_Partida_Base', 'Costo de partida en moneda local antes de aplicar los filtros.'),
+        ('Umbrales base', 'Fria_Num1_M, Tibia_Num1_O, Tibia_Num2_N y Caliente_Num1_P delimitan los tramos por horas detenidas.'),
+        ('Tarifas de partida base', 'Partida_Fria, Partida_Tibia, Partida_Tibia_2 y Partida_Caliente son las tarifas disponibles en USD.'),
+        ('Filtros de Detencion', 'Filtro_Conf_Detencion, Filtro_Disp_Detencion, Filtro_Op_Detencion y Filtro_CostoCero_Detencion: 1 acepta y 0 rechaza el costo.'),
+        ('Costo_Detencion_Base', 'Costo de detencion en moneda local antes de aplicar los filtros.'),
+        ('Detencion_Tarifa', 'Tarifa de detencion base en USD correspondiente al ultimo bloque del ciclo.'),
+        ('Tipo_Partida_RIO', 'Tramo determinado con la configuracion instruida por el RIO.'),
+        ('Umbrales RIO', 'Fria_Num1_M_RIO, Tibia_Num2_N_RIO y Caliente_Num1_P_RIO delimitan los tramos de la configuracion RIO.'),
+        ('Tarifas de partida RIO', 'Partida_Fria_RIO, Partida_Tibia_RIO, Partida_Tibia_2_RIO y Partida_Caliente_RIO son las tarifas instruidas en USD.'),
+        ('Detencion_Tarifa_RIO', 'Tarifa de detencion en USD de la configuracion RIO del ultimo bloque.'),
+        ('Config_RIO_Usada_Partida', 'Configuracion instruida por el RIO usada para fijar la tarifa de partida.'),
+        ('Config_RIO_Usada_Detencion', 'Configuracion instruida por el RIO usada para fijar la tarifa de detencion.'),
+        ('Formula completa',
+         'Total SC_PD = MAX(0, (Costo_Partida_Efectivo + Costo_Detencion_Efectivo) - Margen_Suma_Ciclo)\n\n'
+         'Costo_Partida_Efectivo = Costo_Partida_Base * Filtro_Conf_Partida * Filtro_Disp_Partida * Filtro_Op_Partida * Filtro_CostoCero_Partida\n\n'
+         'Costo_Partida_Base se determina por Tipo_Partida:\n'
+         'Fria si Horas_Detenida_Ciclo > Fria_Num1_M -> tarifa Partida_Fria\n'
+         'Tibia_2 si Horas_Detenida_Ciclo > Tibia_Num2_N -> tarifa Partida_Tibia_2\n'
+         'Caliente si Horas_Detenida_Ciclo < Caliente_Num1_P -> tarifa Partida_Caliente\n'
+         'Tibia en cualquier otro caso -> tarifa Partida_Tibia\n\n'
+         'Cuando USAR_TARIFA_RIO_INSTRUIDA=1, se usan las columnas _RIO para fijar la tarifa realmente cobrada; Config_RIO_Usada_Partida indica la configuracion instruida.'),
+    ]
+    return pd.DataFrame(filas, columns=['Columna', 'Que significa'])
+
+
+def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida):
+    """Define el orden legible de las columnas exportadas a nivel de ciclo."""
+    columnas = [
+        'Etiqueta_Relacionada', 'Central_Relacionada', 'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
+        'Inicio_Ciclo', 'Termino_Ciclo', 'Horas_Detenida_Ciclo',
+        'Generacion_Suma_Ciclo', 'Margen_Suma_Ciclo',
+        'Config_RIO_Rescatada_Ventana_Partida', 'Config_RIO_Rescatada_Ventana_Detencion',
+        'Estado_Op_Partida', 'Consigna_Partida', 'Motivo_Partida',
+        'Tipo_Partida',
+        'Filtro_Conf_Partida', 'Filtro_Disp_Partida', 'Filtro_Op_Partida', 'Filtro_CostoCero_Partida',
+        'Costo_Partida_Base',
+        'Fria_Num1_M', 'Tibia_Num1_O', 'Tibia_Num2_N', 'Caliente_Num1_P',
+        'Partida_Fria', 'Partida_Tibia', 'Partida_Tibia_2', 'Partida_Caliente',
+        'Costo_Partida_Efectivo', 'Obs_Partida',
+        'Estado_Op_Detencion', 'Consigna_Detencion', 'Motivo_Detencion',
+        'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion', 'Filtro_Op_Detencion', 'Filtro_CostoCero_Detencion',
+        'Costo_Detencion_Base', 'Detencion_Tarifa',
+        'Costo_Detencion_Efectivo', 'Obs_Detencion',
+        'Costos_Totales_PD', 'Total SC_PD', 'Obs_Liquidacion_Final', 'Etiqueta_Original',
+    ]
+    if usar_config_dominante == 1 and usar_tarifa_rio_instruida == 0:
+        columnas += ['Central_Partida', 'Central_Partida_Original',
+                     'Central_Detencion', 'Central_Detencion_Original']
+    if usar_tarifa_rio_instruida == 1:
+        posicion_partida = columnas.index('Costo_Partida_Efectivo')
+        columnas[posicion_partida:posicion_partida] = [
+            'Config_RIO_Usada_Partida', 'Tipo_Partida_RIO',
+            'Fria_Num1_M_RIO', 'Tibia_Num2_N_RIO', 'Caliente_Num1_P_RIO',
+            'Partida_Fria_RIO', 'Partida_Tibia_RIO', 'Partida_Tibia_2_RIO', 'Partida_Caliente_RIO',
+            'Costo_Partida_Base_Original',
+        ]
+        posicion_detencion = columnas.index('Costo_Detencion_Efectivo')
+        columnas[posicion_detencion:posicion_detencion] = [
+            'Config_RIO_Usada_Detencion', 'Detencion_Tarifa_RIO',
+            'Costo_Detencion_Base_Original',
+        ]
+    return columnas
+
+
 def main(rutas: dict, panel: dict | None = None):
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
@@ -1084,33 +1214,8 @@ def main(rutas: dict, panel: dict | None = None):
     resumen_relacionada = resumen_relacionada.sort_values(
         by=['Central_Relacionada', 'Ciclo_ID_Relacionada', 'FECHA_HORA', 'GENERACION'])
 
-    df_compacto = resumen_relacionada.groupby(
-        ['Etiqueta_Relacionada', 'Central_Relacionada', 'Ciclo_ID_Relacionada'], as_index=False
-    ).agg(
-        Inicio_Ciclo=('FECHA_HORA', 'min'), Termino_Ciclo=('FECHA_HORA', 'max'),
-        Generacion_Suma_Ciclo=('GENERACION', 'sum'), Margen_Suma_Ciclo=('Margen', 'sum'),
-        Horas_Detenida_Ciclo=('Horas_Detenida_Ciclo', 'first'),
-        Flag_Exencion=('Flag_Exencion', 'first'),
-        Central_Partida=('Central', 'first'), Central_Detencion=('Central', 'last'),
-        Costo_Partida_Base=('Costo_Partida_ML', 'first'), Costo_Detencion_Base=('Costo_Detencion_ML', 'last'),
-        Filtro_CostoCero_Partida=('Filtro_CostoCero_Partida', 'first'),
-        Filtro_CostoCero_Detencion=('Filtro_CostoCero_Detencion', 'last'),
-        Filtro_Conf_Partida=('Conf despachada RIO', 'first'),
-        Filtro_Disp_Partida=('Disponible (1) / Pruebas (0)', 'first'),
-        Filtro_Op_Partida=('Filtro_Operacional', 'first'),
-        Consigna_Partida=('CONSIGNAS', 'first'), Motivo_Partida=('MOTIVO', 'first'),
-        Estado_Op_Partida=('ESTADO OPERACIONAL', 'first'),
-        Fuente_Config_RIO_Partida=('Fuente_Config_RIO', 'first'),
-        Config_RIO_Rescatada_Ventana_Partida=('Config_RIO_Rescatada_Ventana', 'first'),
-        Filtro_Conf_Detencion=('Conf despachada RIO', 'last'),
-        Filtro_Disp_Detencion=('Disponible (1) / Pruebas (0)', 'last'),
-        Filtro_Op_Detencion=('Filtro_Operacional', 'last'),
-        Consigna_Detencion=('CONSIGNAS', 'last'), Motivo_Detencion=('MOTIVO', 'last'),
-        Estado_Op_Detencion=('ESTADO OPERACIONAL', 'last'),
-        Fuente_Config_RIO_Detencion=('Fuente_Config_RIO', 'last'),
-        Config_RIO_Rescatada_Ventana_Detencion=('Config_RIO_Rescatada_Ventana', 'last'),
-        Estado_Ciclo_Mes=('Estado_Ciclo_Mes', 'first')
-    )
+    df_compacto = compactar_resumen_ciclos(
+        resumen_relacionada, USAR_TARIFA_RIO_INSTRUIDA)
 
     # ==========================================
     # 14.1 REASIGNACION A CONFIGURACION DOMINANTE
@@ -1654,20 +1759,8 @@ def main(rutas: dict, panel: dict | None = None):
          'Costo nulo o anulado por filtros RIO/EP',
          'Sobrecosto validado a pago'], default='Sin Pago')
 
-    columnas_finales = [
-        'Etiqueta_Relacionada', 'Central_Relacionada', 'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
-        'Inicio_Ciclo', 'Termino_Ciclo', 'Horas_Detenida_Ciclo',
-        'Generacion_Suma_Ciclo', 'Margen_Suma_Ciclo',
-        'Config_RIO_Rescatada_Ventana_Partida', 'Config_RIO_Rescatada_Ventana_Detencion',
-        'Estado_Op_Partida', 'Consigna_Partida', 'Motivo_Partida', 'Costo_Partida_Efectivo', 'Obs_Partida',
-        'Estado_Op_Detencion', 'Consigna_Detencion', 'Motivo_Detencion', 'Costo_Detencion_Efectivo', 'Obs_Detencion',
-        'Costos_Totales_PD', 'Total SC_PD', 'Obs_Liquidacion_Final', 'Etiqueta_Original']
-    if USAR_CONFIG_DOMINANTE == 1 and USAR_TARIFA_RIO_INSTRUIDA == 0:
-        columnas_finales += ['Central_Partida', 'Central_Partida_Original',
-                            'Central_Detencion', 'Central_Detencion_Original']
-    if USAR_TARIFA_RIO_INSTRUIDA == 1:
-        columnas_finales += ['Config_RIO_Usada_Partida', 'Config_RIO_Usada_Detencion',
-                            'Costo_Partida_Base_Original', 'Costo_Detencion_Base_Original']
+    columnas_finales = columnas_resumen_ciclos(
+        USAR_CONFIG_DOMINANTE, USAR_TARIFA_RIO_INSTRUIDA)
     df_compacto = df_compacto[columnas_finales]
 
 
@@ -1722,7 +1815,8 @@ def main(rutas: dict, panel: dict | None = None):
 
     print(f"\nExportando a: {RUTA_SALIDA} ...")
     with pd.ExcelWriter(RUTA_SALIDA, engine='xlsxwriter') as writer:
-        hojas = {'Waterfall_Costos': df_auditoria_costos,
+        hojas = {'Guia_Lectura': crear_guia_lectura(),
+                 'Waterfall_Costos': df_auditoria_costos,
                  'SC_por_Empresa': df_empresa,
                  'Resumen_Ciclos_PD': df_compacto,
                  'Detalle_15Min': detalle_mes,
