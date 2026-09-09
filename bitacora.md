@@ -26,6 +26,60 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Confirmación specs 13 y 14 con datos reales (PR #29) — ambas cerradas
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión.
+- **Origen:** implementación de Codex en `aaeaaa9` (PR #29,
+  `codex/implementar-especificaciones-del-diagnostico-y-visibilidad`) de
+  `docs/specs/13-fix-diagnostico-observaciones-termino-ciclo-rio.md` y
+  `docs/specs/14-secuencia-rio-visibilidad-ventana.md`.
+- **Revisión del código:**
+  - Spec 13: `_diagnostico_ciclos` corrige el nombre de columna
+    (`Termino_Ciclo` en vez de `Fin_Ciclo`) y agrega
+    `Tipo_Partida_RIO`, `Config_RIO_Usada_Partida`,
+    `Config_RIO_Usada_Detencion`, `Detencion_Tarifa`,
+    `Detencion_Tarifa_RIO` a la hoja `Diagnostico`, exactamente como
+    pedía la spec.
+  - Spec 14: `listar_secuencia_rio_ventana` (nueva, junto a
+    `rescatar_config_rio_en_limites`) arma la secuencia cronológica de
+    instrucciones RIO dentro de `± VENTANA_CUARTOS_HORA` alrededor de
+    `Inicio_Ciclo`/`Termino_Ciclo`, formato `"{offset:+d}min
+    CONSIGNAS/MOTIVO/NOMBRE_CONFIGURACION; ..."`. Se agregó como
+    `Secuencia_RIO_Partida`/`Secuencia_RIO_Detencion` junto a
+    `Config_RIO_Usada_Partida`/`Detencion` en
+    `columnas_resumen_ciclos()`, y una fila nueva en `Guia_Lectura`
+    aclarando que es solo informativa.
+- **Validación con datos reales (junio 2026, mismo insumo de
+  revisiones anteriores):**
+  - `pytest -q -m ""`: 34/34 OK (incluye `tests/test_secuencia_rio.py`,
+    nuevo, y el test de regresión agregado a
+    `test_diagnostico_observaciones.py`).
+  - **`Total SC_PD` idéntico al de antes de este cambio:**
+    1.180.652.295,52 CLP — confirma que la spec 14 es aditiva pura, no
+    tocó ningún cálculo.
+  - Confirmé en el ciclo real `AGUASBLANCAS-AGB_DIESEL&1` exactamente
+    el patrón que motivó la spec 14:
+    - `Secuencia_RIO_Partida` = `"-7min PP/OM/AGUASBLANCAS-AGB_DIESEL;
+      +5min PC/OM/AGUASBLANCAS-AGB_DIESEL"` (coincide con el ejemplo
+      de la spec).
+    - `Secuencia_RIO_Detencion` = `"-2min PS/OM/AGUASBLANCAS-AGB_DIESEL;
+      +10min FS/OM/AGUASBLANCAS-AGB_DIESEL"` — confirma también el
+      patrón simétrico de detención (PS→FS) que se había hipotetizado
+      pero no verificado explícitamente en el mismo ciclo.
+  - Confirmé con el diagnóstico de ese mismo ciclo (vía
+    `armar_trazado`, spec 12/13) que la hoja `Diagnostico` ahora sí
+    muestra `Termino_Ciclo` (`2026-06-01 21:00:00`) y las columnas
+    `_RIO` (`Tipo_Partida_RIO`, `Config_RIO_Usada_Partida`,
+    `Config_RIO_Usada_Detencion`, `Detencion_Tarifa_RIO`) — el hallazgo
+    de la spec 13 queda resuelto.
+- **Conclusión:** ambas specs cierran limpio, sin hallazgos nuevos.
+- **Pendientes:** ninguno de estas dos specs. Queda abierta la decisión
+  de negocio (no de esta spec) de si algún día se cambia la regla de
+  selección de qué instrucción RIO determina la tarifa cuando hay
+  varias en la ventana — por ahora la visibilidad de la spec 14 es
+  puramente informativa, según lo decidido explícitamente con el dueño
+  del proyecto.
+
 ### 2026-09-09 — Claude — Revisión de la herramienta de diagnóstico de observaciones (spec 12, PR #27)
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión,
