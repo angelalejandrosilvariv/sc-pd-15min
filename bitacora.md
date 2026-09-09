@@ -26,6 +26,71 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión de la herramienta de diagnóstico de observaciones (spec 12, PR #27)
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión,
+  con 2 hallazgos que requieren corrección.
+- **Origen:** implementación de Codex en `6f82224` (PR #27,
+  `codex/implementar-herramienta-diagnostico-observaciones`) de
+  `docs/specs/12-herramienta-diagnostico-observaciones.md`.
+- **Revisión del código:** el cambio en `main()` es exactamente aditivo
+  (parámetro `devolver_diagnostico=False` por defecto, sin tocar el
+  `return` implícito existente cuando no se usa) — confirmado además
+  porque `pytest -q -m ""` (30/30, incluidos los 5 tests nuevos de
+  `test_diagnostico_observaciones.py`) sigue en verde sin cambios de
+  comportamiento. `coincide_central`/`filtrar_ventana`/`armar_trazado`
+  siguen el diseño de la spec: no agregan lógica de negocio nueva, solo
+  filtran y despliegan columnas que el motor ya calcula.
+- **Validación con datos reales:** corrí `main(rutas,
+  devolver_diagnostico=True)` contra el mismo insumo real de junio 2026
+  ya usado en revisiones anteriores, y probé `armar_trazado` con dos
+  casos:
+  1. **TENO_DIESEL, 04-06-2026 19:38–19:52** (la ventana citada
+     textualmente en una observación real de `Observaciones_16.xlsx`):
+     el trazado devuelve `Detalle_15Min` y `Resumen_Ciclos_PD` vacíos, y
+     la hoja `Diagnostico` dice explícitamente "No aparece en
+     Detalle_15Min: no fue considerada en ningún ciclo de este cálculo"
+     — reproduce exactamente el patrón que describe la observación
+     ("no se está pagando la partida ni la detención [...] ya que no
+     aparece la activación en la hoja PARTIDAS_DETENCIONES"). El RIO
+     real (`RIO_06_2026.xlsx`) tampoco trae registros de esta central en
+     esa ventana — consistente con que muchos de estos sub-puntos, en
+     las respuestas reales del Coordinador, terminan "No Acogido" por no
+     encontrarse en el RIO oficial.
+  2. Un ciclo real que sí se pagó (`AGUASBLANCAS-AGB_DIESEL&1`,
+     5.890,71 CLP): el trazado devuelve 10 filas de `Detalle_15Min` y la
+     fila completa de `Resumen_Ciclos_PD`, confirmando que el caso
+     "encontrado" también funciona de punta a punta.
+- **Hallazgos (a corregir):**
+  1. **Bug de nombre de columna:** `_diagnostico_ciclos` (en
+     `src/diagnostico_observaciones.py`) filtra por el nombre literal
+     `'Fin_Ciclo'`, pero la columna real en `Resumen_Ciclos_PD` es
+     `Termino_Ciclo` — confirmado con `columnas_resumen_ciclos()` y con
+     la corrida real de arriba: la hoja `Diagnostico` muestra
+     `Inicio_Ciclo` pero nunca la hora de término del ciclo. No hace
+     `raise` (el nombre simplemente nunca calza), así que pasó
+     silenciosamente los tests y la corrida real.
+  2. **Campos RIO faltantes en la hoja `Diagnostico`:** con
+     `USAR_TARIFA_RIO_INSTRUIDA=1` (el interruptor activo en producción),
+     la tarifa realmente cobrada la determinan las columnas `_RIO`
+     (`Tipo_Partida_RIO`, `Config_RIO_Usada_Partida`,
+     `Config_RIO_Usada_Detencion`, `Detencion_Tarifa_RIO`), no
+     `Tipo_Partida` a secas. Ninguna de esas columnas `_RIO` quedó en la
+     lista de prefijos de `_diagnostico_ciclos`, así que la hoja
+     resumen "en lenguaje llano" —el punto central de esta herramienta—
+     no muestra la razón RIO real detrás del monto. La hoja completa
+     `Resumen_Ciclos_PD` del mismo Excel sí trae estas columnas, así que
+     no se pierde información, pero la hoja pensada para verse "de un
+     vistazo" queda incompleta para el caso más común de las
+     observaciones reales revisadas.
+- **Conclusión:** el diseño y el flujo end-to-end funcionan
+  correctamente y ya se verificaron contra un caso real citado
+  textualmente en una observación. Los dos hallazgos de arriba se
+  documentan en la spec 13 para que Codex los corrija antes de dar por
+  cerrada esta herramienta.
+- **Pendientes:** aplicar spec 13 (fix de `Termino_Ciclo` + columnas
+  `_RIO` en la hoja `Diagnostico`).
+
 ### 2026-09-09 — Claude — Convención de `Cuarto de Hora` confirmada contra el mes completo — spec 11 cerrada
 
 - **Tipo:** validación final con datos reales, cierre de spec.
