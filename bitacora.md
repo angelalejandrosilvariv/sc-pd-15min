@@ -26,6 +26,45 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión del fallback de empresa por configuración (spec 10, PR #21)
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión.
+- **Origen:** implementación de Codex en `0273610` (PR #21,
+  `codex/aplicar-diccionario-empresa-fallback`) de
+  `docs/specs/10-diccionario-empresa-fallback-configuracion.md`.
+- **Revisión del código — hallazgo importante detectado por el propio
+  implementador:** el código original tenía **dos asignaciones
+  independientes de `Empresa`** — una a nivel de bloque
+  (`reporte_sin_ceros['Empresa']`) y otra a nivel de ciclo
+  (`df_compacto['Empresa']`, con su propio `.map()` directo contra
+  `Central_Relacionada`, ignorando por completo la resolución a nivel de
+  bloque). Si solo se corregía la primera (como pedía la spec
+  literalmente), el rescate por nombre de configuración nunca se habría
+  reflejado en `SC_por_Empresa`, porque esa hoja depende de la segunda.
+  Codex corrigió ambas: `asignar_empresas()` (nueva función de módulo,
+  testeable) resuelve por relacionada y rescata por configuración a nivel
+  de bloque; `df_compacto['Empresa']` ahora se calcula agregando la
+  `Empresa` ya resuelta por bloque, tomando la dominante por energía
+  dentro de cada ciclo (antes decía hacerlo en un comentario, pero el
+  código no lo hacía). Tests nuevos
+  (`tests/test_diccionario_empresa.py`) cubren el rescate, la prioridad
+  de la relacionada directa sobre el rescate, y el caso genuinamente sin
+  empresa. `pytest -q -m ""`: 21/21 OK.
+- **Verificación con datos reales (junio 2026, sexta corrida completa,
+  con `RUTA_DICCIONARIO_EMPRESA` real conectado):** el log confirma
+  `"1 centrales relacionadas resueltas por nombre de configuracion
+  (217.03 MWh): NEHUENCO-9B"` y `"OK: todas las centrales relacionadas
+  vigentes tienen empresa asignada"`. En `Resumen_Ciclos_PD`, el ciclo
+  `NEHUENCO-9B&1` quedó con `Empresa = COLBUN` (antes `Sin_Empresa`). El
+  total de `SC_por_Empresa` no cambió (1.180.652.296 CLP).
+- **Nota:** la funcionalidad de desglose por empresa
+  (`RUTA_DICCIONARIO_EMPRESA`) ya existía en el motor desde antes de este
+  proyecto de correcciones — se probó por primera vez con el diccionario
+  real del dueño del proyecto en esta ronda (specs 10), no hubo que
+  construirla desde cero.
+- **Pendientes:** ninguno de esta spec. Sigue pendiente conseguir
+  RIO/reporte/costos de mayo 2026 para el empalme de frontera mensual.
+
 ### 2026-09-09 — Claude — Revisión de la trazabilidad exportada por ciclo (spec 09, PR #18)
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión.
