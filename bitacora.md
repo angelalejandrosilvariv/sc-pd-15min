@@ -26,6 +26,52 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Primera corrida real del motor completo (junio 2026) + revisión del fix crítico
+
+- **Tipo:** prueba de integración end-to-end con datos de producción.
+- **Origen:** primera vez que se corre `main()` contra archivos reales
+  completos (`Reporte_PD_15min_2606.csv` 787.820 filas,
+  `RIO_06_2026.xlsx`, `Diccionario_central_config.xlsx`,
+  `Costos_de_P-D_Consolidado.xlsx` regenerado con el fix de Tibia 2 a
+  partir de las 116 políticas PO reales de junio). Sin archivos de mes
+  anterior (mayo 2026 no disponible en esta sesión).
+- **Hallazgo crítico encontrado y corregido (spec 07, PR #11,
+  commit `f06e2d9`):** `leer_reporte()` usaba `dayfirst=True`, que invertía
+  día/mes incluso en fechas ISO no ambiguas para los días 1-12 de cada mes.
+  Medido con dos corridas completas del motor sobre los mismos datos:
+  - Con el bug: ventana `2026-01-06` → `2026-12-06`, SC P-D final =
+    691.806.794 CLP.
+  - Corregido: ventana `2026-06-01` → `2026-06-30`, SC P-D final =
+    **1.175.418.218 CLP**.
+  - Subestimación del bug: **483.611.424 CLP (70%) en un solo mes.**
+- **Revisión del fix de Codex:** confirmé que `dayfirst=False` más la
+  función `validar_meses_reporte()` (aborta si aparecen fechas en más de
+  2 meses-calendario, con muestra de valores original/parseado) quedaron
+  bien implementados. Volví a correr el motor real (sin ningún parche mío)
+  con el código ya corregido: reproduce exactamente
+  **1.175.418.218 CLP**, igual que mi verificación independiente.
+  `pytest -q -m ""`: 13/13 OK.
+- **Otros hallazgos de esta corrida real, registrados para seguimiento
+  (no bloquean, no son de la prioridad de la spec 07):**
+  - Cruce `Llave_FHC` vs. tabla de costos: solo 83,2% de los bloques
+    encuentran tarifa.
+  - Cobertura de instrucción RIO: 42,0% de la generación analizada
+    (1.257.132 MWh) queda "No instruida" (sin `MOTIVO` directo ni por
+    ventana/mismo bloque) — probablemente se reduce bastante al agregar
+    RIO y reporte del mes anterior (mayo 2026), no disponibles en esta
+    prueba.
+  - 5 de 85 centrales relacionadas no tienen ningún registro en el RIO
+    del mes.
+  - 2 filas del diccionario con prefijo de configuración distinto al de
+    la relacionada (`UJINA-6_HFO`→`UJINA-4`, `TENOGAS-1a26_GLP`→`TENOGAS_GLP`)
+    — a revisar si son agrupaciones legítimas.
+  - `CODIGOS_EO_VALIDOS=['PDO']` sigue sin aparecer en el RIO de junio
+    (consistente con lo ya confirmado: es un estado poco frecuente, no un
+    error de mapeo).
+- **Pendientes:** conseguir RIO/reporte/costos de mayo 2026 para probar el
+  empalme de frontera mensual con datos reales; investigar la cobertura
+  RIO del 42% "no instruida" una vez que exista ese empalme.
+
 ### 2026-09-09 — Claude — Revisión de specs 04-06 (PR #8)
 
 - **Tipo:** prueba y revisión.
