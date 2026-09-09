@@ -26,6 +26,40 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión de la trazabilidad exportada por ciclo (spec 09, PR #18)
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión.
+- **Origen:** implementación de Codex en `c9e10c3` (PR #18,
+  `codex/aplicar-detalles-de-documento-de-ciclos`) de
+  `docs/specs/09-detalle-replicable-resumen-ciclos.md`.
+- **Revisión del código:** extrajo `compactar_resumen_ciclos()`,
+  `columnas_resumen_ciclos()` y `crear_guia_lectura()` como funciones de
+  módulo (testeables). Las columnas RIO quedaron insertadas junto a
+  `Costo_Partida_Efectivo`/`Costo_Detencion_Efectivo` (no al final), más
+  legible de lo que pedía la spec literalmente. Tests nuevos
+  (`tests/test_resumen_ciclos_exportacion.py`) cubren un ciclo sintético
+  con Tibia_2 base y RIO, la exportación real a Excel, y que el
+  interruptor `USAR_TARIFA_RIO_INSTRUIDA=0` no exige columnas `_RIO`.
+  `pytest -q -m ""`: 18/18 OK.
+- **Verificación con datos reales (junio 2026, cuarta corrida completa):**
+  `Resumen_Ciclos_PD` pasó de 30 a 59 columnas. El sobrecosto final no
+  cambió (1.180.652.296 CLP, idéntico a la corrida anterior) — confirma
+  que la spec solo agregó columnas, sin alterar ningún cálculo. Tomé un
+  ciclo real aprobado (`AGUASBLANCAS-AGB_DIESEL&2`) y repliqué a mano
+  `Costo_Partida_Base_RIO × Filtro_Conf × Filtro_Disp × Filtro_Op ×
+  Filtro_CostoCero` usando solo las columnas nuevas: coincide exacto con
+  `Costo_Partida_Efectivo` (5.890,71 CLP). También confirmé que
+  `Partida_Tibia_2_RIO` para `GUACOLDA-3_CAR` (31.963,694) coincide con el
+  valor que se había verificado a mano semanas atrás contra el archivo PO
+  original.
+- **Nota:** ningún ciclo de junio quedó clasificado en `Tibia_2` con
+  `Horas_Detenida_Ciclo` calculada — las centrales GUACOLDA generan casi
+  todo el mes sin parar, y sin datos de mayo no se puede calcular cuántas
+  horas llevaban detenidas antes de junio (mismo problema de frontera
+  mensual ya conocido). No es un bug de esta spec.
+- **Pendientes:** ninguno de esta spec. Sigue pendiente conseguir
+  RIO/reporte/costos de mayo 2026 para el empalme de frontera.
+
 ### 2026-09-09 — Claude — Revisión del rescate de Configuracion RIO (spec 08, PR #15)
 
 - **Tipo:** prueba de integración end-to-end con datos reales + revisión.
