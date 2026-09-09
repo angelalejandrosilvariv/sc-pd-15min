@@ -367,6 +367,24 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida):
     ).agg(**agregaciones)
 
 
+def asignar_empresas(reporte, empresa_por_nombre):
+    """Asigna empresa por relacionada y rescata faltantes por configuracion."""
+    resultado = reporte.copy()
+    resultado['Empresa'] = (resultado['Central_Relacionada'].astype(str).str.strip()
+                            .map(empresa_por_nombre))
+
+    # El archivo puede mezclar relacionadas (p. ej. ANDES-1) con nombres de
+    # configuracion sin consolidar (p. ej. ANDES-1_DIESEL). Solo las filas que
+    # no cruzaron por relacionada se reintentan contra la configuracion cruda.
+    sin_empresa_mask = resultado['Empresa'].isna()
+    rescate_config = (resultado.loc[sin_empresa_mask, 'Central'].astype(str).str.strip()
+                      .map(empresa_por_nombre))
+    resultado.loc[sin_empresa_mask, 'Empresa'] = rescate_config
+    resultado['_Empresa_Rescatada_Config'] = False
+    resultado.loc[sin_empresa_mask, '_Empresa_Rescatada_Config'] = rescate_config.notna()
+    return resultado
+
+
 def crear_guia_lectura():
     """Construye el glosario y las formulas que permiten auditar cada ciclo."""
     filas = [
@@ -659,8 +677,17 @@ def main(rutas: dict, panel: dict | None = None):
         print(f"  {len(empresa_por_relacionada):,} centrales relacionadas mapeadas a "
               f"{df_emp[col_emp].nunique():,} empresas.")
 
-        reporte_sin_ceros['Empresa'] = (reporte_sin_ceros['Central_Relacionada'].astype(str).str.strip()
-                                        .map(empresa_por_relacionada))
+        reporte_sin_ceros = asignar_empresas(reporte_sin_ceros, empresa_por_relacionada)
+
+        rescatadas = reporte_sin_ceros[reporte_sin_ceros['_Empresa_Rescatada_Config']]
+        if not rescatadas.empty:
+            print(f"  {rescatadas['Central_Relacionada'].nunique()} centrales relacionadas resueltas "
+                  f"por nombre de configuracion ({rescatadas['GENERACION'].sum():,.2f} MWh):")
+            for c in sorted(rescatadas['Central_Relacionada'].dropna().unique())[:25]:
+                print(f"      - {c}")
+            if rescatadas['Central_Relacionada'].nunique() > 25:
+                print(f"      ... y {rescatadas['Central_Relacionada'].nunique() - 25} mas.")
+
         sin_emp = reporte_sin_ceros[reporte_sin_ceros['Empresa'].isna()
                                     & reporte_sin_ceros['Central_Relacionada'].notna()]
         if not sin_emp.empty:
@@ -1439,9 +1466,18 @@ def main(rutas: dict, panel: dict | None = None):
         df_compacto['Config_RIO_Sin_Tarifa_Partida'] = False
         df_compacto['Config_RIO_Sin_Tarifa_Detencion'] = False
 
-    # Empresa a nivel de ciclo (dominante por energia dentro de la relacionada)
-    df_compacto['Empresa'] = df_compacto['Central_Relacionada'].map(empresa_por_relacionada) \
-                                                              .fillna('Sin_Empresa')
+    # Empresa a nivel de ciclo (dominante por energia dentro de la relacionada).
+    # Se usa la empresa ya resuelta por bloque para conservar los rescates por
+    # nombre de configuracion realizados al cargar el diccionario.
+    gen_por_empresa = (resumen_relacionada.groupby(
+        ['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Empresa'], dropna=False)['GENERACION']
+        .sum())
+    idx_empresa = gen_por_empresa.groupby(level=[0, 1]).idxmax()
+    empresa_ciclo = (gen_por_empresa.loc[idx_empresa].reset_index()
+                     [['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Empresa']])
+    df_compacto = df_compacto.merge(
+        empresa_ciclo, on=['Central_Relacionada', 'Ciclo_ID_Relacionada'], how='left')
+    df_compacto['Empresa'] = df_compacto['Empresa'].fillna('Sin_Empresa')
 
     if FILTRAR_CICLOS_BAJA_GEN == 1:
         print("\n" + "=" * 78)
