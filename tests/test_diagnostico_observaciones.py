@@ -75,6 +75,24 @@ def test_armar_trazado_conserva_ciclo_mal_atribuido_y_resumen_exacto():
     assert trazado["Diagnostico"].iloc[0]["Filtro_Conf_Partida"] == 0
 
 
+def test_armar_trazado_muestra_termino_y_evidencia_rio_sin_modificarlos():
+    rio, reporte, detalle, resumen = _insumos()
+    resumen = resumen.assign(
+        Inicio_Ciclo=pd.Timestamp("2026-07-21 08:15"),
+        Termino_Ciclo=pd.Timestamp("2026-07-21 09:15"),
+        Tipo_Partida_RIO="Tibia_2",
+        Config_RIO_Usada_Partida="CORONEL_GNL",
+    )
+    diagnostico = armar_trazado(
+        rio, reporte, detalle, resumen, "CANDELARIA-1",
+        "2026-07-21 08:00", "2026-07-21 09:30",
+    )["Diagnostico"]
+
+    assert diagnostico.loc[0, "Termino_Ciclo"] == pd.Timestamp("2026-07-21 09:15")
+    assert diagnostico.loc[0, "Tipo_Partida_RIO"] == "Tibia_2"
+    assert diagnostico.loc[0, "Config_RIO_Usada_Partida"] == "CORONEL_GNL"
+
+
 def test_armar_trazado_explica_ausencia_en_detalle():
     rio, reporte, detalle, resumen = _insumos()
     trazado = armar_trazado(

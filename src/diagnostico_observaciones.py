@@ -71,7 +71,10 @@ def _filtrar_insumo(df, consulta, fecha, central, relacionada, inicio, fin, marg
 def _diagnostico_ciclos(resumen: pd.DataFrame) -> pd.DataFrame:
     """Presenta exclusivamente campos explicativos ya calculados por el motor."""
     prefijos = (
-        "Etiqueta_Relacionada", "Inicio_Ciclo", "Fin_Ciclo", "Tipo_Partida",
+        "Etiqueta_Relacionada", "Inicio_Ciclo", "Termino_Ciclo",
+        "Tipo_Partida", "Tipo_Partida_RIO",
+        "Config_RIO_Usada_Partida", "Config_RIO_Usada_Detencion",
+        "Detencion_Tarifa", "Detencion_Tarifa_RIO",
         "Obs_Partida", "Obs_Detencion", "Obs_Liquidacion_Final",
     )
     columnas = [
