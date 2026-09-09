@@ -26,6 +26,42 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-09 — Claude — Revisión del rescate de Configuracion RIO (spec 08, PR #15)
+
+- **Tipo:** prueba de integración end-to-end con datos reales + revisión.
+- **Origen:** implementación de Codex en `873cae2` (PR #15,
+  `codex/revisar-y-aplicar-especificaciones-de-rescate`) de
+  `docs/specs/08-rescate-config-rio-ventana.md`.
+- **Revisión del código:** `rescatar_config_rio_en_limites()` quedó
+  extraída como función de módulo (testeable sin correr `main()`),
+  respeta exactamente el alcance pedido (solo bloques de
+  `Inicio_Ciclo_Global`/`Termino_Ciclo_Global`, solo cuando
+  `Configuracion RIO == 'Sin_Registro_RIO'`, guardada por
+  `ACTIVAR_BUSQUEDA_RELAJADA`), actualiza `Fuente_Config_RIO` en
+  consistencia, y agrega su propia columna de auditoría
+  (`Config_RIO_Rescatada_Ventana_Partida/Detencion`) exportada en
+  `Resumen_Ciclos_PD`. Tests nuevos (`tests/test_rescate_config_rio.py`)
+  cubren los 3 casos pedidos: dentro de ventana, fuera de ventana,
+  interruptor apagado. `pytest -q -m ""`: 16/16 OK.
+- **Verificación con datos reales (junio 2026, tercera corrida completa):**
+  64 de los 68 casos identificados quedaron rescatados automáticamente
+  (`Configuracion RIO rescatada partida: 64 ciclos, 5.190.351 CLP
+  efectivos`; `detencion: 6 ciclos, 43.727 CLP`). "Revisar manualmente:
+  config RIO sin tarifa" en partida bajó de 94 a 33; ciclos aprobados
+  subieron de 875 a 920. Sobrecosto P-D final: de 1.175.418.218 CLP a
+  **1.180.652.296 CLP** (+5.234.078 CLP, coincide exactamente con el
+  monto rescatado reportado por el propio motor).
+- **Corrección a mi propio reporte anterior:** inicialmente atribuí a esta
+  spec el salto en la métrica amplia "Cobertura de Instrucción RIO"
+  (57,5%→94,0%), pero verifiqué contra la corrida intermedia (solo con
+  spec 07, sin spec 08) y esa métrica ya estaba en 94,0% antes de esta
+  spec — el salto fue enteramente del fix de fechas (spec 07). Lo corregí
+  con el usuario antes de reportarlo como definitivo.
+- **Pendientes:** los ~30 casos restantes de "revisar manualmente"/"sin
+  tarifa de partida" tras el rescate son mayormente cobertura de datos
+  (la configuración que instruyó el RIO no tiene precio en
+  `Costos_de_P-D_Consolidado.xlsx`), no un problema de lógica del motor.
+
 ### 2026-09-09 — Claude — Primera corrida real del motor completo (junio 2026) + revisión del fix crítico
 
 - **Tipo:** prueba de integración end-to-end con datos de producción.
