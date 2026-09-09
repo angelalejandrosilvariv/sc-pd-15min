@@ -306,6 +306,53 @@ def rescatar_config_rio_en_limites(resumen, rio_subset, activar, ventana_cuartos
     return resultado
 
 
+def listar_secuencia_rio_ventana(momentos, rio_subset, ventana_cuartos_hora):
+    """Lista todas las instrucciones RIO cercanas a cada momento por central.
+
+    El resultado es exclusivamente informativo: conserva el indice de
+    ``momentos`` y no modifica ninguno de los DataFrames recibidos.
+    """
+    secuencias = pd.Series('', index=momentos.index, dtype='object')
+    if momentos.empty or rio_subset.empty:
+        return secuencias
+
+    rio_valido = rio_subset.dropna(
+        subset=['FECHA_HORA_RIO', 'Central_Relacionada_RIO']).copy()
+    rio_valido['FECHA_HORA_RIO'] = pd.to_datetime(
+        rio_valido['FECHA_HORA_RIO'], errors='coerce')
+    rio_valido = rio_valido.dropna(subset=['FECHA_HORA_RIO'])
+    por_central = {
+        central: grupo.sort_values('FECHA_HORA_RIO', kind='stable')
+        for central, grupo in rio_valido.groupby(
+            'Central_Relacionada_RIO', sort=False)
+    }
+    tolerancia = pd.Timedelta(minutes=ventana_cuartos_hora * 15)
+
+    for indice, fila in momentos.iterrows():
+        momento = pd.to_datetime(fila['Momento'], errors='coerce')
+        candidatos = por_central.get(fila['Central_Relacionada'])
+        if pd.isna(momento) or candidatos is None:
+            continue
+        diferencias = candidatos['FECHA_HORA_RIO'] - momento
+        dentro = diferencias.abs() <= tolerancia
+        if not dentro.any():
+            continue
+
+        instrucciones = []
+        for (_, candidato), diferencia in zip(
+                candidatos.loc[dentro].iterrows(), diferencias[dentro]):
+            valores = [
+                candidato[columna]
+                for columna in ('CONSIGNAS', 'MOTIVO', 'NOMBRE CONFIGURACIÓN')
+            ]
+            texto = '/'.join('' if pd.isna(valor) else str(valor) for valor in valores)
+            offset = int(round(diferencia.total_seconds() / 60))
+            instrucciones.append(f'{offset:+d}min {texto}')
+        secuencias.at[indice] = '; '.join(instrucciones)
+
+    return secuencias
+
+
 def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida):
     """Resume los bloques por ciclo sin perder los insumos de su liquidacion."""
     agregaciones = {
@@ -402,6 +449,8 @@ def crear_guia_lectura():
         ('Detencion_Tarifa_RIO', 'Tarifa de detencion en USD de la configuracion RIO del ultimo bloque.'),
         ('Config_RIO_Usada_Partida', 'Configuracion instruida por el RIO usada para fijar la tarifa de partida.'),
         ('Config_RIO_Usada_Detencion', 'Configuracion instruida por el RIO usada para fijar la tarifa de detencion.'),
+        ('Secuencia_RIO_Partida / Secuencia_RIO_Detencion',
+         'Todas las instrucciones RIO dentro de la ventana configurable alrededor del inicio o termino del ciclo; son solo informativas y no participan del calculo.'),
         ('Formula completa',
          'Total SC_PD = MAX(0, (Costo_Partida_Efectivo + Costo_Detencion_Efectivo) - Margen_Suma_Ciclo)\n\n'
          'Costo_Partida_Efectivo = Costo_Partida_Base * Filtro_Conf_Partida * Filtro_Disp_Partida * Filtro_Op_Partida * Filtro_CostoCero_Partida\n\n'
@@ -441,14 +490,14 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida):
     if usar_tarifa_rio_instruida == 1:
         posicion_partida = columnas.index('Costo_Partida_Efectivo')
         columnas[posicion_partida:posicion_partida] = [
-            'Config_RIO_Usada_Partida', 'Tipo_Partida_RIO',
+            'Config_RIO_Usada_Partida', 'Secuencia_RIO_Partida', 'Tipo_Partida_RIO',
             'Fria_Num1_M_RIO', 'Tibia_Num2_N_RIO', 'Caliente_Num1_P_RIO',
             'Partida_Fria_RIO', 'Partida_Tibia_RIO', 'Partida_Tibia_2_RIO', 'Partida_Caliente_RIO',
             'Costo_Partida_Base_Original',
         ]
         posicion_detencion = columnas.index('Costo_Detencion_Efectivo')
         columnas[posicion_detencion:posicion_detencion] = [
-            'Config_RIO_Usada_Detencion', 'Detencion_Tarifa_RIO',
+            'Config_RIO_Usada_Detencion', 'Secuencia_RIO_Detencion', 'Detencion_Tarifa_RIO',
             'Costo_Detencion_Base_Original',
         ]
     return columnas
@@ -1553,6 +1602,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                  & df_compacto[fuente_filtros].notna())
         df_compacto[f'Diverge_Fuente_RIO_{prefijo}'] = (
             ambas & (df_compacto[f'Fuente_Config_RIO_{prefijo}'] != df_compacto[fuente_filtros]))
+
+    df_compacto['Secuencia_RIO_Partida'] = listar_secuencia_rio_ventana(
+        df_compacto[['Central_Relacionada']].assign(Momento=df_compacto['Inicio_Ciclo']),
+        rio_subset, VENTANA_CUARTOS_HORA)
+    df_compacto['Secuencia_RIO_Detencion'] = listar_secuencia_rio_ventana(
+        df_compacto[['Central_Relacionada']].assign(Momento=df_compacto['Termino_Ciclo']),
+        rio_subset, VENTANA_CUARTOS_HORA)
 
     for c in ['Filtro_Conf_Partida', 'Filtro_Disp_Partida', 'Filtro_Op_Partida',
               'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion', 'Filtro_Op_Detencion']:
