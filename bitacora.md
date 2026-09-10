@@ -26,6 +26,48 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Interruptor de margen (spec 22, PR #46) verificado con datos reales
+
+- **Tipo:** revisión de implementación + validación con datos reales.
+- **Origen:** `docs/specs/22-interruptor-criterio-de-margen.md`,
+  implementada por Codex en PR #46, ya fusionada en `main`.
+- **Revisión del diff:** implementación exacta a lo especificado —
+  interruptor `CALCULAR_MARGEN_EN_EL_MOTOR` en la sección de lógica de
+  negocio, función `calcular_margen_bloques`, reemplazo del cálculo
+  inline, bloque de impresión del criterio activo con la referencia al
+  otro criterio, y el interruptor expuesto en
+  `Carpeta_de_Trabajo/correr_motor.py` vía el parámetro `panel`. Sin
+  desviaciones y sin tocar `src/fase1_integridad.py`.
+- **Validación ejecutada** (junio 2026, sin mes pasado en este entorno):
+  1. `pytest -q -m ""`: **51/51 OK** (47 anteriores + 4 nuevos).
+  2. **Interruptor en 0:** margen 45.589.554.833 CLP, `Total SC_PD` =
+     **1.035.077.837,13** — idéntico peso a peso al baseline previo a
+     esta spec. Sin regresión.
+  3. **Interruptor en 1:** margen 112.842.764.244 CLP, `Total SC_PD` =
+     **793.802.749,56**. Baja 241.275.088 CLP (−23,3%).
+  4. **El margen del modo 1 coincide exactamente con la estimación
+     independiente** que había calculado antes de escribir la spec
+     (112.842.764.244), lo que confirma que la implementación hace lo
+     que se analizó.
+  5. **Prueba de que el cambio es quirúrgico:** `Costos_Totales_PD` da
+     exactamente 1.595.732.666 CLP en **ambos** modos — el interruptor
+     solo mueve el margen, no toca ningún costo de partida ni detención.
+  6. De 1.034 ciclos, 418 cambian de pago y **ninguno sube** — correcto
+     por definición: más margen solo puede amortizar más, nunca menos.
+  7. Los 23 ciclos diferidos de la spec 17 siguen diferidos y en cero en
+     ambos modos; el mecanismo no se vio afectado.
+- **Observación para la comparación con el modelo horario:** con el
+  interruptor en 1 **no convergemos** al horario, lo pasamos por debajo
+  (793,8 millones contra 1.029,5 del horario, aunque no son
+  directamente comparables porque esta corrida no tiene mayo cargado).
+  Es lo esperado: la causa 2 (configuración/tarifa, efecto deliberado de
+  la spec 15) nos hace cobrar menos que el horario, y empuja en sentido
+  contrario al margen.
+- **Pendientes:** que el dueño del proyecto corra con sus datos reales
+  (con mayo) y decida si el criterio nuevo es el correcto. Siguen
+  abiertas las causas 2 y 3 de la comparación, que requieren el detalle
+  por ciclo del modelo horario.
+
 ### 2026-09-10 — Claude — Diferencias contra el modelo horario: causa dominante identificada — spec 22 escrita
 
 - **Tipo:** análisis comparativo con datos reales + especificación.
