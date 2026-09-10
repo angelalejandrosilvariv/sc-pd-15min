@@ -26,6 +26,34 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Revisión de `Carpeta_de_Trabajo` (spec 19, PR #40) — verificada con datos reales
+
+- **Tipo:** revisión de implementación + validación con datos reales.
+- **Origen:** `docs/specs/19-carpeta-de-trabajo-unica-para-spyder.md`,
+  implementada por Codex en PR #40, ya fusionada en `main`.
+- **Revisión del diff:** los 5 archivos (`_LEEME.txt`,
+  `correr_motor.py`, `correr_prorrateo.py`, `correr_diagnostico.py`,
+  `correr_consolidar_politicas.py`) quedaron copia exacta de lo pedido
+  en la spec, sin desviaciones. Ningún archivo existente en `src/` ni
+  `scripts/` fue tocado — confirmado con el diff completo del PR.
+- **Validación ejecutada:**
+  1. `pytest -q -m ""`: **45/45 OK**.
+  2. `ast.parse` sobre los 4 `.py` nuevos: sin errores de sintaxis.
+  3. **Prueba de extremo a extremo real:** copié `Carpeta_de_Trabajo/`
+     completa a un entorno de prueba aislado, dejé ahí los datos reales
+     de junio 2026 (reporte, RIO, costos, diccionarios) usando
+     exactamente los nombres de archivo que ya vienen por defecto en
+     `correr_motor.py`, y lo corrí sin editar ninguna variable ni pasar
+     ningún argumento (`python correr_motor.py`, equivalente a F5 en
+     Spyder). Generó `Reporte_Sobrecostos_PD_Final.xlsx` en la misma
+     carpeta, con **1.034 ciclos** y **Total SC_PD = 1.035.077.837 CLP**
+     — idéntico al resultado de la corrida de verificación de la spec 18
+     (PR #38), confirmando cero drift respecto al motor real.
+- **Conclusión:** la carpeta queda lista para usar. El dueño del
+  proyecto puede descargar el ZIP actualizado del repo y usar
+  `Carpeta_de_Trabajo/` como su único espacio de trabajo en Spyder.
+- **Pendientes:** ninguno sobre esta spec.
+
 ### 2026-09-10 — Claude — Especificación de carpeta de trabajo única para Spyder
 
 - **Tipo:** especificación.
