@@ -573,10 +573,20 @@ def diferir_costos_ciclos_sin_terminar(df, activar=1):
 
 def asignar_observaciones_liquidacion(df, ciclos_sin_terminar, activar=1):
     """Explica el diferimiento y el resultado financiero de cada ciclo."""
+    # Se recalcula aqui en vez de confiar en el parametro recibido: entre
+    # diferir_costos_ciclos_sin_terminar() y este punto, main() reordena y
+    # reindexa df_compacto (ver "RENUMERACION DE CICLOS PARA EL REPORTE"),
+    # lo que desalinea cualquier Serie booleana calculada antes de eso.
+    # Estado_Ciclo_Mes viaja con cada fila sin importar el orden, asi que
+    # recalcular aqui es inmune a ese (o cualquier futuro) reordenamiento.
     if activar == 1:
+        ciclos_sin_terminar = df['Estado_Ciclo_Mes'].isin(
+            ['Continua todo el mes', 'Continua proximo mes'])
         mensaje = 'Diferido: ciclo aun no termina'
         df.loc[ciclos_sin_terminar, 'Obs_Partida'] = mensaje
         df.loc[ciclos_sin_terminar, 'Obs_Detencion'] = mensaje
+    else:
+        ciclos_sin_terminar = pd.Series(False, index=df.index)
 
     df['Obs_Liquidacion_Final'] = np.select(
         [ciclos_sin_terminar,

@@ -67,3 +67,46 @@ def test_interruptor_apagado_conserva_comportamiento_anterior():
     assert resultado['Obs_Partida'] == 'Aprobado'
     assert resultado['Obs_Detencion'] == 'Aprobado'
     assert resultado['Obs_Liquidacion_Final'] == 'Sobrecosto validado a pago'
+
+
+def test_observaciones_siguen_al_ciclo_despues_de_reordenar_y_reindexar():
+    estados = [
+        'Inicia y termina este mes',
+        'Continua todo el mes',
+        'Viene del mes anterior',
+        'Continua proximo mes',
+        'Inicia y termina este mes',
+    ]
+    df = pd.concat([_ciclo(estado) for estado in estados], ignore_index=True)
+    df['Ciclo'] = ['C', 'A', 'E', 'B', 'D']
+    # Replica los huecos que deja el filtrado previo del motor real.
+    df.index = [0, 2, 4, 7, 9]
+
+    df, diferidos_antes_de_reordenar = diferir_costos_ciclos_sin_terminar(
+        df, activar=1)
+    df['Costos_Totales_PD'] = (
+        df['Costo_Partida_Efectivo'] + df['Costo_Detencion_Efectivo'])
+    df['Total SC_PD'] = (df['Costos_Totales_PD'] - 50.0).clip(lower=0)
+
+    # Replica la renumeracion de main(): cambia tanto el orden como el indice.
+    df = df.sort_values('Ciclo').reset_index(drop=True)
+    resultado = asignar_observaciones_liquidacion(
+        df, diferidos_antes_de_reordenar, activar=1)
+
+    for _, ciclo in resultado.iterrows():
+        debe_diferirse = ciclo['Estado_Ciclo_Mes'] in {
+            'Continua todo el mes', 'Continua proximo mes'}
+        if debe_diferirse:
+            assert ciclo['Costo_Partida_Efectivo'] == 0.0
+            assert ciclo['Costo_Detencion_Efectivo'] == 0.0
+            assert ciclo['Total SC_PD'] == 0.0
+            assert ciclo['Obs_Partida'] == 'Diferido: ciclo aun no termina'
+            assert ciclo['Obs_Detencion'] == 'Diferido: ciclo aun no termina'
+            assert ciclo['Obs_Liquidacion_Final'].startswith('Diferido:')
+        else:
+            assert ciclo['Costo_Partida_Efectivo'] == 120.0
+            assert ciclo['Costo_Detencion_Efectivo'] == 80.0
+            assert ciclo['Total SC_PD'] == 150.0
+            assert ciclo['Obs_Partida'] == 'Aprobado'
+            assert ciclo['Obs_Detencion'] == 'Aprobado'
+            assert ciclo['Obs_Liquidacion_Final'] == 'Sobrecosto validado a pago'
