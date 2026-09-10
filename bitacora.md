@@ -26,6 +26,74 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — 🔴 Bug crítico encontrado en spec 17 (PR #35): motor se cae con datos reales — spec 18 escrita
+
+- **Tipo:** revisión post-merge + hallazgo de bug crítico + especificación
+  de corrección.
+- **Origen:** revisión de rutina (iniciativa propia, como parte de la
+  responsabilidad de revisar cada implementación) de la spec 16 (PR #34,
+  commit `603837e`) y la spec 17 (PR #35, commit `b43a460`), ambas ya
+  fusionadas en `main` (confirmado con `git log`: merges `578a82f` y
+  `6989052` respectivamente).
+- **Spec 16 (prorrateo sin CLI):** revisión limpia. `leer_retiros()` y
+  `ejecutar()` quedaron byte a byte idénticas (confirmado por diff), ya no
+  se importa `argparse`, las 4 variables editables quedaron al inicio del
+  archivo igual que `diagnosticar_observacion.py`. Sin hallazgos.
+- **Spec 17 (diferir ciclos sin terminar):** la lógica de negocio quedó
+  bien implementada — los 4 tests nuevos en
+  `tests/test_diferir_ciclos_sin_terminar.py` pasan y cubren los 4
+  escenarios pedidos. `pytest -q -m ""` completo: **44/44 OK**. Pero al
+  correr el **motor completo contra datos reales** de junio 2026 (1.034
+  ciclos, mismo dataset de corridas anteriores) para validar el
+  comportamiento end-to-end, **el motor se cae**:
+  ```
+  TypeError: unhashable type: 'Series'
+    File "src/sc_pd_motor_v7.py", line 1964, in main
+      df_compacto = asignar_observaciones_liquidacion(...)
+    File "src/sc_pd_motor_v7.py", line 578, in asignar_observaciones_liquidacion
+      df.loc[ciclos_sin_terminar, 'Obs_Partida'] = mensaje
+  ```
+  Los tests unitarios no lo detectan porque usan un DataFrame sintético de
+  una sola fila, donde este tipo de desalineación no puede ocurrir.
+- **Causa raíz** (confirmada instrumentando una copia descartable del
+  motor en `/tmp` con prints de diagnóstico, nunca el archivo real del
+  repo): `ciclos_sin_terminar` se calcula en la línea ~1716 y se usa recién
+  en la línea ~1947. **Entre medio**, la sección preexistente
+  "RENUMERACION DE CICLOS PARA EL REPORTE" (línea ~1753, nada que ver con
+  la spec 17) hace `df_compacto.sort_values(...).reset_index(drop=True)`
+  — reordena las filas y les asigna un índice nuevo. La variable
+  `ciclos_sin_terminar`, calculada antes de ese reordenamiento, queda con
+  el índice viejo. Verificado elemento a elemento (no solo una muestra):
+  mismo largo (1.034 en ambos), pero valores de índice distintos desde la
+  posición 4 en adelante — exactamente el patrón esperado al comparar un
+  índice con huecos (heredado de un filtrado anterior sin
+  `reset_index`, línea ~1627) contra un `RangeIndex` limpio posterior.
+- **Riesgo adicional detectado, más allá del crash:** si pandas no hubiera
+  lanzado la excepción, la línea `np.select([ciclos_sin_terminar, ...])`
+  de la misma función no falla (opera por posición, no por índice) — habría
+  asignado el mensaje "Diferido..." a **filas equivocadas** en
+  `Obs_Liquidacion_Final`, en silencio. El fix propuesto en la spec 18
+  elimina ambos problemas de raíz.
+- **Spec escrita:** `docs/specs/18-fix-crash-diferir-ciclos-indice-desalineado.md`.
+  Fix quirúrgico: `asignar_observaciones_liquidacion` recalcula
+  `ciclos_sin_terminar` internamente desde la columna `Estado_Ciclo_Mes`
+  del propio `df` recibido (en vez de confiar en el parámetro, que puede
+  quedar obsoleto), garantizando alineación por construcción sin importar
+  cuántas veces se haya reordenado el DataFrame antes. No cambia la firma
+  de la función ni el call site en `main()`. Pide un test nuevo que
+  reproduzca el reordenamiento intermedio explícitamente, para que este
+  tipo de bug no pueda volver a colarse sin que un test lo detecte.
+- **Validación de mi parte:** reproducido el crash de forma aislada y
+  confirmado el fix propuesto contra el mecanismo real (no se modificó el
+  archivo del repo, todo en una copia en `/tmp`, descartada al terminar).
+- **Estado:** `main` queda con un bug de producción activo hasta que la
+  spec 18 se implemente — el dueño del proyecto no debería volver a correr
+  el motor completo con `DIFERIR_CICLOS_SIN_TERMINAR=1` (valor por
+  defecto) hasta entonces.
+- **Pendientes:** implementación de la spec 18 (Codex). Después de
+  implementada, repetir la validación con datos reales antes de dar por
+  cerrada la spec 17.
+
 ### 2026-09-09 — Claude — Investigación de casos "Sin_Registro_RIO" y corrección sobre NUEVARENCA
 
 - **Tipo:** análisis ad-hoc con datos reales, a pedido del dueño del
