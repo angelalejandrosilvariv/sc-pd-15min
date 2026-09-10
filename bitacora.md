@@ -26,6 +26,86 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Diferencias contra el modelo horario: causa dominante identificada — spec 22 escrita
+
+- **Tipo:** análisis comparativo con datos reales + especificación.
+- **Origen:** el dueño del proyecto entregó la salida del modelo horario
+  (`Salida_Horaria.xlsx`, 1.015 ciclos), su fuente horaria
+  (`Reporte_PD_2606.csv`, 190.069 filas) y nuestra salida de junio 2026
+  (1.035 ciclos), y pidió investigar las diferencias.
+- **Punto de partida:** horario 1.029.455.882 CLP vs nuestro
+  1.065.910.132 CLP (+36 millones, +3,5%). Ese +3,5% esconde diferencias
+  mucho mayores que se compensan: 59 de 82 centrales difieren en más de
+  1.000 CLP, con casos como KELAR-TG12 (−97,8 millones) y CORONEL
+  (+34,0 millones) apuntando en direcciones opuestas.
+- **Causa 1 — el margen (dominante, y está en el dato de entrada, no en
+  el motor):** la columna `CMg-CV` del reporte de 15 minutos no es una
+  resta aritmética. Viene en cero en el 100% de las filas
+  `Tipo = 'OTRO'` (645.717) y `Tipo = 'SCMT'` (37.161), y poblada solo
+  en el 51% de las `Tipo = 'C.Frec'`. Son 181.473 filas donde la columna
+  dice 0 aunque `CMg > CV`. El reporte horario ni siquiera tiene esa
+  columna: trae `CMg`, `CV` y `Dolar` crudos. Con **la misma generación
+  en ambas fuentes** (4.272.938 MWh exactos), el margen da 148.321
+  millones en la horaria contra 57.764 millones en la nuestra. Ejemplos
+  extremos: GUACOLDA-3_CAR y ALFALFAL tienen margen 0 en nuestro
+  cálculo y 3.779 y 2.755 millones en el horario.
+- **Regla del modelo horario, reconstruida y confirmada sin necesidad de
+  su código** (pesa 74 MB comprimido y no se pudo enviar): margen =
+  Σ max(0, CMg − CV) × Dólar × Generación sobre los bloques del ciclo,
+  con las columnas crudas y sin filtrar por `Tipo`. Validación: 60 de
+  las 80 centrales calzan dentro del 0,1% contra la columna
+  `Total Margen` de la salida horaria; total reconstruido 110.995
+  millones contra 109.136 reportados (1,7%, explicable porque yo sumé
+  todas las horas del mes y el horario suma solo las horas en ciclos).
+  Detalle a cuidar: `Total Margen` y `Margen ciclo inconcluso` son
+  columnas distintas y **no** deben sumarse.
+- **Impacto estimado del criterio de margen:** recalculando el margen
+  crudo por ciclo sobre nuestra propia salida, el `Total SC_PD` bajaría
+  de 1.065.910.132 a **~823 millones**, con 415 ciclos de 1.035
+  cambiando de pago.
+- **Causa 2 — configuración/tarifa:** KELAR-TG12 (−97,8 M) y
+  MEJILLONES-CTM3 (−29,0 M) son el efecto **deliberado** de la spec 15.
+  El horario mezcla configuraciones hermanas y termina aplicando
+  tarifas de ciclo combinado; en KELAR cobra 60 millones de partida
+  donde nosotros cobramos 7,4 millones con la configuración exacta.
+- **Causa 3 — segmentación de ciclos:** a 15 minutos vemos detenciones
+  que la resolución horaria no puede ver (CORONEL 35 ciclos vs 30,
+  KELAR 7 vs 6). Más ciclos implica más partidas y detenciones
+  cobradas, y además mueve `Horas_Detenida`, que puede cambiar la
+  tarifa entre fría/tibia/caliente.
+- **Decisión del dueño del proyecto:** probar el criterio del modelo
+  horario, con un interruptor al inicio del código para controlarlo.
+- **Spec escrita:** `docs/specs/22-interruptor-criterio-de-margen.md`
+  (`CALCULAR_MARGEN_EN_EL_MOTOR`, por defecto en 1, expuesto también en
+  `Carpeta_de_Trabajo/correr_motor.py` vía el parámetro `panel` que
+  `main()` ya acepta).
+- **Pendientes:** implementación por Codex. Quedan abiertas las causas 2
+  y 3, que requieren el detalle por ciclo del modelo horario (fechas de
+  inicio/término, horas detenida, tarifa y configuración aplicada).
+
+### 2026-09-10 — Claude — Spec 21 descartada: era un nombre de archivo mal escrito, no un bug
+
+- **Tipo:** corrección de un diagnóstico propio equivocado.
+- **Origen:** tras reportar el dueño del proyecto que "no está
+  funcionando el cruce para saber la empresa", diagnostiqué que el
+  nombre por defecto de `RUTA_DICCIONARIO_EMPRESA`
+  (`Diccionario_configuracion_empresa.xlsx`) estaba mal y debía ser
+  `Diccionario_central_empresa.xlsx`, y escribí la spec 21 (PR #45).
+- **Corrección:** el dueño del proyecto aclaró que **él tenía mal
+  escrito el nombre de su archivo local**. El nombre por defecto del
+  código es el correcto y no hay ningún bug.
+- **Mi error:** tomé como evidencia el nombre del archivo en mi entorno
+  de pruebas y una mención en la spec 10, y no verifiqué con el dueño
+  del proyecto antes de escribir la spec. El diagnóstico correcto era
+  preguntar primero.
+- **Estado:** **PR #45 no debe fusionarse** — aplicarlo rompería el
+  nombre por defecto para todos. La spec 21 queda anulada.
+- **Lo único aprovechable del episodio:** cuando no encuentra el
+  diccionario, el motor deja todo el reporte en `Empresa = 'Sin_Empresa'`
+  avisando con una sola línea fácil de pasar por alto. Si eso vuelve a
+  confundir, se puede especificar un aviso más visible — pero no se hace
+  ahora, no fue pedido.
+
 ### 2026-09-10 — Claude — Bug real reportado: nombre incorrecto del diccionario de empresas — spec 21 escrita
 
 - **Tipo:** diagnóstico de bug reportado por el usuario + especificación
