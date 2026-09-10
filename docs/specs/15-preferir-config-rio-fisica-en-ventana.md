@@ -70,10 +70,18 @@ más reciente **de cualquier config** de esa relacionada. El registro de
 en el RIO 1 minuto después) es el que corresponde según la disciplina
 de "una configuración, un historial propio".
 
-**Caso límite ya identificado** (`NUEVARENCA_TG1+TV1&1`, detención): no
-existe ningún registro RIO de la configuración exacta dentro de la
-ventana — ahí no hay nada que corregir, se mantiene el comportamiento
-actual sin cambios.
+**Caso límite ya identificado** (`NUEVARENCA_TG1+TV1&1`, detención):
+inicialmente lo describimos como "sin ningún registro de la
+configuración exacta en la ventana", pero al investigarlo a fondo
+después de implementar esta spec, encontramos que **sí hay un registro
+de la configuración física correcta (`NUEVARENCA_TG1+TV1_GN_A`, estado
+`EP`) a 36 minutos de `Termino_Ciclo`** — apenas 6 minutos fuera de la
+ventana `±30min` (`VENTANA_CUARTOS_HORA=2`). Es el mismo patrón que
+`CHUYACA_DIESEL&1` (34 min) y `UJINA-2/3/4&1` (38 min cada una, mismo
+instante) — 5 casos "casi dentro de ventana" que una `VENTANA_CUARTOS_HORA=3`
+(±45min) resolvería en conjunto. No es un caso genuinamente "sin nada
+en la ventana" como se dijo originalmente — queda documentado como
+pendiente de una spec futura si se decide ampliar la ventana.
 
 ## Regla a implementar
 
