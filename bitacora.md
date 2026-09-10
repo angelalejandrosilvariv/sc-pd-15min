@@ -26,6 +26,38 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Bug real reportado: nombre incorrecto del diccionario de empresas — spec 21 escrita
+
+- **Tipo:** diagnóstico de bug reportado por el usuario + especificación
+  de corrección.
+- **Origen:** el dueño del proyecto reportó "no esta funcionando el
+  cruce para saber la empresa, eso antes estaba funcionando".
+- **Causa raíz:** el nombre de archivo por defecto de
+  `RUTA_DICCIONARIO_EMPRESA` quedó mal desde la spec 00 (la que
+  restauró el motor) — `Diccionario_configuracion_empresa.xlsx` en el
+  código, cuando el archivo real que usa el dueño del proyecto se llama
+  `Diccionario_central_empresa.xlsx` (esto lo documenta correctamente la
+  propia spec 10, y es el nombre que usé yo mismo en todas las corridas
+  reales de esta sesión — de hecho, al validar la spec 19 tuve que
+  **renombrar** el archivo real a mano para que calzara con el nombre
+  por defecto incorrecto, sin notar en ese momento que ese era el
+  síntoma de un bug). Si el archivo no se encuentra bajo ese nombre, la
+  sección de carga (línea ~818) cae en su rama de "sin diccionario" y
+  deja **todo el reporte en `Empresa = 'Sin_Empresa'`**, con solo una
+  línea de aviso fácil de pasar por alto. Con `Carpeta_de_Trabajo/`
+  (spec 19) el problema se volvió más visible, porque el dueño del
+  proyecto ahora deja su archivo (ya correctamente nombrado
+  `Diccionario_central_empresa.xlsx`) en esa carpeta sin razón para
+  renombrarlo.
+- **Spec escrita:** `docs/specs/21-fix-nombre-diccionario-empresa.md`.
+  Corrige el nombre por defecto en los 5 lugares donde aparece mal
+  (`src/sc_pd_motor_v7.py`, `scripts/diagnosticar_observacion.py`, los
+  dos lanzadores de `Carpeta_de_Trabajo/`, y `README.md`). No toca
+  ninguna lógica de negocio.
+- **Pendientes:** implementación por Codex, luego pedir al dueño del
+  proyecto que confirme con una corrida real que el cruce de empresa
+  vuelve a funcionar.
+
 ### 2026-09-10 — Claude — Fix de spec 20 (PR #43) verificado — spec 20 cerrada
 
 - **Tipo:** revisión de implementación + validación.
