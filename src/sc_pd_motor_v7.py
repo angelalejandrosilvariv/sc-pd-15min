@@ -486,6 +486,16 @@ def asignar_empresas(reporte, empresa_por_nombre):
     return resultado
 
 
+def calcular_unidades_facturables(df_externo):
+    """Calcula las unidades con costo sin agrupar filas cuya UNIDAD es nula."""
+    df_costos_validos = df_externo[df_externo['UNIDAD'].notna()]
+    tiene_costo = (
+        df_costos_validos['Costo_Cero'].astype(str).str.strip().str.upper().eq('NO')
+        .groupby(df_costos_validos['UNIDAD']).transform('any')
+    )
+    return set(df_costos_validos.loc[tiene_costo, 'UNIDAD'])
+
+
 def crear_guia_lectura():
     """Construye el glosario y las formulas que permiten auditar cada ciclo."""
     filas = [
@@ -749,9 +759,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     df_costos_pd = df_externo[cols_costos].drop_duplicates(subset=['Llave_Concatenada'], keep='last')
 
     # --- Filtro Costo_Cero ---
-    tiene_costo = (df_externo['Costo_Cero'].astype(str).str.strip().str.upper().eq('NO')
-                   .groupby(df_externo['UNIDAD']).transform('any'))
-    unidades_facturables = set(df_externo.loc[tiene_costo, 'UNIDAD'])
+    df_costos_validos = df_externo[df_externo['UNIDAD'].notna()]
+    filas_sin_unidad = len(df_externo) - len(df_costos_validos)
+    if filas_sin_unidad > 0:
+        print(f"  [!] {filas_sin_unidad:,} fila(s) de Costos Consolidados (PO) sin "
+              f"UNIDAD (vacio/NaN) -- excluidas del filtro Costo_Cero. Revisa el "
+              f"archivo de origen si no lo esperabas.")
+    unidades_facturables = calcular_unidades_facturables(df_costos_validos)
     resultado_buscarx = reporte_sin_ceros['Central'].isin(unidades_facturables)
     mask_no_cogen = ~reporte_sin_ceros['Central'].astype(str).str.contains('COGEN', case=False, na=False)
     reporte_sin_ceros['Costo_Final'] = np.where(mask_no_cogen & resultado_buscarx, 'NO', 'No_Aplica')
