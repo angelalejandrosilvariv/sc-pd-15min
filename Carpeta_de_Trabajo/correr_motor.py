@@ -26,6 +26,11 @@ NOMBRE_DICCIONARIO = "Diccionario_central_config.xlsx"
 NOMBRE_DICCIONARIO_EMPRESA = "Diccionario_configuracion_empresa.xlsx"
 NOMBRE_SALIDA = "Reporte_Sobrecostos_PD_Final.xlsx"
 
+# Criterio de margen: 1 = el motor calcula (CMg - CV) * Dolar sobre todas las
+# filas (igual que el modelo horario). 0 = usa la columna 'CMg-CV' del reporte
+# tal como viene (solo poblada en filas Tipo = 'C.Frec').
+CALCULAR_MARGEN_EN_EL_MOTOR = 1
+
 
 def _ruta(nombre: str) -> str:
     return str(CARPETA / nombre) if nombre else ""
@@ -43,7 +48,7 @@ def main() -> None:
         "RUTA_DICCIONARIO_EMPRESA": _ruta(NOMBRE_DICCIONARIO_EMPRESA),
         "RUTA_SALIDA": _ruta(NOMBRE_SALIDA),
     }
-    motor.main(rutas)
+    motor.main(rutas, {"CALCULAR_MARGEN_EN_EL_MOTOR": CALCULAR_MARGEN_EN_EL_MOTOR})
 
 
 if __name__ == "__main__":
