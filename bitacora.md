@@ -26,6 +26,36 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Fix de spec 20 (PR #43) verificado — spec 20 cerrada
+
+- **Tipo:** revisión de implementación + validación.
+- **Origen:** `docs/specs/20-fix-crash-unidad-vacia-filtro-costo-cero.md`,
+  implementada por Codex en PR #43, ya fusionada en `main`.
+- **Revisión del diff:** el fix extrae `calcular_unidades_facturables(df_externo)`
+  como función propia y testeable (opción que la spec permitía
+  explícitamente), excluye las filas con `UNIDAD` nula antes del
+  `groupby`, e imprime el aviso `[!] N fila(s) ... sin UNIDAD` cuando
+  corresponde. Coincide con lo pedido.
+- **Validación ejecutada:**
+  1. `pytest -q -m ""`: **47/47 OK** (los 45 anteriores + los 2 tests
+     nuevos de `tests/test_unidades_facturables.py`).
+  2. **Reproducción directa del crash reportado:** armé un `DataFrame`
+     sintético con filas de `UNIDAD` vacía mezcladas con válidas
+     (replicando la forma del archivo real que hizo fallar al dueño del
+     proyecto) y llamé a `calcular_unidades_facturables` directamente —
+     ya no lanza `ValueError`, excluye correctamente las filas sin
+     `UNIDAD` y calcula bien las unidades facturables restantes.
+  3. Corrida completa del motor real contra los datos de junio 2026 (sin
+     filas `UNIDAD` vacías, como antes): mismo resultado de siempre
+     (1.034 ciclos) — sin regresión para el caso sin datos faltantes.
+- **Conclusión:** el crash reportado por el dueño del proyecto queda
+  resuelto. Falta que él vuelva a correr `correr_motor.py` con sus datos
+  reales de producción para la confirmación final end-to-end (no se pudo
+  reproducir con los datos de prueba de este entorno, que no tienen
+  `UNIDAD` vacía).
+- **Pendientes:** ninguno de mi parte. Avisar al dueño del proyecto para
+  que reintente su corrida real.
+
 ### 2026-09-10 — Claude — Bug real reportado por el dueño del proyecto: crash por `UNIDAD` vacía en Costos Consolidados — spec 20 escrita
 
 - **Tipo:** diagnóstico de bug reportado por el usuario + especificación
