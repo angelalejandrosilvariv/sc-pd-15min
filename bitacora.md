@@ -26,6 +26,27 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Especificación de carpeta de trabajo única para Spyder
+
+- **Tipo:** especificación.
+- **Origen:** pedido explícito del dueño del proyecto — quiere una sola
+  carpeta donde dejar todos los archivos de entrada de cada mes y correr
+  todos los scripts desde ahí, más un `.txt` breve con instrucciones. Es
+  continuación directa de la molestia ya documentada en la spec 16
+  ("no me gusta que el ambiente de trabajo sea de esta manera").
+- **Spec escrita:** `docs/specs/19-carpeta-de-trabajo-unica-para-spyder.md`.
+  Propone una carpeta nueva `Carpeta_de_Trabajo/` con 4 scripts
+  "lanzadores" cortos (para el motor, el prorrateo, el diagnóstico de
+  observaciones y la consolidación de políticas PO) que importan la
+  lógica real desde `src/`/`scripts/` sin duplicarla — solo resuelven
+  las rutas de entrada/salida contra la propia carpeta, usando nombres
+  de archivo en vez de rutas largas de Windows. Incluye el texto exacto
+  de `_LEEME.txt` con instrucciones breves y el orden de uso. Ningún
+  archivo existente se modifica.
+- **Pendientes:** implementación por Codex, luego revisión con una
+  corrida real (copiar datos de prueba a `Carpeta_de_Trabajo/` y
+  confirmar que `correr_motor.py` genera el reporte sin errores).
+
 ### 2026-09-10 — Claude — Fix de spec 18 (PR #37) verificado con datos reales — spec 17 cerrada
 
 - **Tipo:** revisión de implementación + validación con datos reales.
