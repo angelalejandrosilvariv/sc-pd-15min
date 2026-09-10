@@ -142,6 +142,11 @@ UMBRAL_RUIDO_MWH          = 1.0
 RENUMERAR_CICLOS_DEL_MES  = 1   # 1 = etiquetas del reporte parten en 1 cada mes
 DIFERIR_CICLOS_SIN_TERMINAR = 1  # 1 = no cobra partida ni detencion hasta que
                                   # el ciclo termine realmente.
+CALCULAR_MARGEN_EN_EL_MOTOR = 1  # 1 = el motor calcula el margen unitario como
+                                  # (CMg - CV) * Dolar sobre TODAS las filas, igual
+                                  # que el modelo horario.
+                                  # 0 = usa la columna 'CMg-CV' del reporte tal como
+                                  # viene (solo poblada en filas Tipo = 'C.Frec').
 
 # Cuando una central puede operar bajo mas de una configuracion (ej. turbina
 # sola vs ciclo combinado con turbina a vapor), el costo de partida/detencion
@@ -496,6 +501,28 @@ def calcular_unidades_facturables(df_externo):
     return set(df_costos_validos.loc[tiene_costo, 'UNIDAD'])
 
 
+def calcular_margen_bloques(reporte, calcular_en_motor=1):
+    """Calcula el margen por bloque. Es cero o positivo por definicion de negocio.
+
+    calcular_en_motor = 1: margen unitario = (CMg - CV) * Dolar, todas las filas.
+    calcular_en_motor = 0: margen unitario = columna 'CMg-CV' tal como viene.
+    """
+    if calcular_en_motor == 1:
+        faltan = [c for c in ['CMg', 'CV', 'Dolar'] if c not in reporte.columns]
+        if faltan:
+            sys.exit("ERROR: CALCULAR_MARGEN_EN_EL_MOTOR=1 requiere columnas "
+                     f"ausentes en el reporte: {faltan}")
+        margen_unitario = ((pd.to_numeric(reporte['CMg'], errors='coerce')
+                            - pd.to_numeric(reporte['CV'], errors='coerce'))
+                           * pd.to_numeric(reporte['Dolar'], errors='coerce'))
+    else:
+        margen_unitario = pd.to_numeric(reporte['CMg-CV'], errors='coerce')
+
+    margen_unitario = margen_unitario.fillna(0)
+    generacion = pd.to_numeric(reporte['GENERACION'], errors='coerce').fillna(0)
+    return np.where(margen_unitario > 0, margen_unitario * generacion, 0)
+
+
 def crear_guia_lectura():
     """Construye el glosario y las formulas que permiten auditar cada ciclo."""
     filas = [
@@ -716,11 +743,25 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     gen_prev, rows_prev = audit_gen("1. Filtro grupos sin generacion", reporte_sin_ceros)
 
     # El margen es cero o positivo por definicion de negocio.
-    reporte_sin_ceros['Margen'] = np.where(
-        reporte_sin_ceros['CMg-CV'] > 0,
-        reporte_sin_ceros['CMg-CV'] * reporte_sin_ceros['GENERACION'],
-        0
-    )
+    reporte_sin_ceros['Margen'] = calcular_margen_bloques(
+        reporte_sin_ceros, CALCULAR_MARGEN_EN_EL_MOTOR)
+
+    print("\n" + "=" * 78)
+    print("  CRITERIO DE MARGEN")
+    print("=" * 78)
+    if CALCULAR_MARGEN_EN_EL_MOTOR == 1:
+        print("  ACTIVO: calculado en el motor -> (CMg - CV) x Dolar, sobre todas las filas")
+        print("          (mismo criterio que el modelo horario).")
+    else:
+        print("  ACTIVO: columna 'CMg-CV' del reporte tal como viene")
+        print("          (solo poblada en filas Tipo = 'C.Frec').")
+    print(f"  Margen total del mes con el criterio activo: "
+          f"{reporte_sin_ceros['Margen'].sum():,.0f} CLP")
+    if all(c in reporte_sin_ceros.columns for c in ['CMg', 'CV', 'Dolar', 'CMg-CV']):
+        otro = calcular_margen_bloques(
+            reporte_sin_ceros, 0 if CALCULAR_MARGEN_EN_EL_MOTOR == 1 else 1)
+        print(f"  (Referencia: con el otro criterio seria {otro.sum():,.0f} CLP.)")
+    print("  Cambia CALCULAR_MARGEN_EN_EL_MOTOR para alternar este criterio.")
 
 
     # ==========================================
