@@ -1,0 +1,36 @@
+INSTRUCCIONES - Carpeta de Trabajo SC P-D
+==========================================
+
+Esta carpeta es donde corres todo. Deja aca los archivos de cada mes
+(el CSV del reporte, el RIO, los diccionarios, el parquet de retiros,
+etc.) y corre los scripts con F5 en Spyder, en este orden:
+
+1. correr_motor.py
+   Calcula los Sobrecostos P-D del mes. Antes de correr, edita las
+   variables NOMBRE_... al inicio del archivo con los nombres exactos
+   de tus archivos de este mes (deben estar en esta misma carpeta).
+   Genera: Reporte_Sobrecostos_PD_Final.xlsx
+
+2. correr_prorrateo.py (opcional)
+   Reparte el costo de cada ciclo entre los suministradores, usando el
+   Excel que genero el paso 1 y tu archivo de retiros de 15 minutos.
+   Edita las variables NOMBRE_... al inicio del archivo.
+
+3. correr_diagnostico.py (opcional, solo si el CEN pide una
+   observacion sobre una central y horario especifico)
+   Edita CENTRAL_CONSULTA, FECHA_INICIO_CONSULTA y FECHA_FIN_CONSULTA
+   al inicio del archivo, ademas de las variables NOMBRE_... .
+
+4. correr_consolidar_politicas.py (opcional)
+   Junta los archivos "PO..." de una subcarpeta llamada "Politicas PO"
+   en un solo consolidado. Esa subcarpeta debe existir dentro de esta
+   misma carpeta antes de correrlo.
+
+Si algo falla, revisa primero que los nombres de archivo escritos en
+las variables NOMBRE_... coincidan exactamente con los archivos que
+dejaste en esta carpeta (mismo nombre, misma extension).
+
+Para bajar la version mas actualizada del proyecto: entra al
+repositorio en GitHub, boton verde "Code" -> "Download ZIP",
+descomprime el ZIP, y usa la carpeta "Carpeta_de_Trabajo" que viene
+adentro.
