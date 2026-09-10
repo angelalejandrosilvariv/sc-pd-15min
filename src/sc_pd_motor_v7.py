@@ -140,6 +140,8 @@ ACTIVAR_CORRECCION_MEZCLA_CONFIG_RIO = 1  # 1 = en los limites, restringe el RIO
 FILTRAR_CICLOS_BAJA_GEN   = 1   # Rechaza ciclos con generacion <= UMBRAL_RUIDO_MWH
 UMBRAL_RUIDO_MWH          = 1.0
 RENUMERAR_CICLOS_DEL_MES  = 1   # 1 = etiquetas del reporte parten en 1 cada mes
+DIFERIR_CICLOS_SIN_TERMINAR = 1  # 1 = no cobra partida ni detencion hasta que
+                                  # el ciclo termine realmente.
 
 # Cuando una central puede operar bajo mas de una configuracion (ej. turbina
 # sola vs ciclo combinado con turbina a vapor), el costo de partida/detencion
@@ -554,6 +556,38 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida):
             'Costo_Detencion_Base_Original',
         ]
     return columnas
+
+
+def diferir_costos_ciclos_sin_terminar(df, activar=1):
+    """Anula temporalmente los costos de ciclos que siguen en operacion."""
+    ciclos_sin_terminar = df['Estado_Ciclo_Mes'].isin(
+        ['Continua todo el mes', 'Continua proximo mes'])
+    if activar == 1:
+        for columna in ['Costo_Partida_Base', 'Costo_Detencion_Base',
+                        'Costo_Partida_Efectivo', 'Costo_Detencion_Efectivo']:
+            df.loc[ciclos_sin_terminar, columna] = 0.0
+    else:
+        ciclos_sin_terminar = pd.Series(False, index=df.index)
+    return df, ciclos_sin_terminar
+
+
+def asignar_observaciones_liquidacion(df, ciclos_sin_terminar, activar=1):
+    """Explica el diferimiento y el resultado financiero de cada ciclo."""
+    if activar == 1:
+        mensaje = 'Diferido: ciclo aun no termina'
+        df.loc[ciclos_sin_terminar, 'Obs_Partida'] = mensaje
+        df.loc[ciclos_sin_terminar, 'Obs_Detencion'] = mensaje
+
+    df['Obs_Liquidacion_Final'] = np.select(
+        [ciclos_sin_terminar,
+         (df['Costos_Totales_PD'] > 0) & (df['Total SC_PD'] == 0),
+         df['Costos_Totales_PD'] == 0,
+         df['Total SC_PD'] > 0],
+        ['Diferido: ciclo aun no termina, se evaluara completo el mes de termino',
+         'Costo amortizado: Margen supero el costo P-D',
+         'Costo nulo o anulado por filtros RIO/EP',
+         'Sobrecosto validado a pago'], default='Sin Pago')
+    return df
 
 
 def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = False):
@@ -1679,6 +1713,12 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df_compacto['Filtro_Conf_Detencion'] = 1
 
     df_compacto = costos_clasicos(df_compacto)
+    df_compacto, ciclos_sin_terminar = diferir_costos_ciclos_sin_terminar(
+        df_compacto, DIFERIR_CICLOS_SIN_TERMINAR)
+    if DIFERIR_CICLOS_SIN_TERMINAR == 1:
+        n_diferidos = int(ciclos_sin_terminar.sum())
+        print(f"\n  Ciclos diferidos (aun no terminan, se evaluaran completos "
+              f"el mes de termino): {n_diferidos:,}")
     df_compacto['Costos_Totales_PD'] = df_compacto['Costo_Partida_Efectivo'] + df_compacto['Costo_Detencion_Efectivo']
     df_compacto['Total SC_PD'] = np.maximum(0, df_compacto['Costos_Totales_PD'] - df_compacto['Margen_Suma_Ciclo'])
 
@@ -1903,14 +1943,8 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # tarifa; al reves, un ciclo rechazado sin tarifa mostraba "Sin tarifa" y
     # ocultaba la causa real.
     df_compacto = marcar_sin_tarifa_rio(df_compacto, configuracion=None)
-
-    df_compacto['Obs_Liquidacion_Final'] = np.select(
-        [(df_compacto['Costos_Totales_PD'] > 0) & (df_compacto['Total SC_PD'] == 0),
-         df_compacto['Costos_Totales_PD'] == 0,
-         df_compacto['Total SC_PD'] > 0],
-        ['Costo amortizado: Margen supero el costo P-D',
-         'Costo nulo o anulado por filtros RIO/EP',
-         'Sobrecosto validado a pago'], default='Sin Pago')
+    df_compacto = asignar_observaciones_liquidacion(
+        df_compacto, ciclos_sin_terminar, DIFERIR_CICLOS_SIN_TERMINAR)
 
     columnas_finales = columnas_resumen_ciclos(
         USAR_CONFIG_DOMINANTE, USAR_TARIFA_RIO_INSTRUIDA)
