@@ -98,8 +98,10 @@ esta estructura:
   de pruebas y una mención en la spec 10, y no verifiqué con el dueño
   del proyecto antes de escribir la spec. El diagnóstico correcto era
   preguntar primero.
-- **Estado:** **PR #45 no debe fusionarse** — aplicarlo rompería el
-  nombre por defecto para todos. La spec 21 queda anulada.
+- **Estado:** la spec 21 queda anulada y **su archivo se eliminó de la
+  rama antes de fusionar**, para que nunca entre al repo: si el archivo
+  quedara en `docs/specs/`, Codex podría implementarlo y rompería el
+  nombre por defecto para todos. Solo queda este registro.
 - **Lo único aprovechable del episodio:** cuando no encuentra el
   diccionario, el motor deja todo el reporte en `Empresa = 'Sin_Empresa'`
   avisando con una sola línea fácil de pasar por alto. Si eso vuelve a
@@ -130,10 +132,12 @@ esta estructura:
   `Diccionario_central_empresa.xlsx`) en esa carpeta sin razón para
   renombrarlo.
 - **Spec escrita:** `docs/specs/21-fix-nombre-diccionario-empresa.md`.
-  Corrige el nombre por defecto en los 5 lugares donde aparece mal
+  Corregía el nombre por defecto en los 5 lugares donde aparecía
   (`src/sc_pd_motor_v7.py`, `scripts/diagnosticar_observacion.py`, los
-  dos lanzadores de `Carpeta_de_Trabajo/`, y `README.md`). No toca
-  ninguna lógica de negocio.
+  dos lanzadores de `Carpeta_de_Trabajo/`, y `README.md`).
+  **⚠️ ANULADA:** el diagnóstico era equivocado (ver la entrada
+  "Spec 21 descartada" más arriba). El archivo de la spec se eliminó
+  antes de fusionar y nunca llegó al repo.
 - **Pendientes:** implementación por Codex, luego pedir al dueño del
   proyecto que confirme con una corrida real que el cruce de empresa
   vuelve a funcionar.
