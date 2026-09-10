@@ -26,6 +26,43 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Bug real reportado por el dueño del proyecto: crash por `UNIDAD` vacía en Costos Consolidados — spec 20 escrita
+
+- **Tipo:** diagnóstico de bug reportado por el usuario + especificación
+  de corrección.
+- **Origen:** el dueño del proyecto corrió `correr_motor.py` (de
+  `Carpeta_de_Trabajo/`) con sus datos reales de producción (con mes
+  pasado acoplado) y compartió el traceback completo. El motor se cae
+  antes de generar cualquier reporte:
+  ```
+  ValueError: Cannot mask with non-boolean array containing NA / NaN values
+    File "src/sc_pd_motor_v7.py", line 754, in main
+      unidades_facturables = set(df_externo.loc[tiene_costo, 'UNIDAD'])
+  ```
+- **Causa raíz** (leída directamente del código, sección "4. COSTOS
+  CONSOLIDADOS Y DICCIONARIOS", código preexistente sin relación con
+  las specs 16-19): el filtro `Costo_Cero` agrupa `df_externo` por la
+  columna `UNIDAD`. Si esa columna trae `NaN` en alguna fila (filas en
+  blanco o incompletas en el Excel real de Costos Consolidados o en su
+  archivo de mes pasado — algo que no aparecía en los datos de prueba
+  usados hasta ahora), pandas excluye esas filas del `groupby` por
+  defecto y `.transform('any')` les devuelve `NaN` en vez de un
+  booleano, produciendo una máscara con huecos que `.loc[]` rechaza.
+- **Spec escrita:** `docs/specs/20-fix-crash-unidad-vacia-filtro-costo-cero.md`.
+  Fix: excluir explícitamente del filtro las filas con `UNIDAD` vacía
+  antes del `groupby`, e imprimir un aviso con el conteo de filas
+  excluidas (para que el dueño del proyecto pueda revisar su archivo de
+  origen si el número no le hace sentido). No cambia la definición de
+  negocio del filtro.
+- **Estado:** no pude reproducir el crash con los datos de prueba en
+  este entorno (no tienen filas con `UNIDAD` vacía) — la spec queda
+  redactada a partir de la lectura del código y del traceback exacto
+  compartido por el dueño del proyecto. Pedí en la spec un test
+  sintético que sí reproduzca el caso.
+- **Pendientes:** implementación por Codex, luego pedir al dueño del
+  proyecto que vuelva a correr `correr_motor.py` con sus datos reales
+  para confirmar que ya no se cae.
+
 ### 2026-09-10 — Claude — Revisión de `Carpeta_de_Trabajo` (spec 19, PR #40) — verificada con datos reales
 
 - **Tipo:** revisión de implementación + validación con datos reales.
