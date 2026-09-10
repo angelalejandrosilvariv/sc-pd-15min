@@ -26,6 +26,47 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Fix de spec 18 (PR #37) verificado con datos reales — spec 17 cerrada
+
+- **Tipo:** revisión de implementación + validación con datos reales.
+- **Origen:** `docs/specs/18-fix-crash-diferir-ciclos-indice-desalineado.md`,
+  implementada por Codex en PR #37 (commit `afd3ebc`), ya fusionada en
+  `main` (merge `06a5dd0`).
+- **Revisión del diff:** el fix aplicado es exactamente el propuesto en la
+  spec — `asignar_observaciones_liquidacion` recalcula
+  `ciclos_sin_terminar` desde `df['Estado_Ciclo_Mes']` en el momento de
+  uso, en vez de confiar en el parámetro recibido (potencialmente
+  desalineado por el reordenamiento de `RENUMERAR_CICLOS_DEL_MES`). Firma
+  de la función y call site en `main()` sin cambios, como se pedía.
+  Agregaron además `test_observaciones_siguen_al_ciclo_despues_de_reordenar_y_reindexar`,
+  que reproduce fielmente el escenario real: índice con huecos
+  (`[0, 2, 4, 7, 9]`, imitando el filtrado previo del motor) seguido de un
+  `sort_values(...).reset_index(drop=True)` a mitad de camino — exactamente
+  el patrón que causaba el crash — y confirma que cada ciclo conserva su
+  observación y costo correctos por identidad, no por posición.
+- **Validación ejecutada:**
+  1. `pytest -q -m ""`: **45/45 OK** (los 44 anteriores + el test nuevo).
+  2. Corrida completa del motor real (`sc_pd_motor_v7.main()`) contra los
+     mismos datos reales de junio 2026 usados en la revisión anterior
+     (1.034 ciclos) — **terminó sin excepciones**, generó el reporte
+     completo (antes se caía en `asignar_observaciones_liquidacion`).
+  3. Verificado en el Excel de salida: los **23 ciclos** con
+     `Estado_Ciclo_Mes` en `{'Continua todo el mes', 'Continua proximo
+     mes'}` quedan **todos** con `Total SC_PD = 0` y
+     `Obs_Liquidacion_Final` empezando con "Diferido..." — incluyendo
+     `GUACOLDA-3_CAR&1`, el caso original que motivó la spec 17. Ningún
+     ciclo quedó con datos cruzados ni desalineados.
+  4. `Total SC_PD` del mes completo: **1.035.077.837 CLP** — coherente con
+     la auditoría financiera impresa por el propio motor durante la
+     corrida (cascada "PAGO FINAL DE SOBRECOSTO P-D").
+- **Conclusión:** el bug de la spec 17 queda cerrado y verificado de
+  extremo a extremo con datos reales. `main` ya no se cae — el dueño del
+  proyecto puede volver a correr el motor completo con normalidad.
+- **Pendientes:** ninguno sobre esta spec. Siguen abiertos los pendientes
+  de negocio ya documentados en entradas anteriores (audit message
+  engañoso de `Config_RIO_Corregida_Mezcla`, casos residuales
+  `Sin_Registro_RIO`, posible ampliación de `VENTANA_CUARTOS_HORA`).
+
 ### 2026-09-10 — Claude — 🔴 Bug crítico encontrado en spec 17 (PR #35): motor se cae con datos reales — spec 18 escrita
 
 - **Tipo:** revisión post-merge + hallazgo de bug crítico + especificación
