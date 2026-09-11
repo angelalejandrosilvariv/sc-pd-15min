@@ -26,6 +26,65 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-11 — Claude — Verificación independiente de la subida manual (specs 23 y 24)
+
+- **Tipo:** revisión y validación con datos reales de un cambio que entró
+  fuera del flujo habitual.
+- **Origen:** el dueño del proyecto subió manualmente a `main` (commit
+  `8726e9c`, "Add files via upload") las specs 23 y 24 ya implementadas,
+  el motor nuevo `src/sc_pd_motor_turbina.py` (2.430 líneas), su
+  lanzador, los tests, el informe
+  `docs/informes/Defensa_Modelo_15min.html` y 182 líneas de bitácora.
+  Como no pasó por PR, lo verifiqué de forma independiente.
+- **Riesgo propio de una subida manual, revisado primero:** una subida
+  por la web reemplaza archivos completos, así que podía haber pisado
+  trabajo previo o resucitado archivos borrados. Comprobado que **no**
+  ocurrió ninguna de las dos cosas: mis entradas anteriores de bitácora
+  siguen intactas (las tres nuevas se agregaron encima, sin borrar), y
+  `docs/specs/21-fix-nombre-diccionario-empresa.md` —anulada y eliminada
+  a propósito— **no reapareció**.
+- **Validación ejecutada:**
+  1. `pytest -q -m ""`: **71/71 OK** (51 anteriores + 20 nuevos).
+  2. **Sin regresión en el v7:** con los valores por defecto el
+     `Total SC_PD` da **793.802.749,56**, idéntico peso a peso al de
+     antes de la subida. La spec 23 entra con `MARGEN_NETEADO_POR_CICLO=0`
+     y efectivamente no cambia ningún monto.
+  3. **`MARGEN_NETEADO_POR_CICLO=1` funciona:** `Total SC_PD` =
+     **1.065.533.897,28** (+271.731.148 CLP, +34,2%), con 670 de 1.034
+     ciclos quedando con margen neto negativo. El aviso en pantalla de
+     que ese criterio no es el del modelo horario se imprime bien.
+  4. Los **−40.377.925.560 CLP** de bloques truncados que declara la
+     spec 23 coinciden **exactamente** con lo que imprime la corrida.
+  5. **El motor por turbina corre completo** contra datos reales:
+     1.064 ciclos, `Total SC_PD` = **915.953.693,11**, costos P-D
+     1.791.109.049 CLP. Conserva la energía igual que el v7
+     (2.992.038 MWh en ambos), que es la comprobación de que no perdió
+     ni duplicó bloques.
+  6. **La copia está al día:** verifiqué que `sc_pd_motor_turbina.py`
+     incorpora los arreglos de las specs 15, 17, 18, 20, 22 y 23. Se
+     copió desde el v7 vigente, no desde una versión antigua.
+- **Observación levantada — duplicación de código:** el motor por
+  turbina es una copia completa (2.430 líneas contra 2.160 del v7, con
+  336 líneas de diferencia). Hoy está al día, pero **desde ahora cada
+  arreglo al v7 hay que aplicarlo dos veces**. No es hipotético: los dos
+  últimos bugs reales del proyecto (specs 18 y 20) fueron caídas del
+  motor detectadas recién al correr con datos reales de producción; si
+  hubieran aparecido después de esta copia, el motor por turbina se
+  habría quedado con el bug sin que nadie lo notara. Conviene decidir
+  explícitamente entre dos caminos: (a) declarar el motor por turbina un
+  experimento congelado, que no se mantiene al día y no se usa para
+  facturar; o (b) extraer a `fase1_integridad.py` la lógica común, para
+  que un arreglo sirva a los dos. No se hace nada ahora — es una
+  decisión del dueño del proyecto.
+- **Observación de negocio:** el motor por turbina cobra **más** que el
+  v7 (costos P-D 1.791 millones contra 1.596, +12%), porque al detectar
+  el ciclo por turbina aparecen más partidas y detenciones. Es el efecto
+  buscado por diseño, pero es un aumento del monto facturado y merece
+  decisión explícita antes de cualquier uso real.
+- **Pendientes:** la decisión sobre la duplicación de código, y las
+  decisiones de negocio ya abiertas (criterio de neteo del margen y si
+  el nivel turbina reemplaza o no al v7).
+
 ### 2026-09-10 — Claude — Experimento controlado: el 94,8% de la brecha contra el horario es de REGLA, no de resolución
 
 - **Tipo:** análisis con datos reales + corrección de conclusiones previas.
