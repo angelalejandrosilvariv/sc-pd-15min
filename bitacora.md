@@ -26,6 +26,188 @@ esta estructura:
 
 ## Updates
 
+### 2026-09-10 — Claude — Experimento controlado: el 94,8% de la brecha contra el horario es de REGLA, no de resolución
+
+- **Tipo:** análisis con datos reales + corrección de conclusiones previas.
+- **Origen:** el dueño del proyecto propuso alimentar nuestro motor con el
+  reporte horario (`Reporte_PD_2606.csv`, 190.069 filas) en vez de seguir
+  infiriendo causas por comparaciones indirectas. Era el control obvio y
+  debió correrse primero; se corrió al final.
+- **Montaje:** el v7 corrido dos veces —con el reporte horario adaptado
+  (`FECHA_HORA = Fecha + (Hora−1) h`) y con el de 15 min— ambas solo junio,
+  mismo RIO, mismos costos, mismos interruptores. Validaciones previas: el
+  mapeo de hora calza en **97,2% de 182.703 pares central-hora** (72,7% la
+  alternativa); la generación total es idéntica en las dos fuentes
+  (**4.272.938,04 MWh**). `AJUSTAR_FIN_BLOQUE = 0`, así que el motor no asume
+  tamaño de bloque en ningún cálculo.
+- **Resultado:**
+
+  | Corrida | SC P-D |
+  |---|---:|
+  | Excel horario | 1.028.628.659 |
+  | Motor sobre dato horario | 805.997.547 |
+  | Motor sobre dato 15 min | 793.802.750 |
+
+  Efecto **regla** (mismo dato, distinto motor): **−222.631.112 (94,8%)**.
+  Efecto **resolución** (mismo motor, distinto dato): −12.194.797 (5,2%).
+  En valor absoluto por empresa la resolución mueve 151,8 M, pero se
+  compensa (ENGIE −61,0 M, ENEL +45,4 M).
+- **ENEL en estado puro de regla:** sobre el mismo dato horario, los dos
+  modelos detectan los mismos 27 ciclos en ATACAMA-1 y 26 en ATACAMA-2, y
+  **cuatro de seis centrales calzan peso a peso** (QUINTERO-1/2,
+  SANISIDRO-1/2: mismos bloques, MWh y CLP/MWh). Las dos que difieren son
+  las multi-configuración, y ahí el Excel deja fuera del ciclo el 62% de la
+  energía de ATACAMA-1 (28.691 de 75.255 MWh): su hoja `Sobrecosto_PD xHyC`
+  no asigna clave de ciclo a todas las sub-configuraciones.
+- **Correcciones a análisis previos de esta sesión:** (a) ENGIE no es
+  selección de configuración, es 83% resolución (−61,0 de −73,4 M); (b)
+  TAMAKAYA/KELAR es regla y más grande de lo estimado: −116,6 M incluso con
+  dato horario; (c) el informe de defensa publicado presentaba la resolución
+  como explicación principal de la brecha — se corrigió con recuadro de
+  advertencia visible en la propia página.
+- **Límites declarados:** el "efecto regla" incluye el tratamiento de ciclos
+  de frontera (sin mayo vs `Ciclos inconclusos` + 28 diferidos del Excel).
+  El propio libro tiene una inconsistencia interna no perseguida: 29.903 M
+  de margen ENEL en `Sobrecosto_Ciclo` contra 22.017 M sumando xHyC.
+- **Pendientes:** son decisiones, no código — criterio de aceptación del
+  modelo si el horario no es el patrón; unidad regulatoria del ciclo
+  (configuración / relacionada / turbina); los 24 ciclos contestables;
+  `MARGEN_NETEADO_POR_CICLO`; qué mes liquida un ciclo de frontera; qué se
+  hace con los defectos encontrados en el Excel.
+
+### 2026-09-10 — Claude — Spec 24: modelo alternativo por turbina, implementado y medido (no reemplaza al v7)
+
+- **Tipo:** especificación + implementación + pruebas + análisis.
+- **Excepción de rol:** el dueño pidió explícitamente que se implementara,
+  como copia completa e independiente, con interruptor para comparar las
+  tres formas de atribuir la tarifa.
+- **Origen:** regla de negocio propuesta por el dueño: abandonar el
+  diccionario configuración → relacionada como entidad del ciclo y pensar en
+  turbinas (`UNIDAD GENERADORA`), con comparación contra el horario a nivel
+  empresa.
+- **Hallazgos estructurales previos a construir:** no existe tarifa por
+  turbina (3 de 275 calzan con la base de costos) ni RIO por turbina (su
+  `UNIDAD GENERADORA` es la planta). Por eso el motor separa tres niveles:
+  ciclo por turbina, tarifa y RIO por configuración. Solo 5 relacionadas
+  agrupan más de una turbina; el diccionario fusionaba plantas distintas
+  (SANISIDRO-1/2, ARICA-M1AR/M2AR).
+- **Implementación:** `src/sc_pd_motor_turbina.py` (copia del v7 con cambios
+  quirúrgicos comentados), `Carpeta_de_Trabajo/correr_motor_turbina.py`,
+  interruptor `ATRIBUCION_TARIFA_TURBINA` ∈ {prorrata, primera,
+  cada_turbina}, hoja `Atribucion_Turbinas`. Ver spec 24.
+- **Defecto propio corregido:** la primera regla de agrupamiento encadenaba
+  por transitividad arranques sucesivos de una sola máquina (19 ciclos de
+  TENOGAS en 202,5 h con ventana de 24 h). Se agregó la regla "una turbina
+  no se repite en un evento". Cambia `prorrata` en 123.370 CLP; cubierto por
+  `test_la_misma_turbina_repetida_no_se_fusiona_por_transitividad`.
+- **Validación:** `pytest -q` **71/71** (58 previos + 13 nuevos). Corridas
+  reales: prorrata 943.149.530, primera 943.149.530, cada_turbina
+  946.106.550. El factor de atribución suma exactamente 1 en los 1.063
+  eventos de partida y 1.046 de detención.
+- **Resultados clave:** KELAR-TV aparece con ciclos propios y su arranque
+  del 27-jun cobra 61.419.507 CLP — el mismo monto del horario, pero por
+  razón física. Σ|Δ| por empresa contra el horario baja de 255,3 M a 185,6 M.
+  ENEL se sobre-corrige (+25,2 M): ATACAMA paga tres partidas por un
+  arranque de ciclo combinado.
+- **Barrido de ventana:** con la regla corregida es completamente plano de
+  ±0,5 h a ±24 h. Las turbinas de una planta arrancan bajo configuraciones
+  distintas por construcción, así que nunca comparten llave. Medido offline
+  con validación de 0 CLP contra las corridas reales. El primer barrido
+  (antes de corregir la regla) mostraba una curva con mínimo en 3 h que era
+  íntegramente el artefacto de encadenamiento — no se usó.
+- **Decisión abierta:** llave de evento por planta en vez de configuración.
+  Medido: ENEL cruza el horario a ±1,5–2 h; la Σ|Δ| agregada empeora, pero
+  ese indicador está sesgado hacia parecerse al horario. Requiere definir
+  llave, ventana y regla de pago (`mayor_tarifa` aparece como tercera
+  opción). No implementado.
+- **Reencuadre posterior:** el experimento controlado (entrada de arriba)
+  mostró que la brecha es 94,8% regla. Este motor se construyó como
+  herramienta de convergencia; su adopción debe decidirse por sus méritos.
+
+### 2026-09-10 — Claude — Spec 23 escrita e implementada: netear el margen dentro del ciclo (`MARGEN_NETEADO_POR_CICLO`)
+
+- **Tipo:** análisis con datos reales + especificación + implementación + pruebas.
+- **Excepción de rol:** el dueño del proyecto pidió explícitamente que además
+  de la spec escribiera el código. Se hizo en esta ocasión; el reparto
+  habitual (Claude especifica, Codex implementa) no cambia.
+- **Origen:** el dueño preguntó si el margen alguna vez es negativo en vez de
+  cero. Respuesta: **no, nunca** — hay dos truncamientos, uno por bloque en
+  `calcular_margen_bloques()` y otro por ciclo en `Total SC_PD`.
+- **El modelo horario hace exactamente lo mismo** (verificado leyendo las
+  fórmulas de `Copia de Sobrecostos_PD_2606 def.xlsm`):
+  `Sobrecosto_PD xHyC!Y = IF(X-W<0,0,X-W)` trunca **por fila hora-central**
+  antes del `SUMIF` del ciclo, y `Sobrecosto_Ciclo!H` aplica el segundo
+  clamp. El motor es un calco. Magnitudes coherentes: el horario trunca
+  8.276 de 19.510 filas (42,4%); el motor 309.326 de 787.820 (39,3%).
+  **Conclusión: no es un bug, es la regla vigente.** Cambiarla requiere
+  aprobación de negocio.
+- **Caso que motiva el cambio:** TOCOPILLA-U16, ciclo del 23-jun. Margen neto
+  real del ciclo −20.601.044 CLP (vendió a pérdida), pero el truncamiento por
+  bloque le acredita +76.923.870, que cubre sus 50.594.150 de costo P-D y lo
+  deja pagando **0**. MEJILLONES-CTM3 igual: neto −59,9 M, acreditado +88,8 M.
+- **Variante sin truncar descartada:** el pago subiría a 11.565.686.567 CLP
+  contra un costo efectivo validado de 1.694.803.967 (~7x los costos P-D). No
+  es defendible y no se implementó.
+- **Implementación:** interruptor `MARGEN_NETEADO_POR_CICLO`, **default 0**.
+  Cuatro seams: `calcular_margen_bloques(..., netear_por_ciclo)` conserva el
+  signo; `compactar_resumen_ciclos(...)` guarda `Margen_Neto_Ciclo` y aplica
+  `MAX(0, ...)` al total ya neteado; `columnas_resumen_ciclos(...)` inserta
+  esa columna en la lista blanca del export (sin esto el criterio quedaba sin
+  trazabilidad); la consola declara el criterio activo y advierte cuando no es
+  el del horario. Expuesto en `Carpeta_de_Trabajo/correr_motor.py`.
+- **Validación ejecutada** (junio 2026 con empalme de mayo, ambos RIO y
+  costos de mayo desde `T:`):
+  1. `pytest -q`: **58/58 OK** (51 anteriores + 7 nuevos).
+  2. **Interruptor en 0:** `Total SC_PD` = **823.168.889,26**, idéntico peso a
+     peso al baseline previo. 0 ciclos con SC_PD distinto, `Costos_Totales_PD`
+     idéntico, y `Margen_Neto_Ciclo` correctamente ausente. Sin regresión.
+  3. **Interruptor en 1:** `Total SC_PD` = **1.099.088.305,85**, que
+     **reproduce exactamente** la medición independiente por monkeypatch hecha
+     antes de escribir la spec.
+  4. **Cambio quirúrgico:** `Costo_Partida_Efectivo`, `Costo_Detencion_Efectivo`,
+     `Costos_Totales_PD`, las bases y `Generacion_Suma_Ciclo` son idénticos en
+     ambos modos. (`Horas_Detenida_Ciclo` aparecía distinto en una primera
+     comparación: era artefacto de comparar `NaN` con `NaN` en los 5 ciclos
+     `sin_historia`; `Series.equals()` confirma que es idéntico.)
+  5. De 1.035 ciclos, **337 cambian y todos suben** — correcto por definición:
+     netear solo puede reducir el margen acreditado, nunca aumentarlo. 667
+     ciclos quedan con margen neto negativo, todos truncados a 0, y ninguno
+     con `Margen_Suma_Ciclo` negativo. Ningún `Total SC_PD` supera su costo.
+  6. Los 23 ciclos diferidos de la spec 17 siguen diferidos en ambos modos.
+  7. 139.165 bloques con margen negativo pasan a compensar
+     (−74.567.817.152 CLP).
+- **Comparación por empresa contra el horario** (total horario
+  **1.028.628.659 CLP**, 987 ciclos con empresa más 28 traspasados; extracción
+  validada peso a peso contra la hoja `RESUMEN` del propio Excel):
+
+  | | Total | Δ neto | Suma \|Δ\| por empresa |
+  |---|---:|---:|---:|
+  | Horario | 1.028.628.659 | — | — |
+  | Interruptor 0 | 823.168.889 | −205.459.770 (−20,0%) | 255.292.186 |
+  | Interruptor 1 | 1.099.088.306 | +70.459.647 (+6,8%) | **275.118.686** |
+
+  **Advertencia:** el criterio 1 acerca el *total* pero **desalinea más la
+  plata por empresa**. ENEL pasa de −14,2 M a **+84,9 M** sobre el horario. No
+  se puede justificar como "se parece más al horario"; hay que defenderlo por
+  su lectura de la regla.
+- **Corrección a un análisis previo de esta misma sesión:** la brecha de
+  TAMAKAYA/KELAR-TG12 (−97.815.745 CLP, 48% del total bajo el criterio 0) se
+  reportó primero como un pendiente abierto que "merece su propia spec". Es
+  incorrecto: ya está documentado en esta bitácora como el **efecto
+  deliberado de la spec 15**, y es inmune a ambos criterios de margen (su
+  margen es 0 en los dos modelos). Converger con el horario ahí significaría
+  revertir la spec 15. También se verificó empíricamente que
+  `USAR_CONFIG_DOMINANTE` no aplica bajo `USAR_TARIFA_RIO_INSTRUIDA = 1`:
+  correr con el interruptor en 1 da cifras idénticas peso a peso, tal como
+  anticipa el comentario del panel (líneas 194-197).
+- **Pendientes:** decisión de negocio sobre encender el interruptor. Queda
+  anotada en la spec una fragilidad latente: con `netear_por_ciclo=0` el
+  truncamiento evalúa el signo del margen **unitario** antes de multiplicar
+  por la generación, así que una `GENERACION` negativa (bombeo/consumo)
+  colaría un margen negativo. Verificado: **0 filas con generación negativa en
+  2606**, inerte hoy. No se corrigió acá para no mezclar robustez con cambio
+  de regla.
+
 ### 2026-09-10 — Claude — Interruptor de margen (spec 22, PR #46) verificado con datos reales
 
 - **Tipo:** revisión de implementación + validación con datos reales.

@@ -95,6 +95,24 @@ python src/sc_pd_motor_v7.py
 
 El resultado se escribe en la ruta definida en `RUTA_SALIDA`.
 
+## Motor alternativo por turbina (experimental)
+
+`src/sc_pd_motor_turbina.py` es una **copia independiente** del v7 que detecta
+el ciclo a nivel de `UNIDAD GENERADORA` (la turbina) en vez de central
+relacionada. No reemplaza al v7 y no lo modifica; se corre aparte con
+`Carpeta_de_Trabajo/correr_motor_turbina.py` y escribe su propio Excel. Su
+interruptor `ATRIBUCION_TARIFA_TURBINA` permite comparar tres formas de
+repartir la tarifa cuando varias turbinas arrancan bajo una misma
+configuración. Ver `docs/specs/24-modelo-por-turbina.md`, que incluye la
+decisión de negocio que sigue abierta.
+
+## Informes
+
+`docs/informes/Defensa_Modelo_15min.html` descompone la diferencia contra el
+modelo horario. Su hallazgo central: alimentando el v7 con el propio reporte
+horario, el 94,8% de la brecha persiste — es diferencia de reglas, no de
+resolución (bitácora 2026-09-10).
+
 ## Auditoría
 
 El flujo exporta hojas de auditoría y conciliación, incluyendo:
@@ -125,7 +143,13 @@ pytest -q
 El propio código deja explícitos asuntos que todavía requieren validación de negocio o regulatoria, por ejemplo:
 
 - la tolerancia de corte de ciclo queda en `0`, de acuerdo con la definición entregada para el proyecto;
-- la regla de margen usa solo margen positivo;
+- la regla de margen usa solo margen positivo, truncado **bloque a bloque**. Se
+  verificó que el modelo horario hace lo mismo (`Sobrecosto_PD xHyC!Y = IF(CMg-CV<0,
+  0, CMg-CV)`, truncada por fila antes del `SUMIF` del ciclo), así que el motor lo
+  replica fielmente. El interruptor `MARGEN_NETEADO_POR_CICLO` permite netear dentro
+  del ciclo antes de truncar; viene **apagado** porque cambia el monto liquidado
+  (+33,5% sobre 2606) y se aparta del modelo vigente — ver
+  `docs/specs/23-margen-neteado-por-ciclo.md`;
 - no se debe sustituir la regla física de ciclo por un puente heurístico de horas de cero;
 - el repositorio no contiene los Excel/CSV operacionales.
 

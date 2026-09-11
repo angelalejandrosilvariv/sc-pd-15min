@@ -1,0 +1,763 @@
+<title>Defensa del Modelo 15-Minutal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --ground: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef1f4;
+    --ink: #131920;
+    --ink-2: #4a5560;
+    --ink-3: #78838f;
+    --rule: #dae0e6;
+    --rule-2: #c3ccd5;
+    --grid: #0d6470;
+    --grid-soft: #d5e8ea;
+    --signal: #a4650a;
+    --signal-soft: #f6e7cd;
+    --ok: #2f6b46;
+    --ok-soft: #d9e9de;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0d1116;
+      --surface: #151b22;
+      --surface-2: #1d242c;
+      --ink: #e4eaf0;
+      --ink-2: #a7b3bf;
+      --ink-3: #7b8794;
+      --rule: #28313a;
+      --rule-2: #3a4550;
+      --grid: #55b7c4;
+      --grid-soft: #14343a;
+      --signal: #dda15e;
+      --signal-soft: #3a2c15;
+      --ok: #74c295;
+      --ok-soft: #17301f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0d1116;
+    --surface: #151b22;
+    --surface-2: #1d242c;
+    --ink: #e4eaf0;
+    --ink-2: #a7b3bf;
+    --ink-3: #7b8794;
+    --rule: #28313a;
+    --rule-2: #3a4550;
+    --grid: #55b7c4;
+    --grid-soft: #14343a;
+    --signal: #dda15e;
+    --signal-soft: #3a2c15;
+    --ok: #74c295;
+    --ok-soft: #17301f;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: 68ch; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 44px 0 22px;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--grid);
+    margin: 0 0 16px;
+    font-weight: 500;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: clamp(30px, 4.4vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 19px;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 62ch;
+  }
+  .meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+  }
+
+  /* ---------- verdict ---------- */
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--grid);
+    padding: 26px 30px;
+    margin-bottom: 52px;
+  }
+  .verdict h2 {
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 14px;
+    font-weight: 600;
+  }
+  .verdict p { margin: 0 0 14px; }
+  .verdict p:last-child { margin-bottom: 0; }
+
+  .splitbar { margin: 22px 0 10px; }
+  .splitbar-track {
+    display: flex;
+    height: 34px;
+    border: 1px solid var(--rule-2);
+    overflow: hidden;
+  }
+  .splitbar-a {
+    background: var(--grid);
+    flex: 0 0 94.2%;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+  }
+  .splitbar-b {
+    background: var(--signal-soft);
+    flex: 1;
+    border-left: 1px solid var(--rule-2);
+  }
+  .splitbar-a span {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--surface);
+    letter-spacing: 0.02em;
+  }
+  :root[data-theme="dark"] .splitbar-a span { color: #0d1116; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .splitbar-a span { color: #0d1116; }
+  }
+  .splitbar-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 26px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 10px;
+  }
+  .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    margin-right: 7px;
+    vertical-align: baseline;
+    border: 1px solid var(--rule-2);
+  }
+  .sw-a { background: var(--grid); }
+  .sw-b { background: var(--signal-soft); }
+
+  /* ---------- sections ---------- */
+  section { margin-bottom: 60px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+  }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--grid);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  h2.sec-title {
+    font-family: var(--sans);
+    font-size: clamp(21px, 2.6vw, 27px);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0;
+    flex: 1 1 auto;
+    text-wrap: balance;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid currentColor;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip-ok { color: var(--ok); background: var(--ok-soft); }
+  .chip-warn { color: var(--signal); background: var(--signal-soft); }
+  .chip-neutral { color: var(--grid); background: var(--grid-soft); }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 600;
+    margin: 34px 0 12px;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0 0 16px; }
+  strong { font-weight: 600; }
+  code, .m {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; margin: 22px 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 14px;
+    background: var(--surface);
+  }
+  caption {
+    caption-side: top;
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: 9px;
+  }
+  th, td {
+    padding: 9px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  thead th {
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--ink-2);
+    border-bottom: 1.5px solid var(--rule-2);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.total td { font-weight: 600; border-top: 1.5px solid var(--rule-2); background: var(--surface-2); }
+  .pos { color: var(--ok); }
+  .neg { color: var(--signal); }
+
+  /* ---------- figure ---------- */
+  figure { margin: 28px 0; }
+  figcaption {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-top: 12px;
+    max-width: 62ch;
+  }
+  .chartbox {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 24px 26px;
+    overflow-x: auto;
+  }
+
+  /* ---------- pull ---------- */
+  .pull {
+    border-left: 3px solid var(--grid);
+    padding: 4px 0 4px 22px;
+    margin: 26px 0;
+    font-size: 19px;
+    color: var(--ink);
+    font-weight: 400;
+  }
+  .warnbox {
+    background: var(--signal-soft);
+    border: 1px solid var(--signal);
+    padding: 20px 24px;
+    margin: 26px 0;
+  }
+  .warnbox h3 { margin-top: 0; color: var(--signal); }
+  .warnbox p:last-child { margin-bottom: 0; }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    padding: 16px 18px;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: 20px 0;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 8px; }
+
+  .footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 22px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  a { color: var(--grid); }
+  :focus-visible { outline: 2px solid var(--grid); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    .wrap { padding: 0 18px 64px; }
+    .verdict { padding: 20px; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Sobrecostos de Partida y Detención · Junio 2026</p>
+  <h1>Por qué el modelo de 15 minutos difiere del horario</h1>
+  <p class="standfirst">La diferencia con el Excel horario casi no tiene que ver con los 15 minutos. Alimentando nuestro motor con el <em>mismo reporte horario</em>, el 94,8% de la brecha sigue ahí: es diferencia de reglas de cálculo, no de resolución.</p>
+  <div class="meta">
+    <span>Experimento controlado sobre Reporte_PD_2606</span>
+    <span>Contraste: Copia de Sobrecostos_PD_2606 def.xlsm</span>
+    <span>Junio 2026</span>
+  </div>
+</header>
+
+<div class="verdict">
+  <h2>Las dos cosas que hay que saber</h2>
+  <p><strong>Primero: la brecha es de reglas.</strong> Corrimos nuestro motor con el reporte horario del propio modelo de referencia — mismo mes, mismo RIO, mismos costos, misma resolución. De los 234,8 millones de diferencia, <strong>222,6 millones (94,8%) sobreviven</strong> a igualar la resolución.</p>
+  <div class="splitbar">
+    <div class="splitbar-track">
+      <div class="splitbar-a"><span>222.631.112 CLP · 94,8% — diferencia de REGLA</span></div>
+      <div class="splitbar-b"></div>
+    </div>
+    <div class="splitbar-key">
+      <span><i class="swatch sw-a"></i>Regla — persiste con el mismo dato horario</span>
+      <span><i class="swatch sw-b"></i>Resolución — 12.194.797 CLP · 5,2%</span>
+    </div>
+  </div>
+  <p><strong>Segundo: donde los dos modelos se miden en igualdad de condiciones, coinciden exactamente.</strong> En ENEL, cuatro de sus seis centrales calzan <em>peso a peso</em> con el Excel sobre el mismo dato: mismos bloques dentro del ciclo, misma generación, mismo margen por MWh. Las dos que difieren son las que operan bajo varias configuraciones.</p>
+  <p>Ese es el argumento: no vemos cosas distintas, aplicamos reglas distintas — y sobre cada regla hay evidencia documental de cuál corresponde.</p>
+</div>
+
+<section>
+  <div class="sec-head">
+    <span class="sec-num">EL EXPERIMENTO</span>
+    <h2 class="sec-title">Separar la regla de la resolución</h2>
+    <span class="chip chip-neutral">Control</span>
+  </div>
+
+  <div class="col">
+    <p>Durante mucho tiempo la comparación fue indirecta: dos modelos, dos fuentes de datos, dos resultados. Imposible saber qué parte de la diferencia venía de la resolución y qué parte de las reglas.</p>
+    <p>El control es sencillo. Alimentar <strong>nuestro motor con el reporte horario</strong>, y comparar contra el Excel que usa ese mismo reporte. Todo lo que sobreviva es regla.</p>
+    <p>Dos validaciones previas dejan el montaje limpio:</p>
+    <ul>
+      <li>El mapeo de <span class="m">Hora</span> (1 a 24) a marca de tiempo se verificó agregando el reporte de 15 minutos a hora: <strong>97,2% de 182.703 pares central-hora calzan exactos</strong> con la convención hora 1 = 00:00, contra 72,7% de la alternativa.</li>
+      <li>La generación total de las dos fuentes es idéntica: <strong>4.272.938,04 MWh</strong>. Es la misma energía, contada con distinto detalle.</li>
+    </ul>
+    <p>Las dos corridas del motor usan solo junio, sin empalme del mes anterior, con los mismos interruptores. Lo único que cambia entre ellas es la resolución del dato de entrada.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Las tres corridas — sobrecosto P-D total, junio 2026</caption>
+      <thead>
+        <tr><th>Corrida</th><th>Dato de entrada</th><th class="num">SC P-D (CLP)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Excel horario</strong></td><td>Reporte horario</td><td class="num">1.028.628.659</td></tr>
+        <tr><td><strong>Motor sobre dato horario</strong></td><td>Reporte horario</td><td class="num">805.997.547</td></tr>
+        <tr><td><strong>Motor sobre dato 15 min</strong></td><td>Reporte de 15 minutos</td><td class="num">793.802.750</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <div class="chartbox">
+      <svg viewBox="0 0 700 200" width="100%" height="200" role="img" aria-label="Descomposición: 222,6 millones por regla, 12,2 millones por resolución">
+        <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)" letter-spacing="1">DESCOMPOSICIÓN DE LA BRECHA DE 234,8 MILLONES</text>
+        <rect x="0" y="42" width="628" height="34" fill="var(--grid)"></rect>
+        <rect x="628" y="42" width="34" height="34" fill="var(--signal)"></rect>
+        <line x1="0" y1="86" x2="662" y2="86" stroke="var(--rule)" stroke-width="1"></line>
+
+        <text x="12" y="64" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--surface)">REGLA · 94,8%</text>
+        <text x="0" y="112" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--grid)" font-weight="600">−222.631.112 CLP</text>
+        <text x="0" y="132" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="var(--ink-2)">Persiste con el mismo dato horario</text>
+
+        <text x="662" y="112" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--signal)" font-weight="600">−12.194.797 CLP</text>
+        <text x="662" y="132" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="var(--ink-2)">Resolución · 5,2%</text>
+
+        <text x="0" y="172" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">El neto de la resolución es chico, pero mueve 151,8 millones en valor absoluto entre empresas: se compensa.</text>
+      </svg>
+    </div>
+    <figcaption>La resolución no es despreciable por empresa — ENGIE baja 61,0 millones por resolución y ENEL sube 45,4, y casi se cancelan. Lo que no hace es explicar la brecha agregada.</figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Las seis empresas que concentran cada efecto</caption>
+      <thead>
+        <tr><th>Empresa</th><th class="num">Excel horario</th><th class="num">Motor · dato horario</th><th class="num">Motor · dato 15 min</th><th class="num">Efecto regla</th><th class="num">Efecto resolución</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>TAMAKAYA</td><td class="num">197.379.263</td><td class="num">80.812.948</td><td class="num">92.127.262</td><td class="num neg">−116.566.315</td><td class="num">+11.314.314</td></tr>
+        <tr><td>ENEL_GENERACION</td><td class="num">204.469.296</td><td class="num">132.879.742</td><td class="num">178.254.441</td><td class="num neg">−71.589.554</td><td class="num">+45.374.699</td></tr>
+        <tr><td>ENGIE</td><td class="num">221.198.623</td><td class="num">208.809.569</td><td class="num">147.778.217</td><td class="num">−12.389.054</td><td class="num neg">−61.031.352</td></tr>
+        <tr><td>COLBUN</td><td class="num">139.755.784</td><td class="num">121.261.449</td><td class="num">107.064.497</td><td class="num">−18.494.335</td><td class="num">−14.196.952</td></tr>
+        <tr><td>SGA</td><td class="num">15.142.052</td><td class="num">25.161.791</td><td class="num">31.916.069</td><td class="num">+10.019.738</td><td class="num">+6.754.278</td></tr>
+        <tr><td>CARDONES SA</td><td class="num">24.523.580</td><td class="num">20.060.594</td><td class="num">20.060.594</td><td class="num">−4.462.986</td><td class="num"><strong>0</strong></td></tr>
+        <tr class="total"><td>Total</td><td class="num">1.028.628.659</td><td class="num">805.997.547</td><td class="num">793.802.750</td><td class="num">−222.631.112</td><td class="num">−12.194.797</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p class="pull">ENGIE es el caso inverso de TAMAKAYA: <strong>su brecha es 83% resolución</strong> (−61,0 de −73,4 millones). Sobre dato horario casi calzamos con el Excel: 208,8 contra 221,2 millones.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="sec-num">CAUSA 1</span>
+    <h2 class="sec-title">El margen no es fuente de divergencia</h2>
+    <span class="chip chip-ok">Los modelos coinciden</span>
+  </div>
+
+  <div class="col">
+    <p>La primera lectura de las cifras sugiere que acreditamos casi el doble de margen que el horario: 137.247 millones contra 70.227. Esa comparación es inválida, y conviene desarmarla antes de que alguien la use en contra.</p>
+    <p>Se estaban comparando perímetros distintos. Dos correcciones:</p>
+    <ul>
+      <li>Nuestro <span class="m">Margen_Suma_Ciclo</span> incluye los bloques de <strong>mayo</strong> de los ciclos de frontera — <strong>24.403.845.099 CLP</strong> que el horario liquida en otro mes.</li>
+      <li>El horario aparta 28 ciclos como <span class="m">"Se traspasa al próximo mes"</span>. Son las centrales base grandes (SANTAMARIA, ANGAMOS, COCHRANE) y concentran <strong>80.469.823.404 CLP</strong> de margen. Excluirlos distorsiona todo.</li>
+    </ul>
+    <p>Puestos en el mismo perímetro —solo bloques de junio— los dos modelos prácticamente calzan:</p>
+  </div>
+
+  <figure>
+    <div class="chartbox">
+      <svg viewBox="0 0 700 190" width="100%" height="190" role="img" aria-label="Margen por MWh: horario 37.340 CLP, 15 minutos 37.714 CLP">
+        <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)" letter-spacing="1">CLP DE MARGEN POR MWh GENERADO DENTRO DE CICLOS</text>
+        <line x1="150" y1="34" x2="150" y2="150" stroke="var(--rule-2)" stroke-width="1"></line>
+        <text x="142" y="66" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--ink)">Horario</text>
+        <rect x="150" y="46" width="446" height="30" fill="var(--rule-2)"></rect>
+        <text x="606" y="66" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--ink)">37.340</text>
+        <text x="142" y="120" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--ink)">15 minutos</text>
+        <rect x="150" y="100" width="450" height="30" fill="var(--grid)"></rect>
+        <text x="610" y="120" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">37.714</text>
+        <line x1="150" y1="150" x2="660" y2="150" stroke="var(--rule)" stroke-width="1"></line>
+        <text x="150" y="172" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-2)">Diferencia: +1,0%</text>
+      </svg>
+    </div>
+    <figcaption>Margen acreditado por unidad de energía generada dentro de ciclos, junio 2026. Las dos reglas de precio son la misma; lo que cambia es cuánta energía queda encerrada en ciclos.</figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Mismo perímetro — solo bloques de junio</caption>
+      <thead>
+        <tr><th>Concepto</th><th class="num">Horario</th><th class="num">15 minutos</th><th class="num">Diferencia</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Margen acreditado (CLP)</td><td class="num">109.136.016.442</td><td class="num">112.843.401.035</td><td class="num">+3,4%</td></tr>
+        <tr><td>Generación dentro de ciclos (MWh)</td><td class="num">2.922.786,95</td><td class="num">2.992.087,57</td><td class="num">+2,4%</td></tr>
+        <tr class="total"><td>Margen por MWh (CLP)</td><td class="num">37.340</td><td class="num">37.714</td><td class="num">+1,0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>La prueba definitiva: cuatro centrales que calzan peso a peso</h3>
+  <div class="col">
+    <p>El experimento permite ir más allá del agregado. Con el mismo reporte horario, comparamos bloque a bloque qué energía queda dentro de cada ciclo de ENEL:</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>ENEL — bloques y margen dentro de ciclos, mismo dato horario</caption>
+      <thead>
+        <tr><th>Central</th><th class="num">Bloques Excel</th><th class="num">Bloques motor</th><th class="num">MWh Excel</th><th class="num">MWh motor</th><th class="num">CLP/MWh Excel</th><th class="num">CLP/MWh motor</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>QUINTERO-1</td><td class="num">438</td><td class="num">438</td><td class="num">32.961</td><td class="num">32.961</td><td class="num">26.208</td><td class="num">26.208</td></tr>
+        <tr><td>QUINTERO-2</td><td class="num">456</td><td class="num">456</td><td class="num">34.711</td><td class="num">34.711</td><td class="num">25.657</td><td class="num">25.657</td></tr>
+        <tr><td>SANISIDRO-1</td><td class="num">714</td><td class="num">714</td><td class="num">221.105</td><td class="num">221.105</td><td class="num">41.121</td><td class="num">41.121</td></tr>
+        <tr><td>SANISIDRO-2</td><td class="num">718</td><td class="num">718</td><td class="num">237.232</td><td class="num">237.232</td><td class="num">42.667</td><td class="num">42.667</td></tr>
+        <tr><td>ATACAMA-1TG1AB</td><td class="num">472</td><td class="num neg">1.045</td><td class="num">28.691</td><td class="num neg">75.255</td><td class="num">20.407</td><td class="num">22.331</td></tr>
+        <tr><td>ATACAMA-2TG2AB</td><td class="num">322</td><td class="num neg">583</td><td class="num">17.914</td><td class="num neg">39.643</td><td class="num">25.839</td><td class="num">30.935</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p><strong>En las cuatro primeras el resultado es idéntico hasta el último peso.</strong> Mismos bloques, misma generación, mismo margen por MWh. No hay margen de discusión: donde la central opera bajo una sola configuración, los dos modelos hacen exactamente lo mismo.</p>
+    <p>Las dos que difieren son precisamente las multi-configuración, y ahí <strong>el Excel deja energía fuera del ciclo</strong>: en ATACAMA-1 incluye 28.691 MWh de los 75.255 que la central generó mientras su ciclo estaba vivo. Su hoja <span class="m">Sobrecosto_PD xHyC</span> está indexada por configuración y no asigna clave de ciclo a todas, así que parte de la generación nunca entra al margen. El precio por MWh, en cambio, sigue siendo casi el mismo (20.407 contra 22.331).</p>
+    <p>Además, el truncamiento del margen negativo es <strong>idéntico</strong> en los dos modelos. La fórmula del horario trunca fila por fila antes de sumar el ciclo:</p>
+  </div>
+
+  <pre><code>Sobrecosto_PD xHyC!Y  = IF(X2-W2&lt;0, 0, X2-W2)        W=CV, X=CMg  → por fila hora-central
+Sobrecosto_PD xHyC!AB = Z2*Y2*AA2                      Margen = USD × diferencia × Gen
+Sobrecosto_Ciclo!E    = SUMIF(...AC:AC, A2, ...AB:AB)  suma los márgenes YA truncados
+Sobrecosto_Ciclo!H    = IF(C2+D2+F2&gt;E2+G2, C2+D2+F2-E2-G2, 0)   segundo clamp</code></pre>
+
+  <div class="col">
+    <p>Nuestro motor hace exactamente lo mismo, y las proporciones lo confirman: el horario trunca 8.276 de 19.510 filas (42,4%); nosotros 309.326 de 787.820 bloques (39,3%). Mismo fenómeno, distinta resolución.</p>
+    <p class="pull">Si alguien cuestiona el margen, la respuesta está cerrada: <strong>coincidimos en 1,0% por MWh y aplicamos la misma regla de truncamiento.</strong></p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="sec-num">CAUSA 2</span>
+    <h2 class="sec-title">La configuración cobrada — aquí está la plata</h2>
+    <span class="chip chip-neutral">94,2% respaldado</span>
+  </div>
+
+  <div class="col">
+    <p>El driver real es el costo, no el margen. El horario reconoce 2.299,4 millones de costo P-D en los ciclos que liquida; nosotros 1.694,8. La diferencia son <strong>604,6 millones</strong>, y se concentra en centrales que pueden operar como turbina sola o como ciclo combinado.</p>
+    <p>El motivo es deliberado y está documentado: la <strong>spec 15</strong> corrigió que el cruce mezclara sub-configuraciones hermanas en una sola bolsa. El documento del CEN «Reglas para Establecer los Registros de Instrucciones Operacionales» define que las instrucciones se registran <strong>por configuración</strong> — cada una con su propio historial. Mezclarlas es apartarse de cómo el RIO registra la información.</p>
+    <p>La consecuencia económica es grande porque el spread entre configuraciones lo es:</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Tarifa de partida fría — configuraciones de KELAR, 1 de junio</caption>
+      <thead>
+        <tr><th>Configuración</th><th class="num">Partida fría (USD)</th><th>Qué es</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="m">KELAR-TG1_TG1_GN_B</span></td><td class="num">1.663</td><td>Turbina a gas sola</td></tr>
+        <tr><td><span class="m">KELAR-TG1_TG1+0.5TV_GN_B</span></td><td class="num">42.210</td><td>Turbina + medio vapor</td></tr>
+        <tr><td><span class="m">KELAR-TG12_TG1+TG2+TV1_GN_B</span></td><td class="num">94.034</td><td>Ciclo combinado completo</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Un factor de <strong>57×</strong> entre la más barata y la más cara. Elegir mal la configuración pesa mucho más que cualquier discusión sobre el margen.</p>
+
+    <h3>La prueba: qué dice el RIO en el instante de la partida</h3>
+    <p>Para cada uno de los 1.035 ciclos revisamos si el RIO contiene, en una ventana de −60 a +15 minutos alrededor del inicio, una instrucción de partida (<span class="m">CONSIGNAS = 'PP'</span>) de una configuración <em>distinta y más cara</em> que la que cobramos.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Respaldo documental de la configuración cobrada</caption>
+      <thead>
+        <tr><th>Situación</th><th class="num">Ciclos</th><th class="num">SC_PD (CLP)</th><th class="num">Participación</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Sin instrucción rival más cara — <strong>respaldado</strong></td><td class="num">1.011</td><td class="num">775.286.241</td><td class="num pos">94,2%</td></tr>
+        <tr><td>Con un «PP» de otra configuración más cara — <strong>contestable</strong></td><td class="num">24</td><td class="num">47.882.649</td><td class="num neg">5,8%</td></tr>
+        <tr class="total"><td>Total liquidado</td><td class="num">1.035</td><td class="num">823.168.889</td><td class="num">100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Caso KELAR-TG12 — la mayor brecha individual</h3>
+  <div class="col">
+    <p>KELAR explica 97.815.745 CLP de diferencia, el 48% del total. El horario cobra 6 ciclos; nosotros 7. Cuatro coinciden peso a peso. Los otros dos son toda la brecha:</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>KELAR-TG12 — costo de partida por ciclo</caption>
+      <thead>
+        <tr><th>Ciclo</th><th class="num">Horario</th><th class="num">15 minutos</th><th>Configuración que aplicamos</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1 a 4</td><td class="num">≈ 7,4 M c/u</td><td class="num">≈ 7,4 M c/u</td><td>coinciden</td></tr>
+        <tr><td>5 — 21-jun 04:45</td><td class="num neg">60.094.624</td><td class="num">7.472.068</td><td><span class="m">KELAR-TG1_TG1_DIESEL</span></td></tr>
+        <tr><td>6 — 22-jun 02:45</td><td class="num neg">61.419.507</td><td class="num">7.472.068</td><td><span class="m">KELAR-TG1_TG1_DIESEL</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p><strong>Ciclo 5 — nuestra posición es sólida.</strong> Los únicos registros del RIO alrededor del inicio son de la turbina sola. No hay ninguna instrucción de la configuración con vapor:</p>
+  </div>
+
+  <pre><code>2026-06-21 04:54   KELAR-TG1_TG1_DIESEL          RO / PS     0 MW
+2026-06-21 05:21   KELAR-TG1_TG1_DIESEL          DRO / FS    0 MW
+
+Ciclo nuestro: 04:45 → 05:15    ·    El horario cobró TG1+0.5TV como "caliente"</code></pre>
+
+  <div class="col">
+    <p>El horario aplicó una tarifa de ciclo combinado a un ciclo donde el RIO solo registra la turbina sola. Esa tarifa no tiene respaldo documental en ese instante.</p>
+  </div>
+
+  <div class="warnbox">
+    <h3>Ciclo 6 — aquí el horario tiene un argumento</h3>
+    <p>Hay que decirlo antes de que lo diga la contraparte. En el ciclo 6 el RIO muestra las dos configuraciones, y la instrucción de <em>partida</em> es de la combinada:</p>
+    <pre><code>2026-06-22 02:30   KELAR-TG1_TG1+0.5TV_DIESEL    DRO / PP    153 MW   ← instrucción de partida
+2026-06-22 02:44   KELAR-TG1_TG1_DIESEL          RO / PMT     95 MW   ← la que cobramos
+
+Ciclo nuestro: parte 02:45</code></pre>
+    <p>Nuestra regla toma el registro más cercano hacia atrás de la configuración exacta del bloque, y eso nos lleva al de 02:44. Pero a las 02:30 el RIO instruyó arrancar en ciclo combinado a 153 MW. La secuencia física es coherente con eso: la turbina a gas parte primero y el vapor entra después. El ciclo 7 (26-jun) repite el patrón.</p>
+    <p>Son exactamente los <strong>24 ciclos contestables</strong> del cuadro anterior. Conviene tener la respuesta preparada, no descubrirlo en la reunión.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Los 24 ciclos contestables, por empresa</caption>
+      <thead>
+        <tr><th>Empresa</th><th class="num">Ciclos</th><th class="num">Costo P-D en juego</th><th class="num">SC_PD efectivo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>COLBUN</td><td class="num">9</td><td class="num">89.952.543</td><td class="num">0</td></tr>
+        <tr><td>ENGIE</td><td class="num">5</td><td class="num">30.511.671</td><td class="num">9.475.482</td></tr>
+        <tr><td>TAMAKAYA_ENERGIA</td><td class="num">2</td><td class="num">28.759.881</td><td class="num">28.759.881</td></tr>
+        <tr><td>ENEL_GENERACION</td><td class="num">7</td><td class="num">12.394.530</td><td class="num">9.647.286</td></tr>
+        <tr><td>GM_HOLDINGS</td><td class="num">1</td><td class="num">1.741.441</td><td class="num">0</td></tr>
+        <tr class="total"><td>Total</td><td class="num">24</td><td class="num">163.360.067</td><td class="num">47.882.649</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>Nótese que en 10 de los 24 el sobrecosto efectivo es <strong>cero</strong>: el margen del ciclo ya absorbió el costo, así que la discusión de configuración no mueve un peso. La exposición real se concentra en KELAR: 28,8 millones de los 47,9.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="sec-num">CAUSA 3</span>
+    <h2 class="sec-title">Lo que el horario no puede ver</h2>
+    <span class="chip chip-warn">Real, pero solo 5,2%</span>
+  </div>
+
+  <div class="warnbox">
+    <h3>Corrección respecto de la versión anterior de este documento</h3>
+    <p>Una versión anterior presentaba esta causa como la explicación principal de la brecha. <strong>Es incorrecto.</strong> El experimento controlado la acota a <strong>12.194.797 CLP netos, el 5,2%</strong> de los 234,8 millones.</p>
+    <p>Los hechos que siguen son ciertos y verificables, pero describen una <em>ventaja de medición</em>, no el origen de la diferencia con el Excel. Llevarlos a una reunión como explicación de la brecha invita a la pregunta obvia — «¿y si corren su motor con nuestro dato horario?» — que ya tiene respuesta: la brecha se mantiene casi entera.</p>
+  </div>
+
+  <div class="col">
+    <p>Dicho eso, la limitación de resolución es aritmética y no admite discusión de criterio. Agregar cuatro bloques de 15 minutos en una hora destruye información que no se puede recuperar, y eso importa para la calidad de la medición aunque no explique el monto.</p>
+  </div>
+
+  <figure>
+    <div class="chartbox">
+      <svg viewBox="0 0 700 210" width="100%" height="210" role="img" aria-label="Minuto de inicio de los 1.035 ciclos: 347 en :00, 229 en :15, 225 en :30, 234 en :45">
+        <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)" letter-spacing="1">MINUTO DE INICIO DE LOS 1.035 CICLOS DETECTADOS</text>
+        <line x1="60" y1="170" x2="660" y2="170" stroke="var(--rule-2)" stroke-width="1"></line>
+        <line x1="60" y1="40" x2="60" y2="170" stroke="var(--rule)" stroke-width="1"></line>
+
+        <rect x="100" y="46" width="96" height="124" fill="var(--rule-2)"></rect>
+        <text x="148" y="38" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--ink)">347</text>
+        <text x="148" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:00</text>
+
+        <rect x="248" y="88" width="96" height="82" fill="var(--grid)"></rect>
+        <text x="296" y="80" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">229</text>
+        <text x="296" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:15</text>
+
+        <rect x="396" y="90" width="96" height="80" fill="var(--grid)"></rect>
+        <text x="444" y="82" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">225</text>
+        <text x="444" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:30</text>
+
+        <rect x="544" y="86" width="96" height="84" fill="var(--grid)"></rect>
+        <text x="592" y="78" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">234</text>
+        <text x="592" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:45</text>
+
+        <text x="0" y="120" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">ciclos</text>
+      </svg>
+    </div>
+    <figcaption>Dos de cada tres ciclos empiezan en un instante que el modelo horario tiene que redondear. Si las partidas ocurrieran realmente en punto, las tres barras de la derecha serían cero.</figcaption>
+  </figure>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Alcance de la limitación de resolución</caption>
+      <thead>
+        <tr><th>Evidencia</th><th class="num">Ciclos</th><th class="num">SC_PD asociado (CLP)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Con al menos un límite en :15, :30 o :45</td><td class="num">909 de 1.035</td><td class="num">738.632.824</td></tr>
+        <tr><td>De duración menor a 1 hora</td><td class="num">263</td><td class="num">101.844.968</td></tr>
+        <tr><td>De duración menor a 2 horas</td><td class="num">455</td><td class="num">193.892.491</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>El 89,7% del sobrecosto vive en ciclos cuyos límites el modelo horario no puede representar, y 263 ciclos duran menos de una hora. <strong>Eso no significa que ahí esté la plata en disputa</strong> — el experimento muestra que el efecto neto es de 12,2 millones. Significa que nuestra medición del instante de partida y detención es más precisa, lo que importa para <span class="m">Horas_Detenida_Ciclo</span> y por lo tanto para el tramo tarifario.</p>
+
+    <h3>Horas que el horario da por encendidas</h3>
+    <p>Hay 4.193 pares central-hora (2,31% del mes, 175 centrales) donde la suma horaria es positiva pero al menos un cuarto está en cero. Para el horario esa central estuvo operando toda la hora. Un ejemplo real:</p>
+  </div>
+
+  <pre><code>CORONEL_GN_A   ·   26 de junio, hora 21
+
+  Lo que ve el horario :  1 hora con 24,22 MWh — encendida
+  Lo que ve el 15min   :  21:00 = 0,00  |  21:15 = 4,27  |  21:30 = 9,97  |  21:45 = 9,97
+                          └── detenida ──┘</code></pre>
+
+  <div class="col">
+    <p>De 1.690 de esas horas la central estuvo detenida <strong>tres de los cuatro cuartos</strong>. No es ruido de medición: es operación real que la resolución horaria promedia hasta hacerla desaparecer.</p>
+    <p>Esto también explica por qué detectamos más ciclos en las mismas centrales — ATACAMA-1 35 contra 27, CORONEL 35 contra 29 — sin que eso signifique cobrar más: nuestro costo total es menor, porque cada ciclo se tarifica con su configuración exacta.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="sec-num">CIERRE</span>
+    <h2 class="sec-title">Cómo queda la defensa</h2>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <caption>Resumen por causa</caption>
+      <thead>
+        <tr><th>Causa</th><th>Efecto en la brecha</th><th>Posición</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Criterio de margen</td><td>Ninguno — 4 centrales calzan peso a peso</td><td><span class="chip chip-ok">Cerrado</span></td></tr>
+        <tr><td>Configuración cobrada</td><td>Driver principal — 94,8% de la brecha</td><td><span class="chip chip-neutral">94,2% respaldado</span></td></tr>
+        <tr><td>Energía dentro del ciclo</td><td>El Excel deja fuera 62% en ATACAMA-1</td><td><span class="chip chip-ok">Evidencia por bloque</span></td></tr>
+        <tr><td>Resolución temporal</td><td>Solo 12,2 M netos (5,2%)</td><td><span class="chip chip-warn">Menor de lo pensado</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <p>El argumento ya no es «vemos cosas que ustedes no ven». Es más fuerte que eso:</p>
+    <p class="pull"><strong>Sobre su propio dato horario coincidimos exactamente donde la central tiene una sola configuración, y diferimos solo donde ustedes dejan energía fuera del ciclo o mezclan configuraciones hermanas.</strong></p>
+    <p>Los 24 ciclos contestables hay que resolverlos antes, no durante. La pregunta abierta —y es una decisión de negocio, no de código— es si una instrucción de partida <span class="m">PP</span> de la configuración combinada debe fijar la tarifa del ciclo aunque la turbina arranque sola primero.</p>
+    <p>La resolución de 15 minutos sigue siendo la forma correcta de medir la operación, y el regulador ya se movió en esa dirección. Pero es un argumento de calidad de medición, no de monto.</p>
+  </div>
+</section>
+
+<div class="footer">
+  <p><strong>Reproducibilidad.</strong> Las corridas del experimento usan <span class="m">Reporte_PD_2606.csv</span> (horario, adaptado solo en el formato de fecha) y <span class="m">Reporte_PD_15min_2606.csv</span>, ambas sin empalme del mes anterior, con el mismo RIO, los mismos costos consolidados y los mismos interruptores. El contraste se extrajo de las hojas <span class="m">Sobrecosto_Ciclo</span> y <span class="m">Sobrecosto_PD xHyC</span> del libro del modelo, y la agregación por empresa fue validada peso a peso contra su propia hoja <span class="m">RESUMEN</span>.</p>
+  <p><strong>Límites declarados.</strong> El «efecto regla» incluye el tratamiento de ciclos de frontera: nuestras corridas van sin mayo, mientras el Excel usa su hoja <span class="m">Ciclos inconclusos</span> y difiere 28 ciclos. Es una diferencia de regla legítima, pero no tarifaria, y convendría aislarla. Aparte, el propio libro presenta una inconsistencia interna que no se persiguió: su <span class="m">Sobrecosto_Ciclo</span> reporta 29.903 millones de margen para ENEL mientras la suma de <span class="m">Sobrecosto_PD xHyC</span> da 22.017 millones; la tabla por bloques de este documento compara xHyC contra nuestro detalle, que es la comparación homogénea.</p>
+  <p>Respaldos: <span class="m">Descomposicion_Regla_vs_Resolucion.xlsx</span>, <span class="m">ENEL_Regla_Excel_vs_Motor.xlsx</span>, <span class="m">Exposicion_Config_Partida.xlsx</span> y <span class="m">Puente_por_Central.xlsx</span>.</p>
+</div>
+
+</div>

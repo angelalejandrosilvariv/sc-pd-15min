@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Corre el motor de Sobrecostos P-D. Deja los archivos de entrada de este mes en esta misma carpeta."""
+"""Corre el motor SC P-D POR TURBINA (modelo alternativo, no reemplaza al v7).
+
+Los ciclos se detectan por 'UNIDAD GENERADORA' en vez de por central relacionada.
+Deja los archivos de entrada de este mes en esta misma carpeta.
+"""
 
 from __future__ import annotations
 
@@ -11,11 +15,9 @@ RAIZ = CARPETA.parent
 if str(RAIZ / "src") not in sys.path:
     sys.path.insert(0, str(RAIZ / "src"))
 
-import sc_pd_motor_v7 as motor  # noqa: E402
+import sc_pd_motor_turbina as motor  # noqa: E402
 
-# Variables editables: solo el NOMBRE del archivo (debe estar en esta
-# carpeta, junto a este script). Deja "" en los "_MES_PASADO" si no vas
-# a usar empalme con el mes anterior.
+# Variables editables: solo el NOMBRE del archivo (debe estar en esta carpeta).
 NOMBRE_REPORTE_15MIN = "Reporte_PD_15min_2606.csv"
 NOMBRE_REPORTE_MES_PASADO = ""
 NOMBRE_RIO = "RIO_06_2026.xlsx"
@@ -24,18 +26,18 @@ NOMBRE_COSTOS_PD = "Costos_de_P-D_Consolidado.xlsx"
 NOMBRE_COSTOS_MES_PASADO = ""
 NOMBRE_DICCIONARIO = "Diccionario_central_config.xlsx"
 NOMBRE_DICCIONARIO_EMPRESA = "Diccionario_configuracion_empresa.xlsx"
-NOMBRE_SALIDA = "Reporte_Sobrecostos_PD_Final.xlsx"
+NOMBRE_SALIDA = "Reporte_Sobrecostos_PD_Turbina.xlsx"
 
-# Criterio de margen: 1 = el motor calcula (CMg - CV) * Dolar sobre todas las
-# filas (igual que el modelo horario). 0 = usa la columna 'CMg-CV' del reporte
-# tal como viene (solo poblada en filas Tipo = 'C.Frec').
+# Criterio de margen, igual que en el v7.
 CALCULAR_MARGEN_EN_EL_MOTOR = 1
-
-# Cuando se descarta el margen negativo. 0 = bloque a bloque, igual que el modelo
-# horario (deja esto salvo que el cambio de criterio este aprobado). 1 = deja que
-# los bloques negativos compensen dentro del ciclo y trunca recien el total.
-# CAMBIA EL MONTO A PAGAR. Ver docs/specs/23-margen-neteado-por-ciclo.md
 MARGEN_NETEADO_POR_CICLO = 0
+
+# Como se reparte la tarifa cuando varias turbinas arrancan bajo la misma
+# configuracion (ej. KELAR-TG1 y KELAR-TV bajo KELAR-TG1_TG1+0.5TV_DIESEL):
+#   'prorrata'     -> el evento paga una vez, repartido por generacion
+#   'primera'      -> el evento paga una vez, todo a la turbina que abrio
+#   'cada_turbina' -> cada turbina paga la tarifa completa (multiplica el monto)
+ATRIBUCION_TARIFA_TURBINA = "prorrata"
 
 
 def _ruta(nombre: str) -> str:
@@ -57,6 +59,7 @@ def main() -> None:
     motor.main(rutas, {
         "CALCULAR_MARGEN_EN_EL_MOTOR": CALCULAR_MARGEN_EN_EL_MOTOR,
         "MARGEN_NETEADO_POR_CICLO": MARGEN_NETEADO_POR_CICLO,
+        "ATRIBUCION_TARIFA_TURBINA": ATRIBUCION_TARIFA_TURBINA,
     })
 
 

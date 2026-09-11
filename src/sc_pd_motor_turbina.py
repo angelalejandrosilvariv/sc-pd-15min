@@ -1,15 +1,45 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Sep  7 16:59:29 2026
-Modificado Sep 8 2026: empalme del RIO con el mes anterior (ver BUG 7 abajo).
+MOTOR SC P-D POR TURBINA - modelo alternativo, independiente del motor v7.
 
-@author: angel.silva
-"""
+Este archivo es una COPIA COMPLETA de sc_pd_motor_v7.py con un cambio de regla
+de negocio: el ciclo de partida/detencion se detecta a nivel de TURBINA
+(columna 'UNIDAD GENERADORA' del reporte de 15 min) en vez de a nivel de
+Central_Relacionada (el diccionario configuracion -> relacionada).
 
-# -*- coding: utf-8 -*-
-"""
-MOTOR DE SOBRECOSTOS DE PARTIDA Y DETENCION (SC P-D) - RESOLUCION 15 MINUTOS
-Version 7
+Por que existe
+--------------
+Una central como KELAR agrupa tres maquinas fisicas distintas -- KELAR-TG1,
+KELAR-TG2 y KELAR-TV -- que arrancan y se detienen por separado. El modelo v7
+las mete en un solo ciclo de 'KELAR-TG12', de modo que el arranque propio de la
+turbina de vapor desaparece dentro del ciclo de la central. Lo mismo pasa en
+ATACAMA-1/2, CERROPABELLON-1, TALTAL-1, UJINA-4 y ARICA: son las 7 centrales
+relacionadas del mes que agrupan mas de una turbina.
+
+Los tres niveles de este modelo (y por que no son el mismo)
+-----------------------------------------------------------
+  CICLO   -> 'UNIDAD GENERADORA'. Es el hecho fisico: esta maquina arranco y se
+             detuvo. Es lo unico que cambia respecto del v7.
+  TARIFA  -> 'CONFIGURACION'. La tabla Costos_de_P-D_Consolidado esta indexada
+             por configuracion: solo 3 de 275 turbinas del mes calzan con su
+             columna UNIDAD (1,1%), contra 261 de 378 configuraciones (69%).
+             No existe tarifa por turbina; hay que resolver una configuracion.
+  RIO     -> 'CONFIGURACION'. El RIO tampoco identifica la turbina: su columna
+             'UNIDAD GENERADORA' esta a nivel de planta ('KELAR', 'ATACAMA-1').
+             Registra planta + configuracion, que es como el documento del CEN
+             define el registro de instrucciones. Por eso en este modelo el
+             cruce maestro con el RIO se hace por configuracion, no por la
+             entidad del ciclo -- a diferencia del v7.
+
+La consecuencia de esos tres niveles es que varias turbinas pueden compartir un
+mismo evento de partida de una configuracion (KELAR-TG1 y KELAR-TV bajo
+KELAR-TG1_TG1+0.5TV_DIESEL). Como se cobra la tarifa en ese caso lo decide el
+interruptor ATRIBUCION_TARIFA_TURBINA del panel de control.
+
+Ver docs/specs/24-modelo-por-turbina.md.
+
+Correcciones acumuladas heredadas del v7:
+  Version 7
 
 Correcciones acumuladas:
   [BUG 1] shift() sobre columna booleana devolvia dtype 'object'. El operador ~
@@ -129,7 +159,36 @@ RUTA_COSTOS_PD           = r"Costos_de_P-D_Consolidado.xlsx"
 RUTA_COSTOS_MES_PASADO   = r"T:\Facturacion\Plabacom\2026\2605\02 Definitivo\SOBRECOSTOS PD\Costos_de_P-D_Consolidado.xlsx"
 RUTA_DICCIONARIO         = r"Diccionario_central_config.xlsx"
 RUTA_DICCIONARIO_EMPRESA = r"Diccionario_configuracion_empresa.xlsx"   # "" para desactivar
-RUTA_SALIDA              = r"Reporte_Sobrecostos_PD_Final.xlsx"
+RUTA_SALIDA              = r"Reporte_Sobrecostos_PD_Turbina.xlsx"
+
+# ==========================================
+# 0.b REGLA PROPIA DE ESTE MODELO
+# ==========================================
+# Varias turbinas pueden arrancar bajo una misma configuracion (KELAR-TG1 y
+# KELAR-TV bajo KELAR-TG1_TG1+0.5TV_DIESEL). La tabla de costos tiene UNA tarifa
+# para esa configuracion, no una por maquina, y esa tarifa ya escala con cuantas
+# maquinas incluye la configuracion: en KELAR, TG1_TG1 vale 1.663 USD y
+# TG12_TG1+TG2+TV1 vale 94.034 USD. Como se reparte entre las turbinas del mismo
+# evento es una decision de negocio, no un detalle tecnico:
+#
+#   'prorrata'      La tarifa se cobra UNA vez por evento y se reparte entre las
+#                   turbinas participantes en proporcion a su generacion en el
+#                   ciclo. El total del mes no cambia respecto de cobrarla una
+#                   sola vez; cambia a quien se le atribuye.
+#   'primera'       La tarifa se cobra UNA vez por evento, completa, a la turbina
+#                   que arranco primero. Las demas quedan en cero. Mismo total
+#                   que 'prorrata', atribucion mas simple de auditar.
+#   'cada_turbina'  Cada turbina cobra la tarifa completa de su configuracion.
+#                   MULTIPLICA el monto en las centrales multi-turbina.
+#
+# Dos ciclos de turbina pertenecen al mismo evento si comparten configuracion de
+# partida (o de detencion) y su inicio (o termino) cae dentro de
+# VENTANA_EVENTO_CUARTOS bloques de 15 min.
+ATRIBUCION_TARIFA_TURBINA = 'prorrata'
+VENTANA_EVENTO_CUARTOS    = 2   # +/- 2 cuartos = +/- 30 min
+
+# Nivel al que se detecta el ciclo. Es lo que distingue este motor del v7.
+COLUMNA_NIVEL_CICLO = 'UNIDAD GENERADORA'
 
 # --- Logica de negocio ---
 ACTIVAR_BUSQUEDA_RELAJADA = 1   # 1 = busca el registro RIO mas conveniente en una ventana
@@ -313,7 +372,9 @@ def rescatar_config_rio_en_limites(resumen, rio_subset, activar, ventana_cuartos
 
     for indice in pendientes:
         fila = resultado.loc[indice]
-        candidatos = por_central.get(fila['Central_Relacionada'])
+        # por_central esta indexado por CONFIGURACION en este modelo, asi que la
+        # llave de la fila es su propia configuracion, no la turbina del ciclo.
+        candidatos = por_central.get(fila['Central'])
         if candidatos is None:
             continue
         diferencias = (candidatos['FECHA_HORA_RIO'] - fila['FECHA_HORA']).abs()
@@ -357,7 +418,7 @@ def corregir_mezcla_configuraciones_rio(resumen, rio_subset, activar,
 
     for indice in candidatos_indices:
         fila = resultado.loc[indice]
-        candidatos = por_central.get(fila['Central_Relacionada'])
+        candidatos = por_central.get(fila['Central'])
         if candidatos is None:
             continue
         misma_config = candidatos[candidatos['NOMBRE CONFIGURACIÓN'] == fila['Central']]
@@ -377,9 +438,10 @@ def corregir_mezcla_configuraciones_rio(resumen, rio_subset, activar,
 
 
 def listar_secuencia_rio_ventana(momentos, rio_subset, ventana_cuartos_hora):
-    """Lista todas las instrucciones RIO cercanas a cada momento por central.
+    """Lista todas las instrucciones RIO cercanas a cada momento por configuracion.
 
-    El resultado es exclusivamente informativo: conserva el indice de
+    ``momentos`` debe traer 'Llave_Config' (la configuracion del limite del ciclo)
+    y 'Momento'. El resultado es exclusivamente informativo: conserva el indice de
     ``momentos`` y no modifica ninguno de los DataFrames recibidos.
     """
     secuencias = pd.Series('', index=momentos.index, dtype='object')
@@ -400,7 +462,7 @@ def listar_secuencia_rio_ventana(momentos, rio_subset, ventana_cuartos_hora):
 
     for indice, fila in momentos.iterrows():
         momento = pd.to_datetime(fila['Momento'], errors='coerce')
-        candidatos = por_central.get(fila['Central_Relacionada'])
+        candidatos = por_central.get(fila['Llave_Config'])
         if pd.isna(momento) or candidatos is None:
             continue
         diferencias = candidatos['FECHA_HORA_RIO'] - momento
@@ -431,6 +493,8 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
         'Termino_Ciclo': ('FECHA_HORA', 'max'),
         'Generacion_Suma_Ciclo': ('GENERACION', 'sum'),
         'Margen_Suma_Ciclo': ('Margen', 'sum'),
+        # Solo informativa: permite comparar este modelo contra el v7.
+        'Relacionada_Diccionario': ('Relacionada_Diccionario', 'first'),
         'Horas_Detenida_Ciclo': ('Horas_Detenida_Ciclo', 'first'),
         'Flag_Exencion': ('Flag_Exencion', 'first'),
         'Central_Partida': ('Central', 'first'),
@@ -597,9 +661,15 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
                             netear_por_ciclo=0):
     """Define el orden legible de las columnas exportadas a nivel de ciclo."""
     columnas = [
-        'Etiqueta_Relacionada', 'Central_Relacionada', 'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
+        'Etiqueta_Relacionada', 'Central_Relacionada', 'Relacionada_Diccionario',
+        'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
         'Inicio_Ciclo', 'Termino_Ciclo', 'Horas_Detenida_Ciclo',
         'Generacion_Suma_Ciclo', 'Margen_Suma_Ciclo',
+        # Trazabilidad de la atribucion entre turbinas del mismo evento.
+        'Central_Partida', 'Evento_Partida', 'Turbinas_En_Evento_Partida',
+        'Factor_Atribucion_Partida',
+        'Central_Detencion', 'Evento_Detencion', 'Turbinas_En_Evento_Detencion',
+        'Factor_Atribucion_Detencion',
         'Config_RIO_Rescatada_Ventana_Partida', 'Config_RIO_Rescatada_Ventana_Detencion',
         'Config_RIO_Corregida_Mezcla_Partida', 'Config_RIO_Corregida_Mezcla_Detencion',
         'Estado_Op_Partida', 'Consigna_Partida', 'Motivo_Partida',
@@ -621,8 +691,9 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
         posicion_margen = columnas.index('Margen_Suma_Ciclo') + 1
         columnas.insert(posicion_margen, 'Margen_Neto_Ciclo')
     if usar_config_dominante == 1 and usar_tarifa_rio_instruida == 0:
-        columnas += ['Central_Partida', 'Central_Partida_Original',
-                     'Central_Detencion', 'Central_Detencion_Original']
+        # Central_Partida/Detencion ya van arriba en este motor (son la llave de
+        # tarifa y de evento), asi que aqui solo se agregan las _Original.
+        columnas += ['Central_Partida_Original', 'Central_Detencion_Original']
     if usar_tarifa_rio_instruida == 1:
         posicion_partida = columnas.index('Costo_Partida_Efectivo')
         columnas[posicion_partida:posicion_partida] = [
@@ -650,6 +721,114 @@ def diferir_costos_ciclos_sin_terminar(df, activar=1):
     else:
         ciclos_sin_terminar = pd.Series(False, index=df.index)
     return df, ciclos_sin_terminar
+
+
+def agrupar_eventos_de_configuracion(df, prefijo, ventana_cuartos):
+    """Asigna un Id de evento a los ciclos de turbina que comparten una partida.
+
+    Un evento es varias TURBINAS DISTINTAS abriendo la misma configuracion, y
+    hacen falta dos reglas para que eso se cumpla:
+
+      1) encadenado por cercania dentro de la misma configuracion: se abre
+         evento nuevo cuando el salto respecto del anterior supera la ventana;
+      2) una turbina no puede aparecer dos veces en el mismo evento. Si se
+         repite, es OTRO arranque suyo y abre un evento nuevo.
+
+    Sin (2) el encadenamiento fusiona por transitividad los arranques repetidos
+    de una sola maquina: con ventana de 24 h se llego a juntar 19 ciclos de
+    TENOGAS-1a26_GLP abarcando 202,5 horas, y el reparto perdia todo sentido.
+    """
+    col_config = f'Central_{prefijo}'
+    col_momento = 'Inicio_Ciclo' if prefijo == 'Partida' else 'Termino_Ciclo'
+
+    orden = df[[col_config, col_momento, 'Central_Relacionada']].copy()
+    orden[col_momento] = pd.to_datetime(orden[col_momento], errors='coerce')
+    orden['_pos'] = np.arange(len(orden))
+    # reset_index para no arrastrar el indice original a los groupby de abajo.
+    orden = orden.sort_values([col_config, col_momento],
+                              kind='stable').reset_index(drop=True)
+
+    tolerancia = pd.Timedelta(minutes=ventana_cuartos * 15)
+    config_previa = orden[col_config].shift(1)
+    momento_previo = orden[col_momento].shift(1)
+    nuevo = ((orden[col_config] != config_previa)
+             | (orden[col_momento] - momento_previo > tolerancia)
+             | orden[col_momento].isna() | momento_previo.isna())
+    orden['_cadena'] = nuevo.cumsum()
+    orden['_repeticion'] = orden.groupby(['_cadena', 'Central_Relacionada']).cumcount()
+    orden[f'Evento_{prefijo}'] = orden.groupby(['_cadena', '_repeticion'],
+                                               sort=False).ngroup()
+
+    return orden.sort_values('_pos')[f'Evento_{prefijo}'].to_numpy()
+
+
+def atribuir_tarifa_entre_turbinas(df, prefijo, modo, ventana_cuartos):
+    """Reparte el costo de un evento entre las turbinas que lo comparten.
+
+    modo = 'cada_turbina' : cada turbina conserva la tarifa completa.
+    modo = 'primera'      : el evento paga una vez, todo a la turbina que abrio.
+    modo = 'prorrata'     : el evento paga una vez, repartido por generacion.
+
+    Devuelve (df, auditoria). La auditoria trae una fila por evento con el costo
+    antes y despues, para poder demostrar que 'primera' y 'prorrata' no cambian
+    el total del evento, solo a quien se le atribuye.
+    """
+    col_base = f'Costo_{prefijo}_Base'
+    col_efectivo = f'Costo_{prefijo}_Efectivo'
+    col_config = f'Central_{prefijo}'
+    col_evento = f'Evento_{prefijo}'
+    col_factor = f'Factor_Atribucion_{prefijo}'
+
+    resultado = df.copy()
+    resultado[col_evento] = agrupar_eventos_de_configuracion(
+        resultado, prefijo, ventana_cuartos)
+
+    grupo = resultado.groupby(col_evento)
+    resultado[f'Turbinas_En_Evento_{prefijo}'] = grupo['Central_Relacionada'] \
+        .transform('nunique')
+
+    if modo == 'cada_turbina':
+        resultado[col_factor] = 1.0
+    elif modo == 'primera':
+        momento = 'Inicio_Ciclo' if prefijo == 'Partida' else 'Termino_Ciclo'
+        primera = grupo[momento].transform('min')
+        # Ante empate exacto de instante se conserva la primera fila del evento,
+        # para que el factor sume 1 y no se cobre dos veces.
+        es_primera = resultado[momento].eq(primera)
+        rank = es_primera.groupby(resultado[col_evento]).cumsum()
+        resultado[col_factor] = np.where(es_primera & rank.eq(1), 1.0, 0.0)
+    elif modo == 'prorrata':
+        gen = pd.to_numeric(resultado['Generacion_Suma_Ciclo'],
+                            errors='coerce').fillna(0).clip(lower=0)
+        total = gen.groupby(resultado[col_evento]).transform('sum')
+        n = grupo[col_evento].transform('size')
+        # Si el evento no tiene generacion positiva, se reparte en partes iguales
+        # en vez de dejar el costo en cero.
+        resultado[col_factor] = np.where(total > 0, gen / total.replace(0, np.nan),
+                                         1.0 / n)
+        resultado[col_factor] = resultado[col_factor].fillna(1.0 / n)
+    else:
+        sys.exit(f"ERROR: ATRIBUCION_TARIFA_TURBINA='{modo}' no es valido. "
+                 f"Usa 'prorrata', 'primera' o 'cada_turbina'.")
+
+    auditoria = pd.DataFrame({
+        'Tipo': prefijo,
+        'Evento': resultado[col_evento],
+        'Configuracion': resultado[col_config],
+        'Turbinas_En_Evento': resultado[f'Turbinas_En_Evento_{prefijo}'],
+        'Costo_Antes': pd.to_numeric(resultado[col_efectivo], errors='coerce').fillna(0),
+    })
+    for columna in (col_base, col_efectivo):
+        resultado[columna] = (pd.to_numeric(resultado[columna], errors='coerce').fillna(0)
+                              * resultado[col_factor])
+    auditoria['Costo_Despues'] = pd.to_numeric(
+        resultado[col_efectivo], errors='coerce').fillna(0).to_numpy()
+
+    auditoria = (auditoria.groupby(['Tipo', 'Evento', 'Configuracion',
+                                    'Turbinas_En_Evento'], as_index=False)
+                 .agg(Costo_Evento_Antes=('Costo_Antes', 'sum'),
+                      Costo_Evento_Despues=('Costo_Despues', 'sum')))
+    return resultado, auditoria
 
 
 def asignar_observaciones_liquidacion(df, ciclos_sin_terminar, activar=1):
@@ -879,14 +1058,48 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                                     prev_gen=gen_prev, prev_rows=rows_prev)
 
     # --- Diccionario Central -> Central_Relacionada ---
+    # En este modelo el diccionario YA NO define la entidad del ciclo. Se sigue
+    # cargando porque el resto del motor lo usa para auditorias y para resolver
+    # empresa cuando la configuracion no cruza directo.
     df_diccionario = pd.read_excel(RUTA_DICCIONARIO, sheet_name=0)
     col_llave, col_valor = df_diccionario.columns[0], df_diccionario.columns[1]
     df_diccionario[col_llave] = df_diccionario[col_llave].astype(str).str.strip()
     df_diccionario[col_valor] = df_diccionario[col_valor].astype(str).str.strip()
     diccionario_central = df_diccionario.drop_duplicates(subset=[col_llave]) \
                                         .set_index(col_llave)[col_valor].to_dict()
-    reporte_sin_ceros['Central_Relacionada'] = reporte_sin_ceros['Central'].astype(str).str.strip() \
-                                                                           .map(diccionario_central)
+
+    # --- LA ENTIDAD DEL CICLO ES LA TURBINA ---
+    # Aqui esta la diferencia con el v7. 'Central_Relacionada' conserva su nombre
+    # para no tocar las 196 referencias del resto del motor, pero su contenido es
+    # la turbina. La relacionada del diccionario se guarda aparte, solo como
+    # columna informativa para poder comparar contra el v7.
+    if COLUMNA_NIVEL_CICLO not in reporte_sin_ceros.columns:
+        sys.exit(f"ERROR: el reporte no trae la columna '{COLUMNA_NIVEL_CICLO}', "
+                 f"que es el nivel de ciclo de este motor.")
+    reporte_sin_ceros['Central_Relacionada'] = (
+        reporte_sin_ceros[COLUMNA_NIVEL_CICLO].astype(str).str.strip()
+        .replace({'': np.nan, 'nan': np.nan}))
+    reporte_sin_ceros['Relacionada_Diccionario'] = (
+        reporte_sin_ceros['Central'].astype(str).str.strip().map(diccionario_central))
+
+    n_turbinas = reporte_sin_ceros['Central_Relacionada'].nunique()
+    n_relacionadas = reporte_sin_ceros['Relacionada_Diccionario'].nunique()
+    print("\n" + "=" * 78)
+    print("  NIVEL DE CICLO: TURBINA (modelo alternativo)")
+    print("=" * 78)
+    print(f"  Ciclos se detectan por '{COLUMNA_NIVEL_CICLO}': {n_turbinas:,} turbinas.")
+    print(f"  Referencia: el v7 los detectaria sobre {n_relacionadas:,} centrales "
+          f"relacionadas.")
+    agrupa = (reporte_sin_ceros.dropna(subset=['Relacionada_Diccionario'])
+              .groupby('Relacionada_Diccionario')['Central_Relacionada'].nunique())
+    multi = agrupa[agrupa > 1]
+    print(f"  Relacionadas que agrupan mas de una turbina: {len(multi)} "
+          f"(son las que cambian de verdad).")
+    for rel in multi.sort_values(ascending=False).index[:10]:
+        uds = sorted(reporte_sin_ceros.loc[
+            reporte_sin_ceros['Relacionada_Diccionario'] == rel,
+            'Central_Relacionada'].dropna().unique())
+        print(f"      {rel:<28} -> {uds}")
 
     if AUDITAR_MAPEO_DICCIONARIO == 1:
         print("\n" + "=" * 78)
@@ -1091,6 +1304,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                                            + resumen['Ciclo_ID_Relacionada'].astype(int).astype(str))
 
         columnas = ['Etiqueta_Relacionada', 'Central_Relacionada', 'Ciclo_ID_Relacionada', 'Central',
+                    'Relacionada_Diccionario',
                     'Empresa', 'Inicio_Ciclo_Global', 'Termino_Ciclo_Global', 'Horas_Detenida_Ciclo',
                     'Inicio_Generacion_Central', 'Termino_Generacion_Central',
                     'FECHA_HORA', 'GENERACION', 'Margen', 'Llave_FHC', 'Llave_FHC_Inicio', 'Llave_FHC_Fin']
@@ -1191,8 +1405,11 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df.loc[hora_str.str.startswith('24:00'), 'FECHA_HORA_RIO'] += pd.Timedelta(days=1)
 
         df['NOMBRE CONFIGURACIÓN'] = df['NOMBRE CONFIGURACIÓN'].astype(str).str.strip()
-        df['Central_Relacionada_RIO'] = (df['NOMBRE CONFIGURACIÓN'].map(diccionario_central)
-                                         .fillna(df['NOMBRE CONFIGURACIÓN']).astype(str).str.strip())
+        # En este modelo el RIO cruza por CONFIGURACION, no por relacionada. El
+        # RIO no identifica la turbina (su 'UNIDAD GENERADORA' esta a nivel de
+        # planta: 'KELAR', 'ATACAMA-1'), asi que colapsarlo al diccionario seria
+        # mezclar configuraciones hermanas -- justo lo que corrigio la spec 15.
+        df['Central_Relacionada_RIO'] = df['NOMBRE CONFIGURACIÓN']
         for c in ['CONSIGNAS', 'MOTIVO', 'ESTADO OPERACIONAL']:
             df[c] = df[c].astype(str).str.strip().replace({'nan': np.nan, '-': np.nan})
         df['COMENTARIO'] = df['COMENTARIO'].astype(str).replace({'nan': ''})
@@ -1249,10 +1466,10 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             print("      columna EO de este RIO. Confirma el codigo correcto con el CEN,")
             print("      o esa rama del filtro operacional nunca se activara.")
 
-    centrales_modelo = set(resumen_relacionada['Central_Relacionada'].dropna().unique())
-    cobertura = len(centrales_modelo & set(rio['Central_Relacionada_RIO'].unique()))
-    print(f"  Cobertura de llaves: {cobertura} de {len(centrales_modelo)} centrales "
-          f"relacionadas tienen registros en el RIO.")
+    configs_modelo = set(resumen_relacionada['Central'].dropna().astype(str).str.strip().unique())
+    cobertura = len(configs_modelo & set(rio['Central_Relacionada_RIO'].unique()))
+    print(f"  Cobertura de llaves: {cobertura} de {len(configs_modelo)} configuraciones "
+          f"del modelo tienen registros en el RIO (el cruce es por configuracion).")
 
 
     # ==========================================
@@ -1266,10 +1483,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     rio_subset = deduplicar_rio_priorizando_motivo(rio[rio_cols]).sort_values('FECHA_HORA_RIO')
 
     resumen_relacionada = resumen_relacionada.sort_values('FECHA_HORA').reset_index(drop=True)
+    # left_by='Central' (la configuracion del bloque), no la turbina: el RIO
+    # registra instrucciones por configuracion. Es la unica llave que existe en
+    # los dos lados.
     resumen_relacionada = pd.merge_asof(
         resumen_relacionada, rio_subset,
         left_on='FECHA_HORA', right_on='FECHA_HORA_RIO',
-        left_by='Central_Relacionada', right_by='Central_Relacionada_RIO',
+        left_by='Central', right_by='Central_Relacionada_RIO',
         direction='backward', tolerance=pd.Timedelta('24 hours'))
 
     resumen_relacionada = resumen_relacionada.rename(columns={
@@ -1356,8 +1576,9 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         # que ya quedo sin cubrir por (a), para no recorrer todo el mes dos veces.
         pendientes = activos[~activos['Instruido_Propio'] & ~activos['Instruido_MismoBloque']].copy()
         if not pendientes.empty:
+            # La llave del RIO en este modelo es la CONFIGURACION, no la turbina.
             rio_instruido = (rio[rio['MOTIVO'].notna()][['FECHA_HORA_RIO', 'Central_Relacionada_RIO']]
-                             .dropna().rename(columns={'Central_Relacionada_RIO': 'Central_Relacionada',
+                             .dropna().rename(columns={'Central_Relacionada_RIO': 'Central',
                                                         'FECHA_HORA_RIO': 'FECHA_HORA_Instruccion'})
                              .sort_values('FECHA_HORA_Instruccion'))
             pendientes = pendientes.sort_values('FECHA_HORA')
@@ -1365,7 +1586,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             resultado = pd.merge_asof(
                 pendientes.reset_index(drop=True), rio_instruido,
                 left_on='FECHA_HORA', right_on='FECHA_HORA_Instruccion',
-                by='Central_Relacionada', direction='nearest',
+                by='Central', direction='nearest',
                 tolerance=pd.Timedelta(minutes=VENTANA_CUARTOS_HORA * 15))
             instruido_ventana = pd.Series(resultado['FECHA_HORA_Instruccion'].notna().values, index=indice_original)
             activos['Instruido_Ventana'] = False
@@ -1773,7 +1994,9 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
 
         def obtener_mejor_rio(row, tipo):
             objetivo = row['Inicio_Ciclo'] if tipo == 'Partida' else row['Termino_Ciclo']
-            sub = por_central.get(row['Central_Relacionada'])
+            # Llave por configuracion del limite, no por la turbina del ciclo.
+            sub = por_central.get(row['Central_Partida'] if tipo == 'Partida'
+                                  else row['Central_Detencion'])
             if pd.isna(objetivo) or sub is None or sub.empty:
                 return pd.Series([None] * 8)
 
@@ -1820,11 +2043,15 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df_compacto[f'Diverge_Fuente_RIO_{prefijo}'] = (
             ambas & (df_compacto[f'Fuente_Config_RIO_{prefijo}'] != df_compacto[fuente_filtros]))
 
+    # La secuencia se lista por configuracion del limite del ciclo, que es la
+    # llave con que el RIO esta indexado en este modelo.
     df_compacto['Secuencia_RIO_Partida'] = listar_secuencia_rio_ventana(
-        df_compacto[['Central_Relacionada']].assign(Momento=df_compacto['Inicio_Ciclo']),
+        df_compacto[['Central_Partida']].rename(columns={'Central_Partida': 'Llave_Config'})
+        .assign(Momento=df_compacto['Inicio_Ciclo']),
         rio_subset, VENTANA_CUARTOS_HORA)
     df_compacto['Secuencia_RIO_Detencion'] = listar_secuencia_rio_ventana(
-        df_compacto[['Central_Relacionada']].assign(Momento=df_compacto['Termino_Ciclo']),
+        df_compacto[['Central_Detencion']].rename(columns={'Central_Detencion': 'Llave_Config'})
+        .assign(Momento=df_compacto['Termino_Ciclo']),
         rio_subset, VENTANA_CUARTOS_HORA)
 
     for c in ['Filtro_Conf_Partida', 'Filtro_Disp_Partida', 'Filtro_Op_Partida',
@@ -1840,6 +2067,44 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df_compacto['Filtro_Conf_Detencion'] = 1
 
     df_compacto = costos_clasicos(df_compacto)
+
+    # --- Atribucion de la tarifa entre turbinas del mismo evento ---
+    # Se aplica sobre los costos ya calculados y ANTES del diferimiento, para que
+    # un ciclo diferido no arrastre a cero la parte de sus companeras de evento.
+    df_compacto, eventos_partida = atribuir_tarifa_entre_turbinas(
+        df_compacto, 'Partida', ATRIBUCION_TARIFA_TURBINA, VENTANA_EVENTO_CUARTOS)
+    df_compacto, eventos_detencion = atribuir_tarifa_entre_turbinas(
+        df_compacto, 'Detencion', ATRIBUCION_TARIFA_TURBINA, VENTANA_EVENTO_CUARTOS)
+    auditoria_eventos = pd.concat([eventos_partida, eventos_detencion], ignore_index=True)
+
+    print("\n" + "=" * 78)
+    print("  ATRIBUCION DE TARIFA ENTRE TURBINAS DEL MISMO EVENTO")
+    print("=" * 78)
+    print(f"  Modo activo: '{ATRIBUCION_TARIFA_TURBINA}'  "
+          f"(ventana de evento: +/- {VENTANA_EVENTO_CUARTOS} cuartos de hora)")
+    if auditoria_eventos.empty:
+        print("  Ningun evento con mas de una turbina.")
+    else:
+        compartidos = auditoria_eventos[auditoria_eventos['Turbinas_En_Evento'] > 1]
+        print(f"  Eventos con mas de una turbina: {len(compartidos):,} de "
+              f"{len(auditoria_eventos):,}")
+        if not compartidos.empty:
+            print(f"  Turbinas involucradas          : "
+                  f"{int(compartidos['Turbinas_En_Evento'].sum()):,}")
+            print(f"  Costo antes de atribuir        : "
+                  f"{compartidos['Costo_Evento_Antes'].sum():>16,.0f} CLP")
+            print(f"  Costo despues de atribuir      : "
+                  f"{compartidos['Costo_Evento_Despues'].sum():>16,.0f} CLP")
+            print("\n  Eventos compartidos por configuracion:")
+            resumen_ev = (compartidos.groupby('Configuracion')
+                          .agg(eventos=('Configuracion', 'size'),
+                               antes=('Costo_Evento_Antes', 'sum'),
+                               despues=('Costo_Evento_Despues', 'sum'))
+                          .sort_values('antes', ascending=False))
+            for cfg, r in resumen_ev.head(15).iterrows():
+                print(f"      {str(cfg)[:46]:<46} {int(r['eventos']):>3} ev  "
+                      f"{r['antes']:>14,.0f} -> {r['despues']:>14,.0f}")
+
     df_compacto, ciclos_sin_terminar = diferir_costos_ciclos_sin_terminar(
         df_compacto, DIFERIR_CICLOS_SIN_TERMINAR)
     if DIFERIR_CICLOS_SIN_TERMINAR == 1:
@@ -2129,11 +2394,16 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
 
     print(f"\nExportando a: {RUTA_SALIDA} ...")
     with pd.ExcelWriter(RUTA_SALIDA, engine='xlsxwriter') as writer:
+        # En este motor la entidad del ciclo es la turbina; el encabezado lo dice
+        # para que nadie lea 'Central_Relacionada' como la relacionada del v7.
+        renombre_turbina = {'Central_Relacionada': 'Unidad_Generadora',
+                            'Etiqueta_Relacionada': 'Etiqueta_Turbina'}
         hojas = {'Guia_Lectura': crear_guia_lectura(),
                  'Waterfall_Costos': df_auditoria_costos,
                  'SC_por_Empresa': df_empresa,
-                 'Resumen_Ciclos_PD': df_compacto,
-                 'Detalle_15Min': detalle_mes,
+                 'Resumen_Ciclos_PD': df_compacto.rename(columns=renombre_turbina),
+                 'Atribucion_Turbinas': auditoria_eventos,
+                 'Detalle_15Min': detalle_mes.rename(columns=renombre_turbina),
                  'Auditoria_Pasos': pd.DataFrame(_audit_log)}
         if AUDITAR_INSTRUCCION_RIO == 1:
             hojas['Cobertura_Instruccion_RIO'] = cobertura_export
