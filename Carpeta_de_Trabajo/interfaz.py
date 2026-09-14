@@ -78,6 +78,9 @@ class Interfaz(tk.Tk):
         ttk.Radiobutton(f_motor, text="Turbina — ciclo por UNIDAD GENERADORA (experimental, no pisa al v7)",
                         variable=self.var_motor, value="turbina",
                         command=self._refrescar_habilitados).pack(anchor="w")
+        ttk.Radiobutton(f_motor, text="Reglas del Horario — contraste, aplica las reglas del Excel al dato 15 min",
+                        variable=self.var_motor, value="reglas_horario",
+                        command=self._refrescar_habilitados).pack(anchor="w")
 
         # -- 2. Archivos
         f_arch = ttk.LabelFrame(cuerpo, text="2. Archivos de entrada", padding=8)
@@ -123,9 +126,10 @@ class Interfaz(tk.Tk):
                         variable=self.var_margen, value=0).pack(anchor="w")
 
         self.var_neteado = tk.IntVar(value=0)
-        ttk.Checkbutton(f_met, text="Netear el margen dentro del ciclo antes de truncar  "
-                                    "(CAMBIA EL MONTO: +33,5% en 2606; el horario NO lo hace)",
-                        variable=self.var_neteado).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.cb_neteado = ttk.Checkbutton(f_met, text="Netear el margen dentro del ciclo antes de truncar  "
+                                                      "(CAMBIA EL MONTO: +33,5% en 2606; el horario NO lo hace)",
+                                          variable=self.var_neteado)
+        self.cb_neteado.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         # solo v7: que tarifa cobra un ciclo que paso por varias configuraciones
         self.lbl_tarifa = ttk.Label(f_met, text="Tarifa del ciclo (solo motor v7)")
@@ -142,23 +146,28 @@ class Interfaz(tk.Tk):
             rb.pack(anchor="w")
 
         self.var_diferir = tk.IntVar(value=1)
-        ttk.Checkbutton(f_met, text="Diferir ciclos que no terminan en el mes (se cobran el mes que terminan)",
-                        variable=self.var_diferir).grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.cb_diferir = ttk.Checkbutton(f_met, text="Diferir ciclos que no terminan en el mes (se cobran el mes que terminan)",
+                                          variable=self.var_diferir)
+        self.cb_diferir.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         self.var_baja_gen = tk.IntVar(value=1)
         fb = ttk.Frame(f_met); fb.grid(row=4, column=0, columnspan=2, sticky="w")
-        ttk.Checkbutton(fb, text="Rechazar ciclos con generacion menor o igual a",
-                        variable=self.var_baja_gen).pack(side="left")
+        self.cb_baja_gen = ttk.Checkbutton(fb, text="Rechazar ciclos con generacion menor o igual a",
+                                           variable=self.var_baja_gen)
+        self.cb_baja_gen.pack(side="left")
         self.var_umbral = tk.StringVar(value="1.0")
-        ttk.Entry(fb, textvariable=self.var_umbral, width=6).pack(side="left", padx=4)
+        self.ent_umbral = ttk.Entry(fb, textvariable=self.var_umbral, width=6)
+        self.ent_umbral.pack(side="left", padx=4)
         ttk.Label(fb, text="MWh").pack(side="left")
 
         self.var_relajada = tk.IntVar(value=1)
         fr = ttk.Frame(f_met); fr.grid(row=5, column=0, columnspan=2, sticky="w")
-        ttk.Checkbutton(fr, text="Buscar el registro RIO mas conveniente en una ventana de ±",
-                        variable=self.var_relajada).pack(side="left")
+        self.cb_relajada = ttk.Checkbutton(fr, text="Buscar el registro RIO mas conveniente en una ventana de ±",
+                                           variable=self.var_relajada)
+        self.cb_relajada.pack(side="left")
         self.var_ventana = tk.StringVar(value="2")
-        ttk.Entry(fr, textvariable=self.var_ventana, width=4).pack(side="left", padx=4)
+        self.ent_ventana = ttk.Entry(fr, textvariable=self.var_ventana, width=4)
+        self.ent_ventana.pack(side="left", padx=4)
         ttk.Label(fr, text="cuartos de hora").pack(side="left")
 
         # solo turbina
@@ -196,18 +205,24 @@ class Interfaz(tk.Tk):
 
     def _refrescar_habilitados(self):
         es_turbina = self.var_motor.get() == "turbina"
+        es_horario = self.var_motor.get() == "reglas_horario"
         estado = "readonly" if es_turbina else "disabled"
         self.cb_atrib.configure(state=estado)
         self.lbl_atrib.configure(foreground="#000" if es_turbina else "#999")
         for rb in self.rb_tarifa:
-            rb.configure(state="disabled" if es_turbina else "normal")
-        self.lbl_tarifa.configure(foreground="#999" if es_turbina else "#000")
+            rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
+        self.lbl_tarifa.configure(foreground="#000" if self.var_motor.get() == "v7" else "#999")
+        for control in (self.cb_neteado, self.cb_diferir, self.cb_baja_gen,
+                        self.ent_umbral, self.cb_relajada, self.ent_ventana):
+            control.configure(state="disabled" if es_horario else "normal")
         # salida por defecto segun motor, si el usuario no la cambio a mano
         actual = self.var_salida.get()
         defecto_v7 = str(CARPETA / "Reporte_Sobrecostos_PD_Final.xlsx")
         defecto_tb = str(CARPETA / "Reporte_Sobrecostos_PD_Turbina.xlsx")
-        if actual in ("", defecto_v7, defecto_tb):
-            self.var_salida.set(defecto_tb if es_turbina else defecto_v7)
+        defecto_horario = str(CARPETA / "Reporte_Sobrecostos_PD_ReglasHorario.xlsx")
+        if actual in ("", defecto_v7, defecto_tb, defecto_horario):
+            defecto = defecto_horario if es_horario else (defecto_tb if es_turbina else defecto_v7)
+            self.var_salida.set(defecto)
 
     # ------------------------------------------------------------ acciones
     def _elegir(self, var, filtros):
@@ -245,6 +260,8 @@ class Interfaz(tk.Tk):
         return None
 
     def _panel(self) -> dict:
+        if self.var_motor.get() == "reglas_horario":
+            return {"CALCULAR_MARGEN_EN_EL_MOTOR": self.var_margen.get()}
         panel = {
             "CALCULAR_MARGEN_EN_EL_MOTOR": self.var_margen.get(),
             "MARGEN_NETEADO_POR_CICLO": self.var_neteado.get(),
@@ -304,6 +321,8 @@ class Interfaz(tk.Tk):
             print()
             if motor_nombre == "turbina":
                 import sc_pd_motor_turbina as motor
+            elif motor_nombre == "reglas_horario":
+                import sc_pd_motor_reglas_horario as motor
             else:
                 import sc_pd_motor_v7 as motor
             motor.main(rutas, panel)

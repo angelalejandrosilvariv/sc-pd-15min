@@ -128,6 +128,21 @@ def factor_operacional(motivo, eo, presta_sscc, es_primer_ciclo):
     return 0
 
 
+def es_cogen_excluida(central):
+    """Exclusión observada en la salida del Excel: toda configuración COGEN."""
+    return pd.Series(central, copy=False).astype(str).str.upper().str.contains('COGEN', na=False)
+
+
+def marcar_traspasos(ciclos, generacion_cierre):
+    """R11: traspasa solo el último ciclo de una relacionada si genera al cierre.
+
+    ``generacion_cierre`` es una Serie indexada por ``Central_Relacionada``.
+    """
+    ultimo = ciclos.groupby('Central_Relacionada')['Ciclo_ID'].transform('max').eq(ciclos['Ciclo_ID'])
+    genera_al_cierre = ciclos['Central_Relacionada'].map(generacion_cierre).fillna(0).ne(0)
+    return ultimo & genera_al_cierre
+
+
 # ==========================================
 # MAIN
 # ==========================================
@@ -196,6 +211,7 @@ def main(rutas: dict, panel: dict | None = None):
     # al Excel es reproducir su resultado, no solo sus formulas: se aplica la
     # misma regla que el v7 (filtro_costo_cero cubre Costo_Cero == SI y COGEN).
     rep['Filtro_CostoCero'] = filtro_costo_cero(rep['Costo_Cero'].fillna('NO'), rep['Central'])
+    rep.loc[es_cogen_excluida(rep['Central']).to_numpy(), 'Filtro_CostoCero'] = 0
     unidades_con_costo = set(costos.loc[costos['Costo_Cero'].astype(str).str.upper().ne('SI'), 'UNIDAD'])
     rep = rep[rep['Central'].astype(str).str.strip().isin(unidades_con_costo)
               & rep['Filtro_CostoCero'].eq(1)].copy()
@@ -321,10 +337,8 @@ def main(rutas: dict, panel: dict | None = None):
     ciclos['Costo_Detencion'] = ciclos['Costo_Detencion_Max'].fillna(0) * ciclos['Factor_Operacional']
 
     # ---- 13. Frontera (R11) ----
-    ultimo = ciclos.groupby('Central_Relacionada')['Ciclo_ID'].transform('max').eq(ciclos['Ciclo_ID'])
     gen_fin = rep[rep['FECHA_HORA'] == f_fin].groupby('Central_Relacionada')['GENERACION'].sum()
-    genera_al_cierre = ciclos['Central_Relacionada'].map(gen_fin).fillna(0).ne(0)
-    ciclos['Se_Traspasa'] = ultimo & genera_al_cierre
+    ciclos['Se_Traspasa'] = marcar_traspasos(ciclos, gen_fin)
 
     # ---- 14. Liquidacion (R10) y empresa (R12) ----
     ciclos['Costos_Totales_PD'] = ciclos['Costo_Partida'] + ciclos['Costo_Detencion']

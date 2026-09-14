@@ -88,6 +88,25 @@ nunca una modificación del v7.
 
 ## Updates
 
+### 2026-09-14 — Codex — Formalización del motor «Reglas del Horario» (spec 26)
+
+- **Tipo:** especificación + pruebas + interfaz + documentación.
+- **Origen:** tarea siguiente indicada en «Punto de partida para el próximo
+  update»: formalizar el tercer motor de contraste ya existente.
+- **Cambios:** `docs/specs/26-motor-reglas-horario.md` delimita las reglas 0–13
+  que aplica, las aproximaciones por insumos ausentes y su carácter no productivo;
+  `tests/test_motor_reglas_horario.py` cubre siete grupos de reglas puras; la
+  exclusión COGEN y el traspaso quedaron expuestos como funciones testeables; la
+  interfaz ofrece el tercer motor, selecciona su salida propia y deshabilita los
+  interruptores ajenos; README y `_LEEME.txt` explican ambas formas de ejecución.
+- **Validación:** `pytest -q` → **94 passed** (87 anteriores + 7 nuevas);
+  `python -m py_compile src/sc_pd_motor_reglas_horario.py
+  Carpeta_de_Trabajo/interfaz.py tests/test_motor_reglas_horario.py` → sin errores.
+- **Pendientes:** reconciliar el pipeline completo con datos operacionales de
+  otro mes; conseguir/formalizar las hojas `Pruebas` y `Ciclos inconclusos` si se
+  exige equivalencia total con el libro. La decisión productiva sobre el primer
+  ciclo sin historia permanece abierta y no fue modificada.
+
 ### 2026-09-14 — Claude — Push directo a `main`: sincroniza el repo con el estado local (specs 24, 25, motor Reglas del Horario, interfaz)
 
 - **Tipo:** implementación + documentación.
