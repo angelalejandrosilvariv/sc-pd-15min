@@ -68,18 +68,22 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 |---|---:|---:|---:|
 | 2606 con empalme 2605 | 823.168.889 | **1.080.340.995** | 1.028.628.659 |
 | 2608 sin julio | 536.027.769 | **875.313.107** | 957.823.663 (preliminar) |
+| 2608 con empalme 2607 (interfaz, umbral 0,5 MWh) | — | **971.292.712** | 957.823.663 (preliminar) |
 
 **Trabajo siguiente, en orden sugerido**
 
-1. Spec + tests para `src/sc_pd_motor_reglas_horario.py` y agregarlo como tercera
-   opción en `interfaz.py` (hoy solo tiene runner).
-2. Conseguir julio 2026 (reporte 15 min, RIO, políticas PO) y recorrer agosto con
-   empalme: resuelve 60 ciclos sin historia. Revisar además `CMg` nulo en el 11,7%
-   de la energía del reporte `2608_v2` (problema de dato, no de regla).
+1. ~~Spec + tests para el motor Reglas del Horario~~ — hecho (spec 26, Codex).
+2. ~~Conseguir julio 2026~~ — hecho; agosto corre con empalme (971,3 MM, +1,4% vs
+   Excel). Queda revisar `CMg` nulo en el reporte `2608_v2` si se vuelve a usar.
 3. Decidir la regla del primer ciclo sin historia (arriba) e implementarla como
    interruptor con spec, siguiendo el patrón de las specs 23 y 25.
-4. Rerun de junio con la exclusión COGEN del motor Reglas del Horario y actualizar
-   `Defensa_Modelo_15min.html` con las cifras de la spec 25.
+4. Decidir los dos puntos abiertos de `docs/informes/Brechas_2608_por_empresa.md`:
+   tolerancia a paradas menores a una hora (hoy toda interrupción es una partida) y
+   fuente del filtro de pruebas (lista `Pruebas` del Excel vs `EP` del RIO). Ambos
+   como interruptor con spec.
+5. Rerun de junio con la exclusión COGEN del motor Reglas del Horario y actualizar
+   `Defensa_Modelo_15min.html` con las cifras de la spec 25 y los mecanismos del
+   informe de brechas de agosto.
 
 **Convenciones**: cada cambio de regla es un interruptor en el panel del motor,
 con spec en `docs/specs/NN-*.md`, tests y una entrada aquí. Nombres descriptivos
@@ -87,6 +91,31 @@ para las variantes (nada de "opción A/B"). Un modelo nuevo es un archivo nuevo,
 nunca una modificación del v7.
 
 ## Updates
+
+### 2026-09-14 — Claude — Agosto con julio: brechas por empresa explicadas ciclo a ciclo (siete mecanismos)
+
+- **Tipo:** análisis con datos reales + documentación.
+- **Origen:** el dueño del proyecto corrió agosto desde la interfaz con empalme de
+  julio (v7, tarifa máxima) y pidió explicar diez empresas con diferencias contra
+  el Excel preliminar: ENGIE, GMETROPOLITANA, SGA, BE FORESTALES, ANTILHUE,
+  COLMITO, ENLASA, ELEKTRAGEN, ENERGIA_SIETE, NUEVA DEGAN.
+- **Cambios:** `docs/informes/Brechas_2608_por_empresa.md` con tablas ciclo a
+  ciclo y `docs/informes/scripts_brechas_2608/` con los scripts del cruce (Excel
+  `Sobrecosto_PD xHyC` vs `Resumen_Ciclos_PD` / `Detalle_15Min` del motor).
+- **Hallazgos:** cinco defectos del Excel con caso concreto — (1) partidas
+  fantasma cuando la planta generó bajo una configuración `_GNL_P` que el Excel no
+  tiene (ENGIE, 61,6 MM cobrados por partidas que no ocurrieron); (3) detenciones
+  reales que la macro no marca (CORONEL, 9 de 21 ciclos); (4) configuraciones fuera
+  de `xHyC` cuya energía no entra al margen (CMPCCORDILLERA GN_B, 51,7 MM); (6)
+  partidas de ciclos de frontera que se pierden en ambos meses; (7) política PO de
+  mitad de mes no aplicada (ENLASA). Dos decisiones de regla abiertas — (2) paradas
+  de 45–75 min que el horario no ve y el motor tarifica como partida caliente
+  (NUEVARENCA +19,9 MM); (5) lista `Pruebas` del Excel vs `EP` del RIO (+8,6 MM).
+  Único término contra el motor: la tarifa restringida al combustible instruido
+  (spec 25) en NUEVARENCA del 2-ago, −9,4 MM.
+- **Validación:** cada mecanismo verificado sobre las filas hora-central del Excel
+  y los bloques del motor en la misma ventana de tiempo (ver informe).
+- **Pendientes:** decisiones (2) y (5); llevar (1), (3), (4), (6), (7) al CEN.
 
 ### 2026-09-14 — Codex — Formalización del motor «Reglas del Horario» (spec 26)
 
