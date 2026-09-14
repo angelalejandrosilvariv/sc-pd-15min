@@ -27,17 +27,17 @@ El motor espera archivos como:
 ```text
 sc-pd-15min/
 ├── docs/
-│   └── specs/
-│       ├── 00-restaurar-motor-v7.md
-│       └── 01-fase1-integridad-datos.md
+│   ├── informes/
+│   └── specs/                  # specs 00–26
 ├── src/
-│   └── sc_pd_motor_v7.py
+│   ├── sc_pd_motor_v7.py       # producción
+│   ├── sc_pd_motor_turbina.py  # experimental
+│   └── sc_pd_motor_reglas_horario.py  # contraste
+├── tests/
+├── Carpeta_de_Trabajo/         # interfaz y runners para Spyder
 ├── requirements.txt
 └── README.md
 ```
-
-`tests/`, `.github/workflows/` y `pyproject.toml` todavía no existen; se
-crean a medida que las specs de `docs/specs/` los requieran (ver más abajo).
 
 ## Cómo se generan los cambios en este repo
 
@@ -95,6 +95,10 @@ python src/sc_pd_motor_v7.py
 
 El resultado se escribe en la ruta definida en `RUTA_SALIDA`.
 
+La forma recomendada para operación manual es abrir
+`Carpeta_de_Trabajo/Abrir_Interfaz.bat`, que permite elegir el motor y las rutas
+sin editar código.
+
 ## Motor alternativo por turbina (experimental)
 
 `src/sc_pd_motor_turbina.py` es una **copia independiente** del v7 que detecta
@@ -105,6 +109,22 @@ interruptor `ATRIBUCION_TARIFA_TURBINA` permite comparar tres formas de
 repartir la tarifa cuando varias turbinas arrancan bajo una misma
 configuración. Ver `docs/specs/24-modelo-por-turbina.md`, que incluye la
 decisión de negocio que sigue abierta.
+
+## Motor «Reglas del Horario» (solo contraste)
+
+`src/sc_pd_motor_reglas_horario.py` es el tercer motor independiente. Aplica al
+reporte de 15 minutos las reglas deducidas de las fórmulas y macros del Excel
+horario: piso al inicio del mes, tramos inclusivos sin Tibia 2, máximo de tarifas
+entre configuraciones, filtro operacional del horario y regla de traspaso, entre
+otras. Sirve para aislar diferencias de resolución o de regla; **no es un modelo
+de producción y no debe usarse para liquidar**.
+
+Está disponible en la interfaz como «Reglas del Horario — contraste, aplica las
+reglas del Excel al dato 15 min», con salida predeterminada
+`Reporte_Sobrecostos_PD_ReglasHorario.xlsx`. También se puede correr con
+`Carpeta_de_Trabajo/correr_motor_reglas_horario.py`. El alcance exacto, las
+sustituciones por insumos ausentes y las pruebas están en
+`docs/specs/26-motor-reglas-horario.md`.
 
 ## Informes
 
@@ -130,7 +150,8 @@ Las pruebas no ejecutan el pipeline completo contra datos productivos. Se concen
 
 1. validar sintácticamente el script;
 2. extraer y probar la función real de detección de ciclos;
-3. proteger regresiones de los fixes críticos descritos en la v7.
+3. proteger regresiones de los fixes críticos descritos en la v7;
+4. verificar las funciones puras de los motores alternativos.
 
 Ejecuta:
 

@@ -3,7 +3,7 @@ INSTRUCCIONES - Carpeta de Trabajo SC P-D
 
 LA FORMA SIMPLE: doble clic en Abrir_Interfaz.bat
 --------------------------------------------------
-Abre una ventana donde eliges el motor (v7 o Turbina), cada archivo con
+Abre una ventana donde eliges el motor (v7, Turbina o Reglas del Horario), cada archivo con
 un boton "Buscar...", el archivo de salida, y los metodos de calculo con
 casillas. Al abrirla ya viene con los archivos de esta carpeta detectados.
 Recuerda tu ultima configuracion (interfaz_config.json). El log del motor
@@ -26,6 +26,16 @@ etc.) y corre los scripts con F5 en Spyder, en este orden:
    en 0) y TARIFA_CONFIGURACION ("maxima" = la configuracion mas cara
    del ciclo, decision vigente; "instruida" = la que instruyo el RIO,
    solo para comparar).
+
+   Alternativas desde la interfaz (no reemplazan al v7):
+   - Turbina: modelo experimental con ciclo por UNIDAD GENERADORA.
+   - Reglas del Horario: modelo de contraste que aplica las reglas deducidas
+     del Excel horario al dato de 15 minutos. No es para liquidar. Genera por
+     defecto Reporte_Sobrecostos_PD_ReglasHorario.xlsx y deshabilita los
+     interruptores del v7/Turbina que no utiliza.
+
+   Para ejecutar este último directamente en Spyder también está
+   correr_motor_reglas_horario.py; solo usa el mes actual, no el anterior.
 
 2. correr_prorrateo.py (opcional)
    Reparte el costo de cada ciclo entre los suministradores, usando el
