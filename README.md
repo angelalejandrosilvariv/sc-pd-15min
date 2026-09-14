@@ -150,6 +150,12 @@ El propio código deja explícitos asuntos que todavía requieren validación de
   del ciclo antes de truncar; viene **apagado** porque cambia el monto liquidado
   (+33,5% sobre 2606) y se aparta del modelo vigente — ver
   `docs/specs/23-margen-neteado-por-ciclo.md`;
+- la tarifa de un ciclo que pasó por varias configuraciones es la de la **más cara**
+  entre las que generaron en él, restringida al combustible que instruyó el RIO
+  (`TARIFA_CONFIGURACION = 'maxima'`, regla del modelo horario, decisión del
+  14-09-2026). `'instruida'` conserva la lectura de la spec 15 (la configuración
+  que instruyó el RIO) para comparaciones — ver
+  `docs/specs/25-tarifa-configuracion-maxima.md`;
 - no se debe sustituir la regla física de ciclo por un puente heurístico de horas de cero;
 - el repositorio no contiene los Excel/CSV operacionales.
 

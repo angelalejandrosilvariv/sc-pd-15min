@@ -24,7 +24,124 @@ esta estructura:
 - **Pendientes:** trabajo que queda abierto, o `Ninguno`.
 ```
 
+## Punto de partida para el próximo update (leer antes de tocar código)
+
+Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
+
+**Qué hay en el repo**
+
+| Pieza | Archivo | Estado |
+|---|---|---|
+| Motor de producción (ciclo por central relacionada) | `src/sc_pd_motor_v7.py` | Vigente. Specs 00–23 y 25 aplicadas. |
+| Motor alternativo por turbina (ciclo por `UNIDAD GENERADORA`) | `src/sc_pd_motor_turbina.py` | Experimental, copia independiente (spec 24). No pisa al v7. |
+| Motor "Reglas del Horario" (las 17 reglas del Excel sobre el dato de 15 min) | `src/sc_pd_motor_reglas_horario.py` | Funcional, **sin spec ni tests**. Solo para contrastar. |
+| Reglas del Excel horario deducidas de sus fórmulas y VBA | `docs/informes/Reglas_Modelo_Horario.md` + `docs/informes/vba_modelo_horario/` | Referencia. |
+| Informe de defensa del modelo 15 min | `docs/informes/Defensa_Modelo_15min.html` | Referencia. |
+| Interfaz visual (tkinter) | `Carpeta_de_Trabajo/interfaz.py`, `Abrir_Interfaz.bat` | Vigente. Elige motor v7/Turbina, archivos, salida e interruptores. |
+| Runners para Spyder | `Carpeta_de_Trabajo/correr_motor*.py` | Vigentes. Editar solo las variables `NOMBRE_*`. |
+| Consolidación de costos desde políticas PO | `scripts/consolidar_politicas.py` | Vigente (produce `Costos_de_P-D_Consolidado_AAMM.xlsx`). |
+
+**Cómo correr y verificar**: `pytest -q` → 87 pruebas deben pasar. Los datos
+(CSV/XLSX/XLSM/parquet) **no se versionan** (`.gitignore`); se dejan en
+`Carpeta_de_Trabajo/`. Nunca escribir en la unidad `T:`; se copia a local.
+
+**Decisiones de negocio tomadas (14-09-2026)** — no reabrir sin el dueño del proyecto:
+
+1. **Tarifa del ciclo = la configuración más cara que generó en el ciclo**, restringida
+   al combustible instruido por el RIO (`TARIFA_CONFIGURACION = 'maxima'`, spec 25).
+   `'instruida'` (spec 15) queda solo para comparar.
+2. **Margen truncado por bloque** (`MARGEN_NETEADO_POR_CICLO = 0`), igual que el Excel.
+3. **Unidad de ciclo = central relacionada** (motor v7). El motor Turbina sigue
+   disponible desde la interfaz.
+
+**Decisiones abiertas** (el código las deja parametrizadas o documentadas):
+
+- Primer ciclo del mes sin historia cuando falta el reporte del mes anterior: hoy
+  la partida queda en 0 (`Tipo_Partida = No_Aplica`); el Excel asume detenida desde
+  el día 1. Recomendación pendiente de aprobar: exigir el archivo del mes anterior.
+- Reportar o no al CEN los defectos detectados en el Excel horario (ATACAMA: 62% de
+  la energía fuera del margen; COGEN excluido a mano sin fórmula).
+
+**Cifras de referencia** (para detectar regresiones al correr con datos reales):
+
+| Corrida | v7 `'instruida'` | v7 `'maxima'` (vigente) | Excel horario |
+|---|---:|---:|---:|
+| 2606 con empalme 2605 | 823.168.889 | **1.080.340.995** | 1.028.628.659 |
+| 2608 sin julio | 536.027.769 | **875.313.107** | 957.823.663 (preliminar) |
+
+**Trabajo siguiente, en orden sugerido**
+
+1. Spec + tests para `src/sc_pd_motor_reglas_horario.py` y agregarlo como tercera
+   opción en `interfaz.py` (hoy solo tiene runner).
+2. Conseguir julio 2026 (reporte 15 min, RIO, políticas PO) y recorrer agosto con
+   empalme: resuelve 60 ciclos sin historia. Revisar además `CMg` nulo en el 11,7%
+   de la energía del reporte `2608_v2` (problema de dato, no de regla).
+3. Decidir la regla del primer ciclo sin historia (arriba) e implementarla como
+   interruptor con spec, siguiendo el patrón de las specs 23 y 25.
+4. Rerun de junio con la exclusión COGEN del motor Reglas del Horario y actualizar
+   `Defensa_Modelo_15min.html` con las cifras de la spec 25.
+
+**Convenciones**: cada cambio de regla es un interruptor en el panel del motor,
+con spec en `docs/specs/NN-*.md`, tests y una entrada aquí. Nombres descriptivos
+para las variantes (nada de "opción A/B"). Un modelo nuevo es un archivo nuevo,
+nunca una modificación del v7.
+
 ## Updates
+
+### 2026-09-14 — Claude — Push directo a `main`: sincroniza el repo con el estado local (specs 24, 25, motor Reglas del Horario, interfaz)
+
+- **Tipo:** implementación + documentación.
+- **Origen:** el repo tenía hasta la subida manual del 11-09 ("Add files via
+  upload"); el trabajo del 11 al 14 de septiembre vivía solo en local.
+- **Cambios:** 20 archivos respecto de `main` — spec 25 y sus tests, motor
+  Reglas del Horario y su runner, interfaz tkinter y `Abrir_Interfaz.bat`,
+  reglas del Excel deducidas (`docs/informes/`), README, `_LEEME.txt`, y la
+  sección "Punto de partida" de esta bitácora.
+- **Validación:** `pytest -q` → 87 pruebas; `git diff --name-status
+  origin/main` revisado: solo adiciones y modificaciones, sin datos
+  operacionales.
+- **Pendientes:** ver "Punto de partida".
+
+### 2026-09-14 — Claude — Decisión: la tarifa del ciclo es la de la configuración más cara (spec 25)
+
+- **Tipo:** decisión + implementación + prueba.
+- **Origen:** revisión ejecutiva del 14-09-2026. El dueño del proyecto resolvió
+  las decisiones abiertas: (1) tarifa del ciclo = **la más cara presente en el
+  ciclo**; (2) margen truncado **por bloque**, como el horario (se mantiene
+  `MARGEN_NETEADO_POR_CICLO = 0`); (4) unidad de ciclo = central relacionada
+  por ahora, con la elección visible en la interfaz (ya lo estaba: radio
+  "v7 / Turbina"). Las decisiones 3 (primer ciclo sin historia) y 5 (defectos
+  del Excel) quedan abiertas con explicación entregada.
+- **Cambios:**
+  - `src/sc_pd_motor_v7.py`: interruptor `TARIFA_CONFIGURACION` (`'maxima'` |
+    `'instruida'`), **activo en `'maxima'`**. Nuevas funciones
+    `combustible_configuracion()` y `tarifa_configuracion_maxima()`;
+    `compactar_resumen_ciclos()` y `columnas_resumen_ciclos()` reciben el
+    parámetro; 14.1b deja de reemplazar la tarifa bajo `'maxima'` y guarda
+    `Costo_*_RIO_Instruida` como referencia; 14.1 (dominante) se ignora bajo
+    `'maxima'`; bloque de consola `TARIFA POR CONFIGURACION`; columnas
+    `Configs_En_Ciclo`, `Config_Tarifa_*`, `Excluida_Combustible_*`;
+    `Guia_Lectura` actualizada.
+  - Regla: compiten las configuraciones que generaron en el ciclo, tras el
+    filtro de Costo_Cero y el de **combustible instruido** (columna `AG` del
+    horario). Sin ese segundo filtro NUEVARENCA&1 cobraba tarifa DIESEL con el
+    RIO instruyendo gas: 66,6 MM en vez de 18,1 MM.
+  - `Carpeta_de_Trabajo/correr_motor.py` e `interfaz.py`: exponen el
+    interruptor (radio "Tarifa del ciclo (solo motor v7)").
+  - `docs/specs/25-tarifa-configuracion-maxima.md`, README.
+- **Validación:** `pytest -q` → **87 pruebas** (16 nuevas en
+  `tests/test_tarifa_configuracion_maxima.py`). Corridas reales con el
+  interruptor (sin monkeypatch): 2606 `'instruida'` 823.168.889 (idéntico al
+  previo, sin regresión); 2606 `'maxima'` **1.080.340.995** (+5,0% vs Excel
+  1.028.628.659; Σ|Δ| por empresa 133,7 MM, antes 255,3 MM); 2608 `'maxima'`
+  **875.313.107** (−8,6% vs Excel 957.823.663; Σ|Δ| 151,4 MM, antes 489,2 MM).
+  Ningún ciclo excluido por combustible en 2606 ni 2608. El experimento previo
+  por monkeypatch (1.119,8 MM / 915,8 MM) no tenía el filtro de combustible;
+  queda superado por estas cifras.
+- **Pendientes:** obtener julio (2607) para los 60 ciclos sin historia de
+  agosto; decisión 3 (primer ciclo sin historia: piso al día 1 como el Excel o
+  exención como el motor); decisión 5 (reportar al CEN los defectos del Excel);
+  spec y tests del motor Reglas del Horario; subir el repo.
 
 ### 2026-09-10 — Claude — Experimento controlado: el 94,8% de la brecha contra el horario es de REGLA, no de resolución
 

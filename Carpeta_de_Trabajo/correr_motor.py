@@ -17,13 +17,14 @@ import sc_pd_motor_v7 as motor  # noqa: E402
 # carpeta, junto a este script). Deja "" en los "_MES_PASADO" si no vas
 # a usar empalme con el mes anterior.
 NOMBRE_REPORTE_15MIN = "Reporte_PD_15min_2606.csv"
-NOMBRE_REPORTE_MES_PASADO = ""
+NOMBRE_REPORTE_MES_PASADO = "Reporte_PD_15min_2605.csv"
 NOMBRE_RIO = "RIO_06_2026.xlsx"
-NOMBRE_RIO_MES_PASADO = ""
-NOMBRE_COSTOS_PD = "Costos_de_P-D_Consolidado.xlsx"
-NOMBRE_COSTOS_MES_PASADO = ""
+NOMBRE_RIO_MES_PASADO = "RIO_05_2026.xlsx"
+NOMBRE_COSTOS_PD = "Costos_de_P-D_Consolidado_2606.xlsx"
+NOMBRE_COSTOS_MES_PASADO = "Costos_de_P-D_Consolidado_2605.xlsx"   # copia local del de T:\...\2605
 NOMBRE_DICCIONARIO = "Diccionario_central_config.xlsx"
-NOMBRE_DICCIONARIO_EMPRESA = "Diccionario_configuracion_empresa.xlsx"
+NOMBRE_DICCIONARIO_EMPRESA = "Diccionario_central_empresa.xlsx"    # OJO: si el nombre no calza, el motor
+                                                                    # NO da error; solo deja empresas vacias
 NOMBRE_SALIDA = "Reporte_Sobrecostos_PD_Final.xlsx"
 
 # Criterio de margen: 1 = el motor calcula (CMg - CV) * Dolar sobre todas las
@@ -36,6 +37,13 @@ CALCULAR_MARGEN_EN_EL_MOTOR = 1
 # los bloques negativos compensen dentro del ciclo y trunca recien el total.
 # CAMBIA EL MONTO A PAGAR. Ver docs/specs/23-margen-neteado-por-ciclo.md
 MARGEN_NETEADO_POR_CICLO = 0
+
+# Que tarifa cobra un ciclo que paso por mas de una configuracion.
+#   'maxima'    = la mas cara de las que generaron en el ciclo (regla del modelo
+#                 horario; decision del 14-09-2026).
+#   'instruida' = la de la configuracion que instruyo el RIO (spec 15).
+# CAMBIA EL MONTO A PAGAR. Ver docs/specs/25-tarifa-configuracion-maxima.md
+TARIFA_CONFIGURACION = "maxima"
 
 
 def _ruta(nombre: str) -> str:
@@ -57,6 +65,7 @@ def main() -> None:
     motor.main(rutas, {
         "CALCULAR_MARGEN_EN_EL_MOTOR": CALCULAR_MARGEN_EN_EL_MOTOR,
         "MARGEN_NETEADO_POR_CICLO": MARGEN_NETEADO_POR_CICLO,
+        "TARIFA_CONFIGURACION": TARIFA_CONFIGURACION,
     })
 
 

@@ -1,0 +1,102 @@
+Attribute VB_Name = "Módulo4"
+Sub CalcularCiclosOptimo()
+    Dim ws As Worksheet
+    Dim LastRow As Long
+    Dim Data As Variant
+    Dim arrResult() As Variant
+    Dim dictMax As Object
+    Dim i As Long, k As Long
+    Dim groupID As String
+    Dim conditionY As Boolean, conditionP As Boolean, conditionStart As Boolean
+    
+    ' 1. Configuración inicial apuntando a la hoja específica
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets("PARTIDAS_DETENCIONES")
+    On Error GoTo 0
+    
+    ' Validar que la hoja exista
+    If ws Is Nothing Then
+        MsgBox "No se encontró la hoja 'PARTIDAS_DETENCIONES'. Revisa el nombre.", vbCritical, "Error"
+        Exit Sub
+    End If
+    
+    Set dictMax = CreateObject("Scripting.Dictionary")
+    
+    ' Encuentra la última fila basándose en la columna C
+    LastRow = ws.Cells(ws.Rows.Count, "C").End(xlUp).Row
+    
+    If LastRow < 2 Then Exit Sub ' Si no hay datos, salir
+    
+    ' 2. Cargar todo el rango de datos a memoria (de la columna A a la P)
+    ' C=3, D=4, F=6, H=8, P=16
+    Data = ws.Range("A1:P" & LastRow).Value2
+    
+    ' Preparamos el arreglo de resultados para la columna I (1 columna, LastRow filas)
+    ReDim arrResult(1 To LastRow, 1 To 1)
+    
+    ' 3. Procesar fila por fila en memoria
+    ' Asumimos que la fila 1 tiene encabezados, empezamos en la 2
+    arrResult(1, 1) = "Ciclo" ' Título de la columna
+    
+    For i = 2 To LastRow
+        groupID = CStr(Data(i, 3))
+        
+        ' Registrar el grupo en el diccionario si no existe
+        If Not dictMax.Exists(groupID) Then
+            dictMax.Add groupID, 0
+        End If
+        
+        ' Lógica de la fórmula traducida a VBA
+        If CStr(Data(i, 3)) <> CStr(Data(i - 1, 3)) Then
+            ' --- SI(C8<>C7) --- ¡Cambio de grupo!
+            If Val(Data(i, 4)) > 0 Then ' SI(D8>0; 1; 0)
+                arrResult(i, 1) = 1
+                dictMax(groupID) = 1 ' Actualizamos el máximo del grupo
+            Else
+                arrResult(i, 1) = 0
+            End If
+            
+        Else
+            ' --- SI(C8=C7) --- Mismo grupo
+            
+            ' Evaluar la condición Y(D7=0;D8>0;P8<>"SIF";P7<>"SIF";P6<>"SIF";P5<>"SIF";P4<>"SIF";P3<>"SIF")
+            conditionY = False
+            If Val(Data(i - 1, 4)) = 0 And Val(Data(i, 4)) > 0 Then
+                conditionP = True
+                ' Bucle para revisar P(i) hasta P(i-5)
+                For k = 0 To 5
+                    If (i - k) >= 2 Then ' Aseguramos no leer el encabezado o fuera de rango
+                        If UCase(CStr(Data(i - k, 16))) = "SIF" Then
+                            conditionP = False
+                            Exit For
+                        End If
+                    End If
+                Next k
+                If conditionP Then conditionY = True
+            End If
+            
+            ' Evaluar O( [CondicionY] ; F8="SI" )
+            conditionStart = conditionY Or (UCase(CStr(Data(i, 6))) = "SI")
+            
+            If conditionStart Then
+                ' Inicia un nuevo estado: buscamos el máximo histórico del grupo y sumamos 1
+                dictMax(groupID) = dictMax(groupID) + 1
+                arrResult(i, 1) = dictMax(groupID)
+            Else
+                ' No inicia estado nuevo. ¿Terminó en la fila anterior? (H7="SI")
+                If UCase(CStr(Data(i - 1, 8))) = "SI" Then
+                    arrResult(i, 1) = 0
+                Else
+                    ' Si no terminó, arrastramos el valor de la fila anterior (I7)
+                    arrResult(i, 1) = arrResult(i - 1, 1)
+                End If
+            End If
+            
+        End If
+    Next i
+    
+    ' 4. Imprimir resultados en la hoja de golpe
+    ws.Range("I1:I" & LastRow).Value = arrResult
+    
+    MsgBox "Cálculo de ciclos en PARTIDAS_DETENCIONES finalizado.", vbInformation, "Éxito"
+End Sub

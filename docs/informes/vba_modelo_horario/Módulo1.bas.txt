@@ -1,0 +1,14 @@
+Attribute VB_Name = "Módulo1"
+Sub MacroTodo()
+Attribute MacroTodo.VB_ProcData.VB_Invoke_Func = " \n14"
+'
+' Macro1 Macro
+'
+
+'
+    Call Listar_archivos_detalle_diario
+    Call Consolida
+    Call Consolida_CV
+    
+End Sub
+

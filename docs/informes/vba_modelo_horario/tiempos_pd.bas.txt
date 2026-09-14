@@ -1,0 +1,101 @@
+Attribute VB_Name = "tiempos_pd"
+Option Explicit
+
+'=== Helpers ===========================================================
+Private Function NormalizeToLocalDecimal(ByVal s As String) As String
+    ' Reemplaza punto/coma por el separador decimal del Excel local
+    Dim decSep As String, otherSep As String
+    decSep = Application.DecimalSeparator
+    If decSep = "," Then
+        otherSep = "."
+    Else
+        otherSep = ","
+    End If
+    s = Replace(s, " ", "")
+    s = Replace(s, otherSep, decSep)
+    NormalizeToLocalDecimal = s
+End Function
+
+Private Function ExtractNthNumber(ByVal txt As String, ByVal n As Long) As Double
+    ' Devuelve el enésimo número encontrado (1 = primero).
+    ' Acepta decimales con punto o coma. Si no existe, devuelve 0.
+    On Error GoTo EH
+    Dim re As Object, m As Object, c As Object, i As Long, rawNum As String
+    
+    txt = CStr(txt)
+    If Len(txt) = 0 Or UCase$(txt) = "0" Then
+        ExtractNthNumber = 0
+        Exit Function
+    End If
+    
+    Set re = CreateObject("VBScript.Regexp")
+    re.Pattern = "[-+]?\d+(?:[.,]\d+)?"
+    re.Global = True
+    re.IgnoreCase = True
+    
+    If re.Test(txt) Then
+        Set m = re.Execute(txt)
+        If n >= 1 And n <= m.Count Then
+            rawNum = m(n - 1).Value
+            rawNum = NormalizeToLocalDecimal(rawNum)
+            ExtractNthNumber = CDbl(rawNum)
+            Exit Function
+        End If
+    End If
+    
+    ExtractNthNumber = 0
+    Exit Function
+EH:
+    ExtractNthNumber = 0
+End Function
+
+'=== Macro principal ====================================================
+Public Sub ExtraerNumeros_Costos_PD()
+    Dim ws As Worksheet
+    Dim LastRow As Long, r As Long
+    Dim prevCalc As XlCalculation
+    
+    On Error GoTo FinConLimpieza
+    Set ws = ThisWorkbook.Worksheets("Costos_de_P-D")
+    
+    ' Última fila según I:K (ajusta si lo prefieres a otra columna)
+    LastRow = ws.Cells(ws.Rows.Count, "I").End(xlUp).Row
+    LastRow = Application.Max(LastRow, ws.Cells(ws.Rows.Count, "J").End(xlUp).Row)
+    LastRow = Application.Max(LastRow, ws.Cells(ws.Rows.Count, "K").End(xlUp).Row)
+    If LastRow < 2 Then Exit Sub
+    
+    ' Optimizaciones
+    On Error Resume Next
+    prevCalc = Application.Calculation
+    On Error GoTo 0
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.DisplayAlerts = False
+    Application.Calculation = xlCalculationManual
+    
+    ' Limpia salida M:P
+    ws.Range("M2:P" & LastRow).ClearContents
+    
+    ' Recorre filas
+    For r = 2 To LastRow
+        ' M: número de I (ej. "> 60" ? 60 ; "> 1.415" ? 1,415)
+        ws.Cells(r, "M").Value = ExtractNthNumber(ws.Cells(r, "I").Value, 1)
+        
+        ' J puede tener "x a y": O = x (1er número), N = y (2° número)
+        ws.Cells(r, "O").Value = ExtractNthNumber(ws.Cells(r, "J").Value, 1)
+        ws.Cells(r, "N").Value = ExtractNthNumber(ws.Cells(r, "J").Value, 2)
+        
+        ' P: número de K (ej. "< 14" ? 14 ; "< 0.112" ? 0,112)
+        ws.Cells(r, "P").Value = ExtractNthNumber(ws.Cells(r, "K").Value, 1)
+    Next r
+
+FinConLimpieza:
+    ' Restaura
+    On Error Resume Next
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Application.DisplayAlerts = True
+    Application.Calculation = prevCalc
+    On Error GoTo 0
+End Sub
+

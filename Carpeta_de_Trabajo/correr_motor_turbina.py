@@ -19,13 +19,14 @@ import sc_pd_motor_turbina as motor  # noqa: E402
 
 # Variables editables: solo el NOMBRE del archivo (debe estar en esta carpeta).
 NOMBRE_REPORTE_15MIN = "Reporte_PD_15min_2606.csv"
-NOMBRE_REPORTE_MES_PASADO = ""
+NOMBRE_REPORTE_MES_PASADO = "Reporte_PD_15min_2605.csv"
 NOMBRE_RIO = "RIO_06_2026.xlsx"
-NOMBRE_RIO_MES_PASADO = ""
-NOMBRE_COSTOS_PD = "Costos_de_P-D_Consolidado.xlsx"
-NOMBRE_COSTOS_MES_PASADO = ""
+NOMBRE_RIO_MES_PASADO = "RIO_05_2026.xlsx"
+NOMBRE_COSTOS_PD = "Costos_de_P-D_Consolidado_2606.xlsx"
+NOMBRE_COSTOS_MES_PASADO = "Costos_de_P-D_Consolidado_2605.xlsx"   # copia local del de T:\...\2605
 NOMBRE_DICCIONARIO = "Diccionario_central_config.xlsx"
-NOMBRE_DICCIONARIO_EMPRESA = "Diccionario_configuracion_empresa.xlsx"
+NOMBRE_DICCIONARIO_EMPRESA = "Diccionario_central_empresa.xlsx"    # OJO: si el nombre no calza, el motor
+                                                                    # NO da error; solo deja empresas vacias
 NOMBRE_SALIDA = "Reporte_Sobrecostos_PD_Turbina.xlsx"
 
 # Criterio de margen, igual que en el v7.

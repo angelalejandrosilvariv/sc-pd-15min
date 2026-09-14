@@ -1,0 +1,285 @@
+Attribute VB_Name = "C_Detecta_partidas_detenciones"
+Option Explicit
+
+Global Estado As Integer
+
+Sub Macro_general_PD_Optimizada()
+    Estado = 2 ' Estado puede ser Ciclo = 1 o Configuracion = 2
+    
+    ' =========================================================
+    ' CONFIGURACIÓN: ¿Marcar toda la rampa hasta el Mínimo Técnico?
+    ' =========================================================
+    Dim UsarMinimoTecnico As Boolean
+    UsarMinimoTecnico = False ' <--- Cambia a True solo si deseas marcar la rampa entera.
+    
+    Dim ws As Worksheet
+    If Estado = 1 Then
+        Set ws = Sheets("PARTIDAS_DETENCIONES")
+    Else
+        Set ws = Sheets("PD x HyConf")
+    End If
+    
+    Dim LastRow As Long
+    LastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    If LastRow < 2 Then Exit Sub
+    
+    ' Apagamos procesos de Excel para máxima velocidad
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    Application.EnableEvents = False
+    
+    ' =========================================================
+    ' 1. CARGA DE DATOS A LA MEMORIA (ARRAY INPUT)
+    ' =========================================================
+    Application.StatusBar = "Cargando datos a memoria..."
+    Dim arrIn As Variant
+    arrIn = ws.Range("A1:O" & LastRow).Value
+    
+    ' =========================================================
+    ' 2. CREACIÓN DE ARRAYS DE SALIDA (PARA PROTEGER FÓRMULAS)
+    ' =========================================================
+    Dim nRows As Long
+    nRows = LastRow - 1
+    Dim arrF() As Variant, arrG() As Variant, arrH() As Variant, arrJ() As Variant
+    ReDim arrF(1 To nRows, 1 To 1) ' Columna F (Partidas)
+    ReDim arrG(1 To nRows, 1 To 1) ' Columna G (Tiempo t)
+    ReDim arrH(1 To nRows, 1 To 1) ' Columna H (Detenciones)
+    ReDim arrJ(1 To nRows, 1 To 1) ' Columna J (Ciclo Operación)
+    
+    Dim i As Long, r As Long, k As Long, kr As Long
+    Dim cent As Variant, centsig As Variant, centant As Variant
+    Dim gen As Variant, gensig As Variant, genant As Variant
+    Dim t As Long, td As Long
+    
+    ' =========================================================
+    ' 3. DETECTAR PARTIDAS Y DETENCIONES (TRANSICIONES EXACTAS AL 0)
+    ' =========================================================
+    Application.StatusBar = "Procesando partidas y detenciones..."
+    For i = 2 To LastRow
+        r = i - 1
+        cent = arrIn(i, 3) ' Col C
+        gen = arrIn(i, 4)  ' Col D
+        
+        If i < LastRow Then
+            centsig = arrIn(i + 1, 3)
+            gensig = arrIn(i + 1, 4)
+        Else
+            centsig = ""
+            gensig = 0
+        End If
+        
+        If i > 2 Then
+            centant = arrIn(i - 1, 3)
+            genant = arrIn(i - 1, 4)
+        Else
+            centant = ""
+            genant = 0
+        End If
+        
+        If (gen <> 0 And gensig = 0) And (gen <> 0 And genant = 0) And (cent = centsig) And (centsig = centant) Then
+            arrH(r, 1) = "SI"
+            arrF(r, 1) = "SI"
+        ElseIf (gen <> 0 And gensig = 0) And cent = centsig Then
+            arrH(r, 1) = "SI"
+        ElseIf gen <> 0 And genant = 0 And cent = centant Then
+            arrF(r, 1) = "SI"
+        End If
+    Next i
+
+    ' =========================================================
+    ' 4. DETECTAR HORAS DETENIDAS
+    ' =========================================================
+    For i = 2 To LastRow
+        r = i - 1
+        If arrF(r, 1) = "SI" Then
+            cent = arrIn(i, 3)
+            t = 0
+            For k = i - 1 To 2 Step -1
+                kr = k - 1
+                If arrIn(k, 3) <> cent Then Exit For
+                If arrH(kr, 1) = "SI" Then Exit For
+                t = t + 1
+            Next k
+            arrG(r, 1) = t
+        End If
+    Next i
+
+    ' =========================================================
+    ' 5 y 6. LÓGICA DE MÍNIMO TÉCNICO (AHORA CONTROLABLE)
+    ' =========================================================
+    If UsarMinimoTecnico Then
+        Application.StatusBar = "Procesando MT y transiciones..."
+        
+        Dim dictMT As Object
+        Set dictMT = CreateObject("Scripting.Dictionary")
+        On Error Resume Next
+        Dim wsCMG As Worksheet, vMT As Variant
+        Set wsCMG = Sheets("CMG_CONS_PROP_USD")
+        If Not wsCMG Is Nothing Then
+            Dim lastRowMT As Long
+            lastRowMT = wsCMG.Cells(wsCMG.Rows.Count, "D").End(xlUp).Row
+            If lastRowMT >= 1 Then
+                vMT = wsCMG.Range("D1:E" & lastRowMT).Value
+                Dim mti As Long
+                For mti = 1 To UBound(vMT, 1)
+                    If Not IsEmpty(vMT(mti, 1)) Then dictMT(CStr(vMT(mti, 1))) = vMT(mti, 2)
+                Next mti
+            End If
+        End If
+        On Error GoTo 0
+
+        Dim mt As Double, check0 As String, check As String
+        
+        ' Partida - Propagación
+        For i = 2 To LastRow
+            r = i - 1
+            ' Solo propagar si la hora anterior fue realmente 0
+            If arrF(r, 1) = "SI" And arrIn(i - 1, 4) = 0 Then
+                cent = CStr(arrIn(i, 3))
+                td = arrG(r, 1)
+                mt = 0
+                If dictMT.Exists(cent) Then mt = CDbl(dictMT(cent))
+
+                If mt > 0 Then
+                    check0 = IIf(arrIn(i, 4) > mt, "SI", "NO")
+                    For k = i + 1 To LastRow
+                        kr = k - 1
+                        If arrIn(k, 3) <> cent Then Exit For
+                        If check0 = "SI" Or arrIn(k, 4) = 0 Then Exit For
+                        
+                        check = IIf(arrIn(k, 4) > mt, "SI", "NO")
+                        If check = "NO" Then
+                            arrF(kr, 1) = "SI"
+                            arrG(kr, 1) = td
+                        End If
+                        If arrIn(k, 4) > mt Then check0 = "SI"
+                    Next k
+                End If
+            End If
+        Next i
+        
+        ' Detención - Propagación
+        For i = 2 To LastRow
+            r = i - 1
+            ' Solo propagar si la hora siguiente fue realmente 0
+            If arrH(r, 1) = "SI" And i < LastRow And arrIn(i + 1, 4) = 0 Then
+                cent = CStr(arrIn(i, 3))
+                mt = 0
+                If dictMT.Exists(cent) Then mt = CDbl(dictMT(cent))
+
+                If mt > 0 Then
+                    check0 = IIf(arrIn(i, 4) > mt, "SI", "NO")
+                    For k = i - 1 To 2 Step -1
+                        kr = k - 1
+                        If arrIn(k, 3) <> cent Then Exit For
+                        If check0 = "SI" Or arrIn(k, 4) = 0 Then Exit For
+                        
+                        check = IIf(arrIn(k, 4) > mt, "SI", "NO")
+                        If check = "NO" Then arrH(kr, 1) = "SI"
+                        If arrIn(k, 4) > mt Then check0 = "SI"
+                    Next k
+                End If
+            End If
+        Next i
+    End If
+
+    ' =========================================================
+    ' 7. REVISIÓN DE DETENCIONES EN LA MISMA HORA
+    ' =========================================================
+    Dim h_par As Long
+    For i = 2 To LastRow
+        r = i - 1
+        If arrH(r, 1) = "SI" Then
+            If i > 2 Then
+                If arrIn(i - 1, 4) = 0 Then
+                    If arrIn(i, 3) = arrIn(i - 1, 3) Then
+                        arrF(r, 1) = "SI"
+                        cent = arrIn(i, 3)
+                        h_par = 0
+                        For k = i - 1 To 2 Step -1
+                            If arrIn(k, 3) <> cent Or arrIn(k, 4) <> 0 Then Exit For
+                            h_par = h_par + 1
+                        Next k
+                        arrG(r, 1) = h_par
+                    End If
+                End If
+            End If
+        End If
+    Next i
+
+    ' =========================================================
+    ' 8. DETECCIÓN CICLO DE OPERACIÓN
+    ' =========================================================
+    Application.StatusBar = "Detectando ciclos de operación..."
+    Dim en_ciclo As String, central As Variant, ciclo_in As Variant, central_ciclo As Variant
+    Dim PD As Integer
+    en_ciclo = "NO"
+    i = 2
+    
+    Do While i <= LastRow
+        r = i - 1
+        central = arrIn(i, 4) ' Col D
+        ciclo_in = arrIn(i, 14) ' Col N
+        
+        If i > 2 Then
+            If central <> arrIn(i - 1, 4) And arrIn(i, 5) <> 0 Then
+                en_ciclo = "SI"
+                central_ciclo = arrIn(i, 4)
+            End If
+        Else
+            If arrIn(i, 5) <> 0 Then
+                en_ciclo = "SI"
+                central_ciclo = arrIn(i, 4)
+            End If
+        End If
+        
+        If ciclo_in <> "SI" And (arrIn(i, 2) = 200201 And arrIn(i, 3) = 1) Then
+            en_ciclo = "SI"
+            central_ciclo = arrIn(i, 4)
+        End If
+        
+        If ciclo_in = "SI" Then
+            en_ciclo = "SI"
+            central_ciclo = arrIn(i, 4)
+        End If
+        
+        If en_ciclo = "SI" Then
+            arrJ(r, 1) = "SI"
+            PD = IIf(arrIn(i, 15) = "SI", 1, 0)
+            
+            Do Until en_ciclo = "NO" Or PD = 1
+                i = i + 1
+                If i > LastRow Then Exit Do
+                r = i - 1
+                arrJ(r, 1) = "SI"
+                central_ciclo = arrIn(i, 4)
+                
+                If arrIn(i, 15) = "SI" Or central_ciclo <> central Or (arrIn(i, 2) = 200229 And arrIn(i, 3) = 24) Then
+                    en_ciclo = "NO"
+                End If
+            Loop
+        End If
+        i = i + 1
+    Loop
+
+    ' =========================================================
+    ' 9. ESCRITURA SEGURA (SIN BORRAR FÓRMULAS)
+    ' =========================================================
+    Application.StatusBar = "Escribiendo resultados..."
+    
+    ws.Range("F2:H" & LastRow).ClearContents
+    ws.Range("J2:J" & LastRow).ClearContents
+
+    ws.Range("F2:F" & LastRow).Value = arrF
+    ws.Range("G2:G" & LastRow).Value = arrG
+    ws.Range("H2:H" & LastRow).Value = arrH
+    ws.Range("J2:J" & LastRow).Value = arrJ
+
+    ' Restauramos configuración de Excel
+    Application.Calculation = xlCalculationAutomatic
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    
+    MsgBox "Proceso finalizado con éxito.", vbInformation, "Macro Optimizada"
+End Sub

@@ -1,6 +1,18 @@
 INSTRUCCIONES - Carpeta de Trabajo SC P-D
 ==========================================
 
+LA FORMA SIMPLE: doble clic en Abrir_Interfaz.bat
+--------------------------------------------------
+Abre una ventana donde eliges el motor (v7 o Turbina), cada archivo con
+un boton "Buscar...", el archivo de salida, y los metodos de calculo con
+casillas. Al abrirla ya viene con los archivos de esta carpeta detectados.
+Recuerda tu ultima configuracion (interfaz_config.json). El log del motor
+se ve en la misma ventana. Tambien se puede abrir con F5 sobre interfaz.py
+en Spyder; si la ventana no aparece, en Spyder usa Run > Configuration >
+"Execute in an external system terminal".
+
+LA FORMA CLASICA: editar los scripts y F5 en Spyder
+----------------------------------------------------
 Esta carpeta es donde corres todo. Deja aca los archivos de cada mes
 (el CSV del reporte, el RIO, los diccionarios, el parquet de retiros,
 etc.) y corre los scripts con F5 en Spyder, en este orden:
@@ -10,6 +22,10 @@ etc.) y corre los scripts con F5 en Spyder, en este orden:
    variables NOMBRE_... al inicio del archivo con los nombres exactos
    de tus archivos de este mes (deben estar en esta misma carpeta).
    Genera: Reporte_Sobrecostos_PD_Final.xlsx
+   Interruptores al inicio del archivo: MARGEN_NETEADO_POR_CICLO (dejar
+   en 0) y TARIFA_CONFIGURACION ("maxima" = la configuracion mas cara
+   del ciclo, decision vigente; "instruida" = la que instruyo el RIO,
+   solo para comparar).
 
 2. correr_prorrateo.py (opcional)
    Reparte el costo de cada ciclo entre los suministradores, usando el

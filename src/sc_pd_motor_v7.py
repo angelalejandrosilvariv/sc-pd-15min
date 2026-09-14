@@ -201,6 +201,24 @@ AUDITAR_INSTRUCCION_RIO = 1
 #     manualmente", distinto de un rechazo por filtro.
 USAR_TARIFA_RIO_INSTRUIDA = 1
 
+# Que configuracion fija la tarifa de partida/detencion cuando la relacionada
+# paso por mas de una dentro del mismo ciclo (turbina sola -> ciclo combinado,
+# distinto combustible, etc.). Cada bloque trae la tarifa de SU configuracion
+# valorizada con el tramo (Fria/Tibia/Caliente) del ciclo; lo que cambia es cual
+# de esas tarifas se cobra.
+#   'instruida' : la de la configuracion que el RIO instruyo en la apertura /
+#                 cierre del ciclo (spec 15, seccion 14.1b). Solo tiene efecto
+#                 con USAR_TARIFA_RIO_INSTRUIDA=1; con 0 se cobra la del primer /
+#                 ultimo bloque como siempre.
+#   'maxima'    : la MAS CARA entre las configuraciones que generaron en el
+#                 ciclo, sin importar cuanto tiempo ni cuando aparecieron. Es
+#                 la regla del modelo horario (MAXIFS sobre las horas de partida
+#                 del ciclo). Los filtros RIO (EP, motivo/SSCC) y el filtro de
+#                 Costo_Cero se mantienen; solo cambia la tarifa base.
+# CAMBIA EL MONTO LIQUIDADO (+297 MM en 2606, +380 MM en 2608 respecto de
+# 'instruida'). Ver docs/specs/25-tarifa-configuracion-maxima.md.
+TARIFA_CONFIGURACION = 'maxima'
+
 # Regla de exencion cuando el RIO no tiene registro de motivo.
 #   'sin_historia' : exime a los ciclos sin ciclo anterior conocido
 #                    (Horas_Detenida_Ciclo nula). Es el equivalente correcto de
@@ -423,9 +441,112 @@ def listar_secuencia_rio_ventana(momentos, rio_subset, ventana_cuartos_hora):
     return secuencias
 
 
+TARIFAS_CONFIGURACION_VALIDAS = ('instruida', 'maxima')
+
+# Campos de partida/detencion que deben viajar juntos con la tarifa elegida:
+# si la tarifa sale de otra configuracion, sus umbrales, tramo y filtro de
+# Costo_Cero tienen que ser los de ESA configuracion, no los del primer bloque.
+_CAMPOS_TARIFA_PARTIDA = {
+    'Costo_Partida_Base': 'Costo_Partida_ML', 'Tipo_Partida': 'Tipo_Partida',
+    'Fria_Num1_M': 'Fria_Num1_M', 'Tibia_Num1_O': 'Tibia_Num1_O',
+    'Tibia_Num2_N': 'Tibia_Num2_N', 'Caliente_Num1_P': 'Caliente_Num1_P',
+    'Partida_Fria': 'Partida_Fria', 'Partida_Tibia': 'Partida_Tibia',
+    'Partida_Tibia_2': 'Partida_Tibia_2', 'Partida_Caliente': 'Partida_Caliente',
+    'Filtro_CostoCero_Partida': 'Filtro_CostoCero_Partida',
+    'Config_Tarifa_Partida': 'Central',
+}
+_CAMPOS_TARIFA_DETENCION = {
+    'Costo_Detencion_Base': 'Costo_Detencion_ML', 'Detencion_Tarifa': 'Detencion',
+    'Filtro_CostoCero_Detencion': 'Filtro_CostoCero_Detencion',
+    'Config_Tarifa_Detencion': 'Central',
+}
+
+
+def combustible_configuracion(configuraciones):
+    """Combustible de una configuracion: lo que sigue a '_GN' o '_DIESEL'; '' si no hay.
+
+    Es el mismo criterio del modelo horario (columna Instrucciones RIO!V), que
+    trata DIESEL como un combustible mas y no solo compara sufijos '_GN'.
+    """
+    textos = configuraciones.astype(str)
+    gn = textos.str.extract(r'(_GN.*)', expand=False)
+    diesel = textos.str.extract(r'(_DIESEL.*)', expand=False)
+    return gn.where(gn.notna(), diesel).astype(object).where(lambda s: s.notna(), '').str.lstrip('_')
+
+
+def tarifa_configuracion_maxima(resumen_relacionada, compacto):
+    """Sustituye la tarifa del primer/ultimo bloque por la mas cara del ciclo.
+
+    Cada bloque ya trae Costo_Partida_ML / Costo_Detencion_ML valorizados con
+    la tarifa de su propia configuracion y el tramo del ciclo. Se elige, por
+    ciclo, el bloque que maximiza esa tarifa DESPUES de dos filtros:
+      - Costo_Cero: una configuracion COGEN o exenta no puede ganar el maximo
+        con una tarifa que luego se anularia.
+      - Combustible instruido: si el RIO instruyo un combustible en la apertura
+        (cierre) del ciclo, solo compiten las configuraciones de ese combustible.
+        Es la columna AG del modelo horario (U = tarifa x AE x AG antes del
+        MAXIFS): con instruccion GN, una configuracion DIESEL del mismo ciclo
+        no puede fijar la tarifa. Sin instruccion, compiten todas.
+    Empate: gana el bloque cronologicamente primero, de modo que un ciclo con
+    una sola configuracion queda identico a 'instruida'.
+    """
+    llave = ['Central_Relacionada', 'Ciclo_ID_Relacionada']
+    bloques = resumen_relacionada.copy()
+    comb_propio = combustible_configuracion(bloques['Central'])
+    if 'Configuracion RIO' in bloques.columns:
+        rio_por_ciclo = bloques.groupby(llave)['Configuracion RIO']
+        instruido = {'Partida': rio_por_ciclo.transform('first'),
+                     'Detencion': rio_por_ciclo.transform('last')}
+    else:
+        instruido = {'Partida': pd.Series('', index=bloques.index),
+                     'Detencion': pd.Series('', index=bloques.index)}
+    for tipo in ('Partida', 'Detencion'):
+        tarifa = pd.to_numeric(bloques[f'Costo_{tipo}_ML'], errors='coerce').fillna(0)
+        filtro = pd.to_numeric(bloques[f'Filtro_CostoCero_{tipo}'], errors='coerce').fillna(1)
+        comb_instruido = combustible_configuracion(instruido[tipo])
+        mismo_combustible = (comb_instruido == '') | (comb_propio == comb_instruido)
+        bloques[f'_Candidata_{tipo}'] = tarifa * filtro * mismo_combustible.astype(int)
+        # Ciclos donde el combustible instruido dejo fuera a TODAS las
+        # configuraciones con tarifa: quedan en 0, igual que en el horario, pero
+        # se marcan para que no pasen desapercibidos.
+        con_tarifa = (tarifa * filtro).groupby([bloques[c] for c in llave]).transform('max') > 0
+        sin_candidata = bloques[f'_Candidata_{tipo}'].groupby([bloques[c] for c in llave]).transform('max') == 0
+        bloques[f'_Excluida_Combustible_{tipo}'] = con_tarifa & sin_candidata
+    idx_p = bloques.groupby(llave)['_Candidata_Partida'].idxmax()
+    idx_d = bloques.groupby(llave)['_Candidata_Detencion'].idxmax()
+
+    ganadores = pd.DataFrame(index=idx_p.index)
+    for destino, origen in _CAMPOS_TARIFA_PARTIDA.items():
+        ganadores[destino] = bloques.loc[idx_p, origen].values
+    for destino, origen in _CAMPOS_TARIFA_DETENCION.items():
+        ganadores[destino] = bloques.loc[idx_d, origen].values
+    ganadores['Configs_En_Ciclo'] = bloques.groupby(llave)['Central'].nunique()
+    ganadores['Excluida_Combustible_Partida'] = bloques.groupby(llave)['_Excluida_Combustible_Partida'].first()
+    ganadores['Excluida_Combustible_Detencion'] = bloques.groupby(llave)['_Excluida_Combustible_Detencion'].first()
+    ganadores = ganadores.reset_index()
+
+    salida = compacto.copy()
+    salida['Costo_Partida_Base_Original'] = salida['Costo_Partida_Base']
+    salida['Costo_Detencion_Base_Original'] = salida['Costo_Detencion_Base']
+    salida = salida.drop(columns=list(_CAMPOS_TARIFA_PARTIDA) + list(_CAMPOS_TARIFA_DETENCION),
+                         errors='ignore')
+    salida = salida.merge(ganadores, on=llave, how='left')
+    salida['Configs_En_Ciclo'] = salida['Configs_En_Ciclo'].fillna(1).astype(int)
+    for tipo in ('Partida', 'Detencion'):
+        excluida = salida[f'Excluida_Combustible_{tipo}'].fillna(False).astype(bool)
+        salida[f'Excluida_Combustible_{tipo}'] = excluida
+        # Sin candidata, idxmax() devuelve el primer bloque: su tarifa no vale.
+        salida[f'Costo_{tipo}_Base'] = (pd.to_numeric(salida[f'Costo_{tipo}_Base'], errors='coerce')
+                                        .fillna(0).where(~excluida, 0.0))
+    return salida
+
+
 def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
-                             netear_por_ciclo=0):
+                             netear_por_ciclo=0, tarifa_configuracion='instruida'):
     """Resume los bloques por ciclo sin perder los insumos de su liquidacion."""
+    if tarifa_configuracion not in TARIFAS_CONFIGURACION_VALIDAS:
+        sys.exit(f"ERROR: TARIFA_CONFIGURACION='{tarifa_configuracion}' no es valido. "
+                 f"Opciones: {TARIFAS_CONFIGURACION_VALIDAS}")
     agregaciones = {
         'Inicio_Ciclo': ('FECHA_HORA', 'min'),
         'Termino_Ciclo': ('FECHA_HORA', 'max'),
@@ -493,6 +614,13 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
     if netear_por_ciclo == 1:
         compacto['Margen_Neto_Ciclo'] = compacto['Margen_Suma_Ciclo']
         compacto['Margen_Suma_Ciclo'] = np.maximum(0, compacto['Margen_Suma_Ciclo'])
+
+    # Con TARIFA_CONFIGURACION='maxima' la tarifa base deja de ser la del primer /
+    # ultimo bloque y pasa a ser la mas cara del ciclo. Se hace aqui, sobre el
+    # detalle por bloque, porque despues del .agg() ya no se sabe que
+    # configuraciones pasaron por el ciclo.
+    if tarifa_configuracion == 'maxima':
+        compacto = tarifa_configuracion_maxima(resumen_relacionada, compacto)
     return compacto
 
 
@@ -572,6 +700,13 @@ def crear_guia_lectura():
         ('Detencion_Tarifa_RIO', 'Tarifa de detencion en USD de la configuracion RIO del ultimo bloque.'),
         ('Config_RIO_Usada_Partida', 'Configuracion instruida por el RIO usada para fijar la tarifa de partida.'),
         ('Config_RIO_Usada_Detencion', 'Configuracion instruida por el RIO usada para fijar la tarifa de detencion.'),
+        ('Config_Tarifa_Partida / Config_Tarifa_Detencion',
+         'Solo con TARIFA_CONFIGURACION=maxima: configuracion cuya tarifa resulto la mas cara del ciclo y es la que se cobra '
+         '(regla del modelo horario). Configs_En_Ciclo dice cuantas configuraciones distintas generaron en el ciclo; '
+         'si es 1, la regla no cambia nada.'),
+        ('Costo_Partida_RIO_Instruida / Costo_Detencion_RIO_Instruida',
+         'Solo con TARIFA_CONFIGURACION=maxima y USAR_TARIFA_RIO_INSTRUIDA=1: lo que habria cobrado la tarifa de la '
+         'configuracion instruida por el RIO. Informativo; la diferencia con Costo_*_Base mide el efecto de la regla.'),
         ('Secuencia_RIO_Partida / Secuencia_RIO_Detencion',
          'Todas las instrucciones RIO dentro de la ventana configurable alrededor del inicio o termino del ciclo; son solo informativas y no participan del calculo.'),
         ('Margen_Suma_Ciclo', 'Margen del ciclo ya truncado en cero, que descuenta del costo P-D. '
@@ -588,13 +723,14 @@ def crear_guia_lectura():
          'Tibia_2 si Horas_Detenida_Ciclo > Tibia_Num2_N -> tarifa Partida_Tibia_2\n'
          'Caliente si Horas_Detenida_Ciclo < Caliente_Num1_P -> tarifa Partida_Caliente\n'
          'Tibia en cualquier otro caso -> tarifa Partida_Tibia\n\n'
-         'Cuando USAR_TARIFA_RIO_INSTRUIDA=1, se usan las columnas _RIO para fijar la tarifa realmente cobrada; Config_RIO_Usada_Partida indica la configuracion instruida.'),
+         'Cuando USAR_TARIFA_RIO_INSTRUIDA=1 y TARIFA_CONFIGURACION=instruida, se usan las columnas _RIO para fijar la tarifa realmente cobrada; Config_RIO_Usada_Partida indica la configuracion instruida.\n'
+         'Cuando TARIFA_CONFIGURACION=maxima, Costo_Partida_Base es la tarifa mas cara entre las configuraciones que generaron en el ciclo (Config_Tarifa_Partida); el RIO sigue decidiendo los filtros pero no la tarifa.'),
     ]
     return pd.DataFrame(filas, columns=['Columna', 'Que significa'])
 
 
 def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
-                            netear_por_ciclo=0):
+                            netear_por_ciclo=0, tarifa_configuracion='instruida'):
     """Define el orden legible de las columnas exportadas a nivel de ciclo."""
     columnas = [
         'Etiqueta_Relacionada', 'Central_Relacionada', 'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
@@ -620,7 +756,15 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
         # ver que ciclos quedaron bajo cero ni auditar el criterio aplicado.
         posicion_margen = columnas.index('Margen_Suma_Ciclo') + 1
         columnas.insert(posicion_margen, 'Margen_Neto_Ciclo')
-    if usar_config_dominante == 1 and usar_tarifa_rio_instruida == 0:
+    if tarifa_configuracion == 'maxima':
+        # Que configuracion gano el maximo y cuantas compitieron: sin esto no hay
+        # como auditar por que un ciclo cobra una tarifa distinta a la del RIO.
+        posicion = columnas.index('Costo_Partida_Base')
+        columnas[posicion:posicion] = ['Configs_En_Ciclo', 'Config_Tarifa_Partida',
+                                       'Excluida_Combustible_Partida']
+        posicion = columnas.index('Costo_Detencion_Base')
+        columnas[posicion:posicion] = ['Config_Tarifa_Detencion', 'Excluida_Combustible_Detencion']
+    if usar_config_dominante == 1 and usar_tarifa_rio_instruida == 0 and tarifa_configuracion != 'maxima':
         columnas += ['Central_Partida', 'Central_Partida_Original',
                      'Central_Detencion', 'Central_Detencion_Original']
     if usar_tarifa_rio_instruida == 1:
@@ -636,6 +780,10 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
             'Config_RIO_Usada_Detencion', 'Secuencia_RIO_Detencion', 'Detencion_Tarifa_RIO',
             'Costo_Detencion_Base_Original',
         ]
+        if tarifa_configuracion == 'maxima':
+            # Lo que habria cobrado 'instruida', para medir la regla ciclo a ciclo.
+            columnas.insert(columnas.index('Costo_Partida_Base_Original'), 'Costo_Partida_RIO_Instruida')
+            columnas.insert(columnas.index('Costo_Detencion_Base_Original'), 'Costo_Detencion_RIO_Instruida')
     return columnas
 
 
@@ -1508,7 +1656,38 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         by=['Central_Relacionada', 'Ciclo_ID_Relacionada', 'FECHA_HORA', 'GENERACION'])
 
     df_compacto = compactar_resumen_ciclos(
-        resumen_relacionada, USAR_TARIFA_RIO_INSTRUIDA, MARGEN_NETEADO_POR_CICLO)
+        resumen_relacionada, USAR_TARIFA_RIO_INSTRUIDA, MARGEN_NETEADO_POR_CICLO,
+        TARIFA_CONFIGURACION)
+
+    print("\n" + "=" * 78)
+    print("  TARIFA POR CONFIGURACION")
+    print("=" * 78)
+    if TARIFA_CONFIGURACION == 'maxima':
+        multi = df_compacto[df_compacto['Configs_En_Ciclo'] > 1]
+        delta_max = ((df_compacto['Costo_Partida_Base'] - df_compacto['Costo_Partida_Base_Original']).sum()
+                     + (df_compacto['Costo_Detencion_Base'] - df_compacto['Costo_Detencion_Base_Original']).sum())
+        print("  ACTIVO: 'maxima' -> cada ciclo cobra la tarifa MAS CARA entre las")
+        print("          configuraciones que generaron en el (regla del modelo horario).")
+        print(f"  Ciclos con mas de una configuracion: {len(multi):,} de {len(df_compacto):,}")
+        print(f"  Impacto bruto vs tarifa del primer/ultimo bloque: {delta_max:+,.0f} CLP")
+        excl_p = df_compacto[df_compacto['Excluida_Combustible_Partida']]
+        excl_d = df_compacto[df_compacto['Excluida_Combustible_Detencion']]
+        print(f"  Ciclos donde el combustible instruido por el RIO dejo sin candidata a toda")
+        print(f"  configuracion con tarifa (quedan en 0, como en el horario): "
+              f"partida {len(excl_p):,}, detencion {len(excl_d):,}")
+        if not excl_p.empty:
+            print(excl_p[['Etiqueta_Relacionada', 'Central_Partida', 'Costo_Partida_Base_Original']]
+                  .head(10).to_string(index=False))
+        if not multi.empty:
+            print("  Top 10 por costo de partida:")
+            print(multi.sort_values('Costo_Partida_Base', ascending=False)
+                  [['Etiqueta_Relacionada', 'Configs_En_Ciclo', 'Config_Tarifa_Partida', 'Costo_Partida_Base']]
+                  .head(10).to_string(index=False))
+        print("  Cambia TARIFA_CONFIGURACION='instruida' para cobrar lo que instruyo el RIO.")
+    else:
+        print("  ACTIVO: 'instruida' -> la tarifa la fija la configuracion que instruyo el")
+        print("          RIO en la apertura/cierre (seccion 14.1b, spec 15).")
+        print("  Cambia TARIFA_CONFIGURACION='maxima' para la regla del modelo horario.")
 
     # ==========================================
     # 14.1 REASIGNACION A CONFIGURACION DOMINANTE
@@ -1517,13 +1696,17 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # aparte del .agg() de arriba (que queda intacto) y se sobreescribe despues,
     # para que con el interruptor en 0 el comportamiento sea IDENTICO al v4.
     # Si USAR_TARIFA_RIO_INSTRUIDA esta activo, este mecanismo ya no hace falta
-    # (ver 14.1b) y se ignora.
+    # (ver 14.1b) y se ignora. Con TARIFA_CONFIGURACION='maxima' tampoco tiene
+    # sentido: la tarifa ya no depende de que configuracion "domino".
     if USAR_CONFIG_DOMINANTE == 1 and USAR_TARIFA_RIO_INSTRUIDA == 1:
         print("\n  [!] USAR_CONFIG_DOMINANTE y USAR_TARIFA_RIO_INSTRUIDA estan ambos en 1.")
         print("      USAR_TARIFA_RIO_INSTRUIDA tiene prioridad; se ignora la reasignacion")
         print("      a configuracion dominante (seccion 14.1) y corre 14.1b en su lugar.")
+    elif USAR_CONFIG_DOMINANTE == 1 and TARIFA_CONFIGURACION == 'maxima':
+        print("\n  [!] USAR_CONFIG_DOMINANTE=1 con TARIFA_CONFIGURACION='maxima': la tarifa")
+        print("      ya es la mas cara del ciclo; se ignora la reasignacion a dominante.")
 
-    if USAR_CONFIG_DOMINANTE == 1 and USAR_TARIFA_RIO_INSTRUIDA == 0:
+    if USAR_CONFIG_DOMINANTE == 1 and USAR_TARIFA_RIO_INSTRUIDA == 0 and TARIFA_CONFIGURACION != 'maxima':
         print("\n" + "=" * 78)
         print("  14.1 REASIGNACION A CONFIGURACION DOMINANTE")
         print("=" * 78)
@@ -1701,16 +1884,32 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             'Filtro_CostoCero_RIO': 'Filtro_CostoCero_Detencion_Nuevo',
             'Config_RIO_Sin_Tarifa': 'Config_RIO_Sin_Tarifa_Detencion'})
 
-        df_compacto['Costo_Partida_Base_Original'] = df_compacto['Costo_Partida_Base']
-        df_compacto['Costo_Detencion_Base_Original'] = df_compacto['Costo_Detencion_Base']
+        if TARIFA_CONFIGURACION != 'maxima':
+            # Con 'maxima' compactar_resumen_ciclos() ya guardo el original
+            # (tarifa del primer/ultimo bloque) antes de elegir la mas cara.
+            df_compacto['Costo_Partida_Base_Original'] = df_compacto['Costo_Partida_Base']
+            df_compacto['Costo_Detencion_Base_Original'] = df_compacto['Costo_Detencion_Base']
 
         df_compacto = df_compacto.merge(apertura_rio, on=['Central_Relacionada', 'Ciclo_ID_Relacionada'], how='left')
         df_compacto = df_compacto.merge(cierre_rio, on=['Central_Relacionada', 'Ciclo_ID_Relacionada'], how='left')
 
-        df_compacto['Costo_Partida_Base'] = df_compacto['Costo_Partida_Base_Nuevo']
-        df_compacto['Costo_Detencion_Base'] = df_compacto['Costo_Detencion_Base_Nuevo']
-        df_compacto['Filtro_CostoCero_Partida'] = df_compacto['Filtro_CostoCero_Partida_Nuevo']
-        df_compacto['Filtro_CostoCero_Detencion'] = df_compacto['Filtro_CostoCero_Detencion_Nuevo']
+        if TARIFA_CONFIGURACION == 'maxima':
+            # La tarifa ya quedo fijada por la configuracion mas cara del ciclo. El
+            # RIO conserva su rol en los filtros (EP, motivo) y en Config_RIO_Usada_*,
+            # y lo que habria cobrado la instruida queda como referencia. Una
+            # configuracion instruida sin tarifa ya no bloquea el cobro: la
+            # tarifa no sale de ella.
+            df_compacto['Costo_Partida_RIO_Instruida'] = df_compacto['Costo_Partida_Base_Nuevo']
+            df_compacto['Costo_Detencion_RIO_Instruida'] = df_compacto['Costo_Detencion_Base_Nuevo']
+            n_sin_tarifa_p = int(df_compacto['Config_RIO_Sin_Tarifa_Partida'].sum())
+            n_sin_tarifa_d = int(df_compacto['Config_RIO_Sin_Tarifa_Detencion'].sum())
+            df_compacto['Config_RIO_Sin_Tarifa_Partida'] = False
+            df_compacto['Config_RIO_Sin_Tarifa_Detencion'] = False
+        else:
+            df_compacto['Costo_Partida_Base'] = df_compacto['Costo_Partida_Base_Nuevo']
+            df_compacto['Costo_Detencion_Base'] = df_compacto['Costo_Detencion_Base_Nuevo']
+            df_compacto['Filtro_CostoCero_Partida'] = df_compacto['Filtro_CostoCero_Partida_Nuevo']
+            df_compacto['Filtro_CostoCero_Detencion'] = df_compacto['Filtro_CostoCero_Detencion_Nuevo']
         df_compacto = df_compacto.drop(columns=['Costo_Partida_Base_Nuevo', 'Costo_Detencion_Base_Nuevo',
                                                 'Filtro_CostoCero_Partida_Nuevo',
                                                 'Filtro_CostoCero_Detencion_Nuevo'])
@@ -1719,15 +1918,24 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df_compacto['Filtro_Conf_Partida'] = 1
         df_compacto['Filtro_Conf_Detencion'] = 1
 
-        delta_p = (df_compacto['Costo_Partida_Base'] - df_compacto['Costo_Partida_Base_Original']).sum()
-        delta_d = (df_compacto['Costo_Detencion_Base'] - df_compacto['Costo_Detencion_Base_Original']).sum()
-        n_sin_tarifa_p = int(df_compacto['Config_RIO_Sin_Tarifa_Partida'].sum())
-        n_sin_tarifa_d = int(df_compacto['Config_RIO_Sin_Tarifa_Detencion'].sum())
-        print(f"  Impacto bruto en costo de partida  : {delta_p:+,.0f} CLP")
-        print(f"  Impacto bruto en costo de detencion: {delta_d:+,.0f} CLP")
-        print(f"  Ciclos con config RIO sin tarifa (quedan para revision manual):")
-        print(f"    Partida  : {n_sin_tarifa_p:,} de {len(df_compacto):,}")
-        print(f"    Detencion: {n_sin_tarifa_d:,} de {len(df_compacto):,}")
+        if TARIFA_CONFIGURACION == 'maxima':
+            delta_p = (df_compacto['Costo_Partida_Base'] - df_compacto['Costo_Partida_RIO_Instruida']).sum()
+            delta_d = (df_compacto['Costo_Detencion_Base'] - df_compacto['Costo_Detencion_RIO_Instruida']).sum()
+            print("  TARIFA_CONFIGURACION='maxima': el RIO decide los filtros, no la tarifa.")
+            print(f"  Tarifa maxima vs tarifa instruida, partida  : {delta_p:+,.0f} CLP")
+            print(f"  Tarifa maxima vs tarifa instruida, detencion: {delta_d:+,.0f} CLP")
+            print(f"  Ciclos cuya config RIO no tiene tarifa (con 'instruida' quedarian en revision manual;")
+            print(f"  aqui cobran la maxima): partida {n_sin_tarifa_p:,}, detencion {n_sin_tarifa_d:,}")
+        else:
+            delta_p = (df_compacto['Costo_Partida_Base'] - df_compacto['Costo_Partida_Base_Original']).sum()
+            delta_d = (df_compacto['Costo_Detencion_Base'] - df_compacto['Costo_Detencion_Base_Original']).sum()
+            n_sin_tarifa_p = int(df_compacto['Config_RIO_Sin_Tarifa_Partida'].sum())
+            n_sin_tarifa_d = int(df_compacto['Config_RIO_Sin_Tarifa_Detencion'].sum())
+            print(f"  Impacto bruto en costo de partida  : {delta_p:+,.0f} CLP")
+            print(f"  Impacto bruto en costo de detencion: {delta_d:+,.0f} CLP")
+            print(f"  Ciclos con config RIO sin tarifa (quedan para revision manual):")
+            print(f"    Partida  : {n_sin_tarifa_p:,} de {len(df_compacto):,}")
+            print(f"    Detencion: {n_sin_tarifa_d:,} de {len(df_compacto):,}")
     else:
         df_compacto['Config_RIO_Sin_Tarifa_Partida'] = False
         df_compacto['Config_RIO_Sin_Tarifa_Detencion'] = False
@@ -2070,11 +2278,18 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # tarifa; al reves, un ciclo rechazado sin tarifa mostraba "Sin tarifa" y
     # ocultaba la causa real.
     df_compacto = marcar_sin_tarifa_rio(df_compacto, configuracion=None)
+    if TARIFA_CONFIGURACION == 'maxima':
+        for tipo in ('Partida', 'Detencion'):
+            excluida = (df_compacto[f'Excluida_Combustible_{tipo}']
+                        & df_compacto[f'Obs_{tipo}'].eq(f'Sin tarifa de {tipo.lower()}'))
+            df_compacto.loc[excluida, f'Obs_{tipo}'] = (
+                'Rechazo: ninguna configuracion del ciclo tiene el combustible instruido')
     df_compacto = asignar_observaciones_liquidacion(
         df_compacto, ciclos_sin_terminar, DIFERIR_CICLOS_SIN_TERMINAR)
 
     columnas_finales = columnas_resumen_ciclos(
-        USAR_CONFIG_DOMINANTE, USAR_TARIFA_RIO_INSTRUIDA, MARGEN_NETEADO_POR_CICLO)
+        USAR_CONFIG_DOMINANTE, USAR_TARIFA_RIO_INSTRUIDA, MARGEN_NETEADO_POR_CICLO,
+        TARIFA_CONFIGURACION)
     df_compacto = df_compacto[columnas_finales]
 
 

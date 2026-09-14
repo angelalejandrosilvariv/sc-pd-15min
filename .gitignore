@@ -1,3 +1,24 @@
+# Python
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Datos operacionales: NUNCA al repositorio (ver README, "Datos de entrada").
+# Se dejan en Carpeta_de_Trabajo para correr, pero no se versionan.
+*.csv
+*.xlsx
+*.xlsm
+*.parquet
+
+# Salidas del motor y de los scripts
+Reporte_Sobrecostos_PD_*.xlsx
+Prorrateo_15Min*.xlsx
+Prorrateo_15Min*.csv
+
+# Configuracion local de la interfaz (rutas absolutas de cada maquina)
+Carpeta_de_Trabajo/interfaz_config.json
+
+# Editores
+.spyproject/
+.vscode/
+.idea/

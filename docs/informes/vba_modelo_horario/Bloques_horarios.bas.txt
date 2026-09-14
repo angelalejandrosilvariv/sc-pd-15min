@@ -1,0 +1,44 @@
+Attribute VB_Name = "Bloques_horarios"
+Sub bloques()
+Application.ScreenUpdating = False
+Sheets("bloques").Select
+Range("C2:C1000").ClearContents
+Range("A2").Select
+Do Until IsEmpty(ActiveCell)
+    Set celda_actual = ActiveCell
+    hdia = ActiveCell.Offset(0, 1).Value
+    Set bloque = Columns("H:H").Find(hdia, , , xlWhole)
+    bloque.Select
+    bloq = ActiveCell.Offset(0, 1).Value
+    celda_actual.Select
+    ActiveCell.Offset(0, 2).Value = bloq
+    ActiveCell.Offset(1, 0).Select
+Loop
+Range("C2").Select
+Range("D2:F1000").ClearContents
+Do Until IsEmpty(ActiveCell)
+    bloq = ActiveCell.Value
+    Select Case bloq
+    Case Is = "A"
+        ActiveCell.Offset(0, 1) = 1
+        ActiveCell.Offset(0, 2) = 0
+        ActiveCell.Offset(0, 3) = 0
+        
+    Case Is = "B"
+        ActiveCell.Offset(0, 1) = 0
+        ActiveCell.Offset(0, 2) = 1
+        ActiveCell.Offset(0, 3) = 0
+    Case Is = "C"
+        ActiveCell.Offset(0, 1) = 0
+        ActiveCell.Offset(0, 2) = 0
+        ActiveCell.Offset(0, 3) = 1
+    Case Else
+        MsgBox "Error Letras de los Bloques de la columna C e I no son iguales"
+    End Select
+    ActiveCell.Offset(1, 0).Select
+Loop
+
+Application.ScreenUpdating = True
+MsgBox "Proceso terminado"
+End Sub
+
