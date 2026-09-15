@@ -8,6 +8,16 @@ LLAVE_REPORTE = ['FECHA_HORA', 'UNIDAD GENERADORA', 'Central', 'CONFIGURACION']
 LLAVE_RIO = ['FECHA_HORA_RIO', 'Central_Relacionada_RIO']
 
 
+def horas_cota_inferior(inicio_ciclo, primera_fecha_datos, horas_detenida_ciclo):
+    """Horas observables sin generar, solo cuando falta un ciclo anterior."""
+    inicio = pd.to_datetime(inicio_ciclo)
+    horas = (inicio - pd.Timestamp(primera_fecha_datos)).total_seconds() / 3600
+    if isinstance(horas_detenida_ciclo, pd.Series):
+        return pd.Series(horas, index=horas_detenida_ciclo.index).where(
+            horas_detenida_ciclo.isna())
+    return horas if pd.isna(horas_detenida_ciclo) else np.nan
+
+
 def empalmar_reportes(reporte_pasado, reporte_actual, audit_log=None):
     """Empalma reportes sin perder energia ante una colision de reloj.
 
@@ -112,9 +122,11 @@ def costos_clasicos(df):
     return out
 
 
-def clasificar_partida(df, sufijo=''):
+def clasificar_partida(df, sufijo='', horas_sin_historia='nulo'):
     """Clasifica y valoriza los cuatro tramos de partida de una politica."""
     out = df.copy()
+    if horas_sin_historia not in ('cota_inferior', 'nulo'):
+        raise ValueError("HORAS_SIN_HISTORIA debe ser 'cota_inferior' o 'nulo'")
     horas = out['Horas_Detenida_Ciclo']
     fria = out[f'Fria_Num1_M{sufijo}']
     tibia2 = out[f'Tibia_Num2_N{sufijo}']
@@ -122,8 +134,14 @@ def clasificar_partida(df, sufijo=''):
     sin_tarifa = out.get('Config_RIO_Sin_Tarifa', False) if sufijo else False
     tipo = f'Tipo_Partida{sufijo}'
     costo = f'Costo_Partida{sufijo}'
+    usar_cota = (horas_sin_historia == 'cota_inferior') & horas.isna() & (
+        out.get('Horas_Cota_Inferior', np.nan) > fria)
+    horas_clasificacion = horas.where(~usar_cota, out.get('Horas_Cota_Inferior'))
+    out[f'Horas_Detenida_Estimada{sufijo}'] = usar_cota
     out[tipo] = np.select(
-        [horas.isna() | sin_tarifa, horas > fria, horas > tibia2, horas < caliente],
+        [(horas_clasificacion.isna() & ~usar_cota) | sin_tarifa,
+         horas_clasificacion > fria, horas_clasificacion > tibia2,
+         horas_clasificacion < caliente],
         ['No_Aplica', 'Fria', 'Tibia_2', 'Caliente'], default='Tibia')
     out[costo] = pd.to_numeric(pd.Series(np.select(
         [out[tipo].eq('Fria'), out[tipo].eq('Tibia_2'),

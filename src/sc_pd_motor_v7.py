@@ -108,7 +108,8 @@ import numpy as np
 
 from fase1_integridad import (calcular_ciclos, clasificar_partida, costos_clasicos,
                               deduplicar_rio_priorizando_motivo,
-                              empalmar_reportes, filtro_costo_cero, marcar_sin_tarifa_rio)
+                              empalmar_reportes, filtro_costo_cero,
+                              horas_cota_inferior, marcar_sin_tarifa_rio)
 
 # ==========================================
 # 0. PANEL DE CONTROL Y RUTAS DE ARCHIVOS
@@ -147,6 +148,7 @@ ACTIVAR_CORRECCION_MEZCLA_CONFIG_RIO = 1  # 1 = en los limites, restringe el RIO
 # partidas (25,4 MM) y 12 detenciones (14,2 MM) que hoy se aprueban con una
 # instruccion de 12 a 24 h antes. Ver docs/specs/27-vigencia-instruccion-rio.md.
 VIGENCIA_INSTRUCCION_RIO_MIN = 30
+HORAS_SIN_HISTORIA = 'cota_inferior'  # 'cota_inferior' | 'nulo'; spec 28
 
 FILTRAR_CICLOS_BAJA_GEN   = 1   # Rechaza ciclos con generacion <= UMBRAL_RUIDO_MWH
 UMBRAL_RUIDO_MWH          = 1.0
@@ -464,6 +466,7 @@ _CAMPOS_TARIFA_PARTIDA = {
     'Partida_Fria': 'Partida_Fria', 'Partida_Tibia': 'Partida_Tibia',
     'Partida_Tibia_2': 'Partida_Tibia_2', 'Partida_Caliente': 'Partida_Caliente',
     'Filtro_CostoCero_Partida': 'Filtro_CostoCero_Partida',
+    'Horas_Detenida_Estimada': 'Horas_Detenida_Estimada',
     'Config_Tarifa_Partida': 'Central',
 }
 _CAMPOS_TARIFA_DETENCION = {
@@ -518,6 +521,8 @@ def tarifa_configuracion_maxima(resumen_relacionada, compacto):
     """
     llave = ['Central_Relacionada', 'Ciclo_ID_Relacionada']
     bloques = resumen_relacionada.copy()
+    if 'Horas_Detenida_Estimada' not in bloques.columns:
+        bloques['Horas_Detenida_Estimada'] = False
     comb_propio = combustible_configuracion(bloques['Central'])
     if 'Configuracion RIO' in bloques.columns:
         rio_por_ciclo = bloques.groupby(llave)['Configuracion RIO']
@@ -576,12 +581,18 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
     if 'Vigencia_RIO' not in resumen_relacionada.columns:
         # Detalle armado sin pasar por la seccion 11 (pruebas): toda instruccion vigente.
         resumen_relacionada = resumen_relacionada.assign(Vigencia_RIO=1)
+    if 'Horas_Cota_Inferior' not in resumen_relacionada.columns:
+        resumen_relacionada = resumen_relacionada.assign(Horas_Cota_Inferior=np.nan)
+    if 'Horas_Detenida_Estimada' not in resumen_relacionada.columns:
+        resumen_relacionada = resumen_relacionada.assign(Horas_Detenida_Estimada=False)
     agregaciones = {
         'Inicio_Ciclo': ('FECHA_HORA', 'min'),
         'Termino_Ciclo': ('FECHA_HORA', 'max'),
         'Generacion_Suma_Ciclo': ('GENERACION', 'sum'),
         'Margen_Suma_Ciclo': ('Margen', 'sum'),
         'Horas_Detenida_Ciclo': ('Horas_Detenida_Ciclo', 'first'),
+        'Horas_Cota_Inferior': ('Horas_Cota_Inferior', 'first'),
+        'Horas_Detenida_Estimada': ('Horas_Detenida_Estimada', 'first'),
         'Flag_Exencion': ('Flag_Exencion', 'first'),
         'Central_Partida': ('Central', 'first'),
         'Central_Detencion': ('Central', 'last'),
@@ -718,6 +729,8 @@ def crear_guia_lectura():
     """Construye el glosario y las formulas que permiten auditar cada ciclo."""
     filas = [
         ('Tipo_Partida', 'Tramo de partida determinado con las horas detenidas y los umbrales base.'),
+        ('Horas_Cota_Inferior / Horas_Detenida_Estimada',
+         'Para el ciclo sin anterior conocido: horas desde el primer FECHA_HORA cargado y marca de que la cota se uso para demostrar el tramo Fria. Horas_Detenida_Ciclo queda nula y conserva la exencion RIO sin_historia.'),
         ('Filtros de Partida', 'Filtro_Conf_Partida, Filtro_Disp_Partida, Filtro_Op_Partida y Filtro_CostoCero_Partida: 1 acepta y 0 rechaza el costo.'),
         ('Vigencia_RIO_Partida / Vigencia_RIO_Detencion', 'Con VIGENCIA_INSTRUCCION_RIO_MIN > 0: 1 si la instruccion RIO usada tiene a lo mas esos minutos de antiguedad respecto del bloque; 0 la deja sin efecto (Filtro_Op = 0) salvo que la busqueda relajada encuentre una instruccion valida en +/- VENTANA_CUARTOS_HORA.'),
         ('Costo_Partida_Base', 'Costo de partida en moneda local antes de aplicar los filtros.'),
@@ -767,6 +780,7 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
     columnas = [
         'Etiqueta_Relacionada', 'Central_Relacionada', 'Empresa', 'Ciclo_Mes', 'Estado_Ciclo_Mes',
         'Inicio_Ciclo', 'Termino_Ciclo', 'Horas_Detenida_Ciclo',
+        'Horas_Cota_Inferior', 'Horas_Detenida_Estimada',
         'Generacion_Suma_Ciclo', 'Margen_Suma_Ciclo',
         'Config_RIO_Rescatada_Ventana_Partida', 'Config_RIO_Rescatada_Ventana_Detencion',
         'Config_RIO_Corregida_Mezcla_Partida', 'Config_RIO_Corregida_Mezcla_Detencion',
@@ -1292,6 +1306,14 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     resumen_relacionada = resumen_relacionada[
         resumen_relacionada['Etiqueta_Relacionada'].isin(ciclos_vivos_este_mes)].copy()
 
+    resumen_relacionada['Horas_Cota_Inferior'] = np.nan
+    if HORAS_SIN_HISTORIA == 'cota_inferior':
+        resumen_relacionada['Horas_Cota_Inferior'] = horas_cota_inferior(
+            resumen_relacionada['Inicio_Ciclo_Global'], reporte['FECHA_HORA'].min(),
+            resumen_relacionada['Horas_Detenida_Ciclo'])
+    elif HORAS_SIN_HISTORIA != 'nulo':
+        sys.exit("ERROR: HORAS_SIN_HISTORIA debe ser 'cota_inferior' o 'nulo'")
+
     arranca_antes = resumen_relacionada['Inicio_Ciclo_Global'] < f_min_actual
     sigue_despues = resumen_relacionada['Termino_Ciclo_Global'] >= f_max_actual
     resumen_relacionada['Estado_Ciclo_Mes'] = np.select(
@@ -1636,7 +1658,8 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df_costos_pd, left_on='Llave_FHC_Inicio', right_on='Llave_Concatenada', how='left'
     ).drop(columns=['Llave_Concatenada'])
 
-    resumen_relacionada = clasificar_partida(resumen_relacionada)
+    resumen_relacionada = clasificar_partida(
+        resumen_relacionada, horas_sin_historia=HORAS_SIN_HISTORIA)
     resumen_relacionada['Filtro_CostoCero_Partida'] = filtro_costo_cero(
         resumen_relacionada['Costo_Cero'], resumen_relacionada['Central'])
 
@@ -1684,7 +1707,8 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         # caso que se marca para revision manual, no se paga automatico.
         resumen_relacionada['Config_RIO_Sin_Tarifa'] = resumen_relacionada['Fria_Num1_M_RIO'].isna()
 
-        resumen_relacionada = clasificar_partida(resumen_relacionada, '_RIO')
+        resumen_relacionada = clasificar_partida(
+            resumen_relacionada, '_RIO', HORAS_SIN_HISTORIA)
         resumen_relacionada['Filtro_CostoCero_RIO'] = filtro_costo_cero(
             resumen_relacionada['Costo_Cero_RIO'], resumen_relacionada['Configuracion RIO'])
 
@@ -1915,10 +1939,12 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             resumen_relacionada['FECHA_HORA'] == resumen_relacionada['Inicio_Ciclo_Global']]
         apertura_rio = apertura_rio.drop_duplicates(subset=['Central_Relacionada', 'Ciclo_ID_Relacionada'])
         apertura_rio = apertura_rio[['Central_Relacionada', 'Ciclo_ID_Relacionada', 'Configuracion RIO',
-                                     'Costo_Partida_RIO_ML', 'Filtro_CostoCero_RIO', 'Config_RIO_Sin_Tarifa']].rename(columns={
+                                     'Costo_Partida_RIO_ML', 'Filtro_CostoCero_RIO',
+                                     'Horas_Detenida_Estimada_RIO', 'Config_RIO_Sin_Tarifa']].rename(columns={
             'Configuracion RIO': 'Config_RIO_Usada_Partida',
             'Costo_Partida_RIO_ML': 'Costo_Partida_Base_Nuevo',
             'Filtro_CostoCero_RIO': 'Filtro_CostoCero_Partida_Nuevo',
+            'Horas_Detenida_Estimada_RIO': 'Horas_Detenida_Estimada_Nuevo',
             'Config_RIO_Sin_Tarifa': 'Config_RIO_Sin_Tarifa_Partida'})
 
         cierre_rio = resumen_relacionada[
@@ -1957,9 +1983,11 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             df_compacto['Costo_Detencion_Base'] = df_compacto['Costo_Detencion_Base_Nuevo']
             df_compacto['Filtro_CostoCero_Partida'] = df_compacto['Filtro_CostoCero_Partida_Nuevo']
             df_compacto['Filtro_CostoCero_Detencion'] = df_compacto['Filtro_CostoCero_Detencion_Nuevo']
+            df_compacto['Horas_Detenida_Estimada'] = df_compacto['Horas_Detenida_Estimada_Nuevo']
         df_compacto = df_compacto.drop(columns=['Costo_Partida_Base_Nuevo', 'Costo_Detencion_Base_Nuevo',
                                                 'Filtro_CostoCero_Partida_Nuevo',
-                                                'Filtro_CostoCero_Detencion_Nuevo'])
+                                                'Filtro_CostoCero_Detencion_Nuevo',
+                                                'Horas_Detenida_Estimada_Nuevo'])
 
         # El filtro de configuracion deja de existir bajo este mecanismo.
         df_compacto['Filtro_Conf_Partida'] = 1
@@ -2325,6 +2353,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # tarifa; al reves, un ciclo rechazado sin tarifa mostraba "Sin tarifa" y
     # ocultaba la causa real.
     df_compacto = marcar_sin_tarifa_rio(df_compacto, configuracion=None)
+    sin_historia_insuficiente = (df_compacto['Horas_Detenida_Ciclo'].isna()
+                                 & df_compacto['Horas_Cota_Inferior'].notna()
+                                 & ~df_compacto['Horas_Detenida_Estimada'].astype(bool))
+    df_compacto.loc[sin_historia_insuficiente, 'Obs_Partida'] = (
+        'Sin historia suficiente: cota '
+        + df_compacto.loc[sin_historia_insuficiente, 'Horas_Cota_Inferior']
+        .round(2).map('{:g}'.format) + ' h < umbral Fria')
     if VIGENCIA_INSTRUCCION_RIO_MIN:
         for tipo in ('Partida', 'Detencion'):
             vencida = ((df_compacto[f'Filtro_Op_{tipo}'] == 0) & (df_compacto[f'Vigencia_RIO_{tipo}'] == 0)

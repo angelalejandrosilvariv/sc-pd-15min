@@ -97,6 +97,25 @@ nunca una modificación del v7.
 
 ## Updates
 
+### 2026-09-15 — Codex (OpenAI) — Spec 28: cota inferior sin historia
+
+- **Tipo:** especificación, implementación y pruebas.
+- **Origen:** `docs/informes/Brechas_2608_por_empresa.md`, mecanismo (10) y
+  causa R8; decisión de implementar `HORAS_SIN_HISTORIA` con
+  `'cota_inferior'` activo por defecto.
+- **Cambios:** se agregó la función pura `horas_cota_inferior()` y la
+  clasificación Fría segura del primer ciclo cuando el periodo observable ya
+  supera `Fria_Num1_M`; la alternativa `'nulo'` conserva el comportamiento
+  anterior. `Horas_Detenida_Ciclo` permanece nula, por lo que la exención RIO
+  `'sin_historia'` sigue activa. Se exportan `Horas_Cota_Inferior` y
+  `Horas_Detenida_Estimada`, se documentan en `Guia_Lectura`, y el interruptor
+  quedó expuesto en runner e interfaz solo para v7.
+- **Validación:** `pytest -q` (104 pruebas), `python -m py_compile src/*.py
+  Carpeta_de_Trabajo/*.py tests/*.py` y `git diff --check`.
+- **Pendientes:** validar con los archivos operacionales empalmados de julio y
+  agosto que YUNGAY-1/YUNGAY-2 reconozcan 313.210 CLP por unidad y revisar el
+  caso TENOGAS_GLP. Los datos no se versionan.
+
 ### 2026-09-15 — Claude — Spec 27: vigencia de la instrucción RIO (±30 min) implementada
 
 - **Tipo:** decisión + implementación + prueba.
