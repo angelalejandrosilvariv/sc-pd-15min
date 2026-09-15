@@ -169,18 +169,24 @@ class Interfaz(tk.Tk):
         self.ent_ventana = ttk.Entry(fr, textvariable=self.var_ventana, width=4)
         self.ent_ventana.pack(side="left", padx=4)
         ttk.Label(fr, text="cuartos de hora").pack(side="left")
+        fv = ttk.Frame(f_met); fv.grid(row=6, column=0, columnspan=2, sticky="w")
+        ttk.Label(fv, text="Aceptar como justificacion una instruccion RIO dada hasta").pack(side="left")
+        self.var_vigencia = tk.StringVar(value="30")
+        self.ent_vigencia = ttk.Entry(fv, textvariable=self.var_vigencia, width=5)
+        self.ent_vigencia.pack(side="left", padx=4)
+        ttk.Label(fv, text="min antes del inicio/termino del ciclo (0 = sin limite, hasta 24 h)").pack(side="left")
 
         # solo turbina
-        ttk.Separator(f_met).grid(row=6, column=0, columnspan=2, sticky="ew", pady=6)
+        ttk.Separator(f_met).grid(row=7, column=0, columnspan=2, sticky="ew", pady=6)
         self.lbl_atrib = ttk.Label(f_met, text="Tarifa entre turbinas del mismo evento (solo motor Turbina)")
-        self.lbl_atrib.grid(row=7, column=0, sticky="w", padx=(0, 8))
+        self.lbl_atrib.grid(row=8, column=0, sticky="w", padx=(0, 8))
         self.var_atrib = tk.StringVar(value="prorrata")
         self.cb_atrib = ttk.Combobox(f_met, textvariable=self.var_atrib, state="readonly", width=44,
                                      values=["prorrata  — una vez, repartida por generacion",
                                              "primera  — una vez, a la turbina que arranco primero",
                                              "cada_turbina  — cada turbina paga completa"])
         self.cb_atrib.current(0)
-        self.cb_atrib.grid(row=7, column=1, sticky="w")
+        self.cb_atrib.grid(row=8, column=1, sticky="w")
 
         # -- 5. Ejecutar + log
         f_run = ttk.Frame(cuerpo)
@@ -213,7 +219,7 @@ class Interfaz(tk.Tk):
             rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
         self.lbl_tarifa.configure(foreground="#000" if self.var_motor.get() == "v7" else "#999")
         for control in (self.cb_neteado, self.cb_diferir, self.cb_baja_gen,
-                        self.ent_umbral, self.cb_relajada, self.ent_ventana):
+                        self.ent_umbral, self.cb_relajada, self.ent_ventana, self.ent_vigencia):
             control.configure(state="disabled" if es_horario else "normal")
         # salida por defecto segun motor, si el usuario no la cambio a mano
         actual = self.var_salida.get()
@@ -254,9 +260,9 @@ class Interfaz(tk.Tk):
         if not self.var_salida.get().strip():
             return "Falta el archivo de salida."
         try:
-            float(self.var_umbral.get()); int(self.var_ventana.get())
+            float(self.var_umbral.get()); int(self.var_ventana.get()); int(self.var_vigencia.get())
         except ValueError:
-            return "El umbral de MWh y la ventana deben ser numeros."
+            return "El umbral de MWh, la ventana y la vigencia deben ser numeros."
         return None
 
     def _panel(self) -> dict:
@@ -270,6 +276,7 @@ class Interfaz(tk.Tk):
             "UMBRAL_RUIDO_MWH": float(self.var_umbral.get()),
             "ACTIVAR_BUSQUEDA_RELAJADA": self.var_relajada.get(),
             "VENTANA_CUARTOS_HORA": int(self.var_ventana.get()),
+            "VIGENCIA_INSTRUCCION_RIO_MIN": int(self.var_vigencia.get()),
         }
         if self.var_motor.get() == "turbina":
             panel["ATRIBUCION_TARIFA_TURBINA"] = self.var_atrib.get().split()[0]
@@ -390,6 +397,7 @@ class Interfaz(tk.Tk):
         self.var_umbral.set(str(p.get("UMBRAL_RUIDO_MWH", 1.0)))
         self.var_relajada.set(p.get("ACTIVAR_BUSQUEDA_RELAJADA", 1))
         self.var_ventana.set(str(p.get("VENTANA_CUARTOS_HORA", 2)))
+        self.var_vigencia.set(str(p.get("VIGENCIA_INSTRUCCION_RIO_MIN", 30)))
         atrib = p.get("ATRIBUCION_TARIFA_TURBINA", "prorrata")
         for i, v in enumerate(self.cb_atrib["values"]):
             if v.startswith(atrib):

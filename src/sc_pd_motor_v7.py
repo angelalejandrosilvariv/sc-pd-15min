@@ -137,6 +137,17 @@ VENTANA_CUARTOS_HORA      = 2   # +/- 2 cuartos = +/- 30 min
 ACTIVAR_CORRECCION_MEZCLA_CONFIG_RIO = 1  # 1 = en los limites, restringe el RIO a
                                            # la configuracion exacta de la fila dentro
                                            # de +/- VENTANA_CUARTOS_HORA.
+# Vigencia de una instruccion del RIO para justificar una partida o detencion.
+# El cruce maestro toma la ultima instruccion anterior al bloque (hasta 24 h
+# atras). Con este limite, una instruccion mas antigua que VIGENCIA minutos ya
+# no habilita el filtro operacional del bloque: el motor solo acepta motivo
+# dentro de [-VIGENCIA, +VENTANA_CUARTOS_HORA*15] minutos alrededor del inicio
+# (partida) o termino (detencion) del ciclo. 0 = sin limite (comportamiento
+# anterior). CAMBIA EL MONTO LIQUIDADO: en 2608, 30 min deja de reconocer 4
+# partidas (25,4 MM) y 12 detenciones (14,2 MM) que hoy se aprueban con una
+# instruccion de 12 a 24 h antes. Ver docs/specs/27-vigencia-instruccion-rio.md.
+VIGENCIA_INSTRUCCION_RIO_MIN = 30
+
 FILTRAR_CICLOS_BAJA_GEN   = 1   # Rechaza ciclos con generacion <= UMBRAL_RUIDO_MWH
 UMBRAL_RUIDO_MWH          = 1.0
 RENUMERAR_CICLOS_DEL_MES  = 1   # 1 = etiquetas del reporte parten en 1 cada mes
@@ -462,6 +473,21 @@ _CAMPOS_TARIFA_DETENCION = {
 }
 
 
+def filtro_vigencia_rio(fecha_hora, fuente_rio, vigencia_min):
+    """1 si la instruccion RIO del bloque tiene a lo mas ``vigencia_min`` minutos.
+
+    ``fuente_rio`` es el instante de la instruccion que el cruce maestro asocio
+    al bloque (``Fuente_Config_RIO``). Sin instruccion (NaT) devuelve 1 para no
+    tocar la exencion 'sin_historia', que ya trata ese caso. Una instruccion
+    posterior al bloque (rescatada en ventana) tambien es vigente. Con
+    ``vigencia_min`` = 0 no se limita nada.
+    """
+    if not vigencia_min:
+        return pd.Series(1, index=fecha_hora.index)
+    antiguedad = (pd.to_datetime(fecha_hora) - pd.to_datetime(fuente_rio)).dt.total_seconds() / 60
+    return np.where(antiguedad.isna() | (antiguedad <= vigencia_min), 1, 0)
+
+
 def combustible_configuracion(configuraciones):
     """Combustible de una configuracion: lo que sigue a '_GN' o '_DIESEL'; '' si no hay.
 
@@ -547,6 +573,9 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
     if tarifa_configuracion not in TARIFAS_CONFIGURACION_VALIDAS:
         sys.exit(f"ERROR: TARIFA_CONFIGURACION='{tarifa_configuracion}' no es valido. "
                  f"Opciones: {TARIFAS_CONFIGURACION_VALIDAS}")
+    if 'Vigencia_RIO' not in resumen_relacionada.columns:
+        # Detalle armado sin pasar por la seccion 11 (pruebas): toda instruccion vigente.
+        resumen_relacionada = resumen_relacionada.assign(Vigencia_RIO=1)
     agregaciones = {
         'Inicio_Ciclo': ('FECHA_HORA', 'min'),
         'Termino_Ciclo': ('FECHA_HORA', 'max'),
@@ -573,6 +602,7 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
         'Filtro_Conf_Partida': ('Conf despachada RIO', 'first'),
         'Filtro_Disp_Partida': ('Disponible (1) / Pruebas (0)', 'first'),
         'Filtro_Op_Partida': ('Filtro_Operacional', 'first'),
+        'Vigencia_RIO_Partida': ('Vigencia_RIO', 'first'),
         'Consigna_Partida': ('CONSIGNAS', 'first'),
         'Motivo_Partida': ('MOTIVO', 'first'),
         'Estado_Op_Partida': ('ESTADO OPERACIONAL', 'first'),
@@ -582,6 +612,7 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
         'Filtro_Conf_Detencion': ('Conf despachada RIO', 'last'),
         'Filtro_Disp_Detencion': ('Disponible (1) / Pruebas (0)', 'last'),
         'Filtro_Op_Detencion': ('Filtro_Operacional', 'last'),
+        'Vigencia_RIO_Detencion': ('Vigencia_RIO', 'last'),
         'Consigna_Detencion': ('CONSIGNAS', 'last'),
         'Motivo_Detencion': ('MOTIVO', 'last'),
         'Estado_Op_Detencion': ('ESTADO OPERACIONAL', 'last'),
@@ -688,6 +719,7 @@ def crear_guia_lectura():
     filas = [
         ('Tipo_Partida', 'Tramo de partida determinado con las horas detenidas y los umbrales base.'),
         ('Filtros de Partida', 'Filtro_Conf_Partida, Filtro_Disp_Partida, Filtro_Op_Partida y Filtro_CostoCero_Partida: 1 acepta y 0 rechaza el costo.'),
+        ('Vigencia_RIO_Partida / Vigencia_RIO_Detencion', 'Con VIGENCIA_INSTRUCCION_RIO_MIN > 0: 1 si la instruccion RIO usada tiene a lo mas esos minutos de antiguedad respecto del bloque; 0 la deja sin efecto (Filtro_Op = 0) salvo que la busqueda relajada encuentre una instruccion valida en +/- VENTANA_CUARTOS_HORA.'),
         ('Costo_Partida_Base', 'Costo de partida en moneda local antes de aplicar los filtros.'),
         ('Umbrales base', 'Fria_Num1_M, Tibia_Num1_O, Tibia_Num2_N y Caliente_Num1_P delimitan los tramos por horas detenidas.'),
         ('Tarifas de partida base', 'Partida_Fria, Partida_Tibia, Partida_Tibia_2 y Partida_Caliente son las tarifas disponibles en USD.'),
@@ -740,13 +772,15 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
         'Config_RIO_Corregida_Mezcla_Partida', 'Config_RIO_Corregida_Mezcla_Detencion',
         'Estado_Op_Partida', 'Consigna_Partida', 'Motivo_Partida',
         'Tipo_Partida',
-        'Filtro_Conf_Partida', 'Filtro_Disp_Partida', 'Filtro_Op_Partida', 'Filtro_CostoCero_Partida',
+        'Filtro_Conf_Partida', 'Filtro_Disp_Partida', 'Filtro_Op_Partida', 'Vigencia_RIO_Partida',
+        'Filtro_CostoCero_Partida',
         'Costo_Partida_Base',
         'Fria_Num1_M', 'Tibia_Num1_O', 'Tibia_Num2_N', 'Caliente_Num1_P',
         'Partida_Fria', 'Partida_Tibia', 'Partida_Tibia_2', 'Partida_Caliente',
         'Costo_Partida_Efectivo', 'Obs_Partida',
         'Estado_Op_Detencion', 'Consigna_Detencion', 'Motivo_Detencion',
-        'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion', 'Filtro_Op_Detencion', 'Filtro_CostoCero_Detencion',
+        'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion', 'Filtro_Op_Detencion', 'Vigencia_RIO_Detencion',
+        'Filtro_CostoCero_Detencion',
         'Costo_Detencion_Base', 'Detencion_Tarifa',
         'Costo_Detencion_Efectivo', 'Obs_Detencion',
         'Costos_Totales_PD', 'Total SC_PD', 'Obs_Liquidacion_Final', 'Etiqueta_Original',
@@ -1582,7 +1616,20 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         'MOTIVO', 'ESTADO OPERACIONAL', 'COMENTARIO', 'Flag_Exencion')
     resumen_relacionada['Conf despachada RIO'] = f_conf
     resumen_relacionada['Disponible (1) / Pruebas (0)'] = f_disp
-    resumen_relacionada['Filtro_Operacional'] = f_op
+    # Una instruccion mas antigua que la vigencia no habilita el bloque, aunque
+    # traiga motivo OM. La busqueda relajada de 14 solo mira +/- VENTANA, asi que
+    # puede rescatar el ciclo unicamente con una instruccion cercana.
+    resumen_relacionada['Vigencia_RIO'] = filtro_vigencia_rio(
+        resumen_relacionada['FECHA_HORA'], resumen_relacionada['Fuente_Config_RIO'],
+        VIGENCIA_INSTRUCCION_RIO_MIN)
+    resumen_relacionada['Filtro_Operacional'] = f_op * resumen_relacionada['Vigencia_RIO']
+    n_vencidas = int(((f_op == 1) & (resumen_relacionada['Vigencia_RIO'] == 0)).sum())
+    if VIGENCIA_INSTRUCCION_RIO_MIN:
+        print(f"\n  Vigencia de la instruccion RIO: {VIGENCIA_INSTRUCCION_RIO_MIN} min hacia atras "
+              f"(+{VENTANA_CUARTOS_HORA * 15} min hacia adelante via busqueda relajada). "
+              f"Bloques con motivo valido pero instruccion vencida: {n_vencidas:,}.")
+    else:
+        print("\n  Vigencia de la instruccion RIO: sin limite (VIGENCIA_INSTRUCCION_RIO_MIN = 0).")
 
     # --- Tarifas de partida ---
     resumen_relacionada = resumen_relacionada.merge(
@@ -2278,6 +2325,12 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # tarifa; al reves, un ciclo rechazado sin tarifa mostraba "Sin tarifa" y
     # ocultaba la causa real.
     df_compacto = marcar_sin_tarifa_rio(df_compacto, configuracion=None)
+    if VIGENCIA_INSTRUCCION_RIO_MIN:
+        for tipo in ('Partida', 'Detencion'):
+            vencida = ((df_compacto[f'Filtro_Op_{tipo}'] == 0) & (df_compacto[f'Vigencia_RIO_{tipo}'] == 0)
+                       & df_compacto[f'Obs_{tipo}'].eq('Rechazo: Sin Motivo ni SSCC en RIO'))
+            df_compacto.loc[vencida, f'Obs_{tipo}'] = (
+                f'Rechazo: instruccion RIO fuera de vigencia (> {VIGENCIA_INSTRUCCION_RIO_MIN} min)')
     if TARIFA_CONFIGURACION == 'maxima':
         for tipo in ('Partida', 'Detencion'):
             excluida = (df_compacto[f'Excluida_Combustible_{tipo}']

@@ -53,6 +53,9 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 2. **Margen truncado por bloque** (`MARGEN_NETEADO_POR_CICLO = 0`), igual que el Excel.
 3. **Unidad de ciclo = central relacionada** (motor v7). El motor Turbina sigue
    disponible desde la interfaz.
+4. **Vigencia de la instrucción RIO = 30 minutos** (15-09-2026): una partida o
+   detención solo se justifica con una instrucción dada hasta 30 min antes (o 30
+   min después, búsqueda relajada). `VIGENCIA_INSTRUCCION_RIO_MIN`, spec 27.
 
 **Decisiones abiertas** (el código las deja parametrizadas o documentadas):
 
@@ -69,6 +72,8 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2606 con empalme 2605 | 823.168.889 | **1.080.340.995** | 1.028.628.659 |
 | 2608 sin julio | 536.027.769 | **875.313.107** | 957.823.663 (preliminar) |
 | 2608 con empalme 2607 (interfaz, umbral 0,5 MWh) | — | **971.292.712** | 957.823.663 (preliminar) |
+| 2606 con empalme 2605, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **1.063.758.505** | 1.028.628.659 |
+| 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 
 **Trabajo siguiente, en orden sugerido**
 
@@ -91,6 +96,28 @@ para las variantes (nada de "opción A/B"). Un modelo nuevo es un archivo nuevo,
 nunca una modificación del v7.
 
 ## Updates
+
+### 2026-09-15 — Claude — Spec 27: vigencia de la instrucción RIO (±30 min) implementada
+
+- **Tipo:** decisión + implementación + prueba.
+- **Origen:** al revisar el listado de filtros del motor, el dueño del proyecto
+  decidió que la instrucción RIO que justifica una partida/detención solo se
+  busque en ±30 minutos; el cruce maestro aceptaba la última instrucción hasta
+  24 h atrás.
+- **Cambios:** `VIGENCIA_INSTRUCCION_RIO_MIN = 30` en el panel del v7; función
+  pura `filtro_vigencia_rio()`; `Filtro_Operacional = f_op × Vigencia_RIO` por
+  bloque; columnas `Vigencia_RIO_Partida/Detencion` en el compacto y el export;
+  observación "Rechazo: instruccion RIO fuera de vigencia (> N min)"; runner e
+  interfaz exponen el valor (0 = sin límite). `docs/specs/27-vigencia-instruccion-rio.md`.
+- **Validación:** `pytest -q` → **99 pruebas** (5 nuevas). Corridas reales:
+  2608 sin julio 875.313.107 → **857.661.488** (−17,65 MM, 11 ciclos: NUEVARENCA
+  &5 −8,56, siete detenciones de CORONEL −8,05, EMELDA, TENOGAS, CMPC); 2606 con
+  mayo 1.080.340.995 → **1.063.758.505** (−16,58 MM). Con 0 se reproduce el
+  número anterior peso a peso.
+- **Pendientes:** el valor 30 rechaza NUEVARENCA &5 aunque tiene PP/OM 90 min
+  antes y PMT/OM 31 min después; la spec deja la tabla de sensibilidad (60/120/240)
+  y una alternativa por consigna (PP/PMT para partida, PS/FS para detención) por
+  si se quiere afinar.
 
 ### 2026-09-15 — Claude — Diagnóstico de causa raíz de las diferencias en ciclos completos del mes
 

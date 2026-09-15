@@ -177,6 +177,9 @@ El propio código deja explícitos asuntos que todavía requieren validación de
   14-09-2026). `'instruida'` conserva la lectura de la spec 15 (la configuración
   que instruyó el RIO) para comparaciones — ver
   `docs/specs/25-tarifa-configuracion-maxima.md`;
+- la instrucción RIO que justifica una partida o detención debe estar dentro de
+  **±30 minutos** del inicio/término del ciclo (`VIGENCIA_INSTRUCCION_RIO_MIN = 30`,
+  decisión del 15-09-2026; 0 = sin límite) — ver `docs/specs/27-vigencia-instruccion-rio.md`;
 - no se debe sustituir la regla física de ciclo por un puente heurístico de horas de cero;
 - el repositorio no contiene los Excel/CSV operacionales.
 

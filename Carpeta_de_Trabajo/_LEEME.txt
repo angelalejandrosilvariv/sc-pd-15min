@@ -25,7 +25,8 @@ etc.) y corre los scripts con F5 en Spyder, en este orden:
    Interruptores al inicio del archivo: MARGEN_NETEADO_POR_CICLO (dejar
    en 0) y TARIFA_CONFIGURACION ("maxima" = la configuracion mas cara
    del ciclo, decision vigente; "instruida" = la que instruyo el RIO,
-   solo para comparar).
+   solo para comparar) y VIGENCIA_INSTRUCCION_RIO_MIN (30 = la instruccion
+   RIO debe estar a menos de 30 min de la partida/detencion; 0 = sin limite).
 
    Alternativas desde la interfaz (no reemplazan al v7):
    - Turbina: modelo experimental con ciclo por UNIDAD GENERADORA.
