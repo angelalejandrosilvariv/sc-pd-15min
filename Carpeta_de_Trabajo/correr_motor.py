@@ -51,6 +51,11 @@ TARIFA_CONFIGURACION = "maxima"
 # 24 h atras, comportamiento anterior). Ver docs/specs/27-vigencia-instruccion-rio.md
 VIGENCIA_INSTRUCCION_RIO_MIN = 30
 
+# Primer ciclo sin uno anterior observable: "cota_inferior" permite cobrarlo
+# como Fria solo si las horas desde el primer dato cargado ya superan el umbral.
+# "nulo" conserva el comportamiento anterior. Solo motor v7 (spec 28).
+HORAS_SIN_HISTORIA = "cota_inferior"
+
 
 def _ruta(nombre: str) -> str:
     return str(CARPETA / nombre) if nombre else ""
@@ -73,6 +78,7 @@ def main() -> None:
         "MARGEN_NETEADO_POR_CICLO": MARGEN_NETEADO_POR_CICLO,
         "TARIFA_CONFIGURACION": TARIFA_CONFIGURACION,
         "VIGENCIA_INSTRUCCION_RIO_MIN": VIGENCIA_INSTRUCCION_RIO_MIN,
+        "HORAS_SIN_HISTORIA": HORAS_SIN_HISTORIA,
     })
 
 

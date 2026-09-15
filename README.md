@@ -180,6 +180,10 @@ El propio código deja explícitos asuntos que todavía requieren validación de
 - la instrucción RIO que justifica una partida o detención debe estar dentro de
   **±30 minutos** del inicio/término del ciclo (`VIGENCIA_INSTRUCCION_RIO_MIN = 30`,
   decisión del 15-09-2026; 0 = sin límite) — ver `docs/specs/27-vigencia-instruccion-rio.md`;
+- el primer ciclo sin anterior conocido usa por defecto la cota inferior desde el
+  primer dato cargado (`HORAS_SIN_HISTORIA = 'cota_inferior'`): solo se clasifica
+  Fría cuando esa cota ya supera su umbral; `'nulo'` conserva la partida en cero.
+  Ver `docs/specs/28-horas-sin-historia-cota-inferior.md`;
 - no se debe sustituir la regla física de ciclo por un puente heurístico de horas de cero;
 - el repositorio no contiene los Excel/CSV operacionales.
 

@@ -176,17 +176,25 @@ class Interfaz(tk.Tk):
         self.ent_vigencia.pack(side="left", padx=4)
         ttk.Label(fv, text="min antes del inicio/termino del ciclo (0 = sin limite, hasta 24 h)").pack(side="left")
 
+        self.lbl_horas_sin_historia = ttk.Label(f_met, text="Primer ciclo sin historia (solo motor v7)")
+        self.lbl_horas_sin_historia.grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+        self.var_horas_sin_historia = tk.StringVar(value="cota_inferior")
+        self.cb_horas_sin_historia = ttk.Combobox(
+            f_met, textvariable=self.var_horas_sin_historia, state="readonly", width=44,
+            values=["cota_inferior", "nulo"])
+        self.cb_horas_sin_historia.grid(row=7, column=1, sticky="w", pady=(6, 0))
+
         # solo turbina
-        ttk.Separator(f_met).grid(row=7, column=0, columnspan=2, sticky="ew", pady=6)
+        ttk.Separator(f_met).grid(row=8, column=0, columnspan=2, sticky="ew", pady=6)
         self.lbl_atrib = ttk.Label(f_met, text="Tarifa entre turbinas del mismo evento (solo motor Turbina)")
-        self.lbl_atrib.grid(row=8, column=0, sticky="w", padx=(0, 8))
+        self.lbl_atrib.grid(row=9, column=0, sticky="w", padx=(0, 8))
         self.var_atrib = tk.StringVar(value="prorrata")
         self.cb_atrib = ttk.Combobox(f_met, textvariable=self.var_atrib, state="readonly", width=44,
                                      values=["prorrata  — una vez, repartida por generacion",
                                              "primera  — una vez, a la turbina que arranco primero",
                                              "cada_turbina  — cada turbina paga completa"])
         self.cb_atrib.current(0)
-        self.cb_atrib.grid(row=8, column=1, sticky="w")
+        self.cb_atrib.grid(row=9, column=1, sticky="w")
 
         # -- 5. Ejecutar + log
         f_run = ttk.Frame(cuerpo)
@@ -218,6 +226,10 @@ class Interfaz(tk.Tk):
         for rb in self.rb_tarifa:
             rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
         self.lbl_tarifa.configure(foreground="#000" if self.var_motor.get() == "v7" else "#999")
+        self.cb_horas_sin_historia.configure(
+            state="readonly" if self.var_motor.get() == "v7" else "disabled")
+        self.lbl_horas_sin_historia.configure(
+            foreground="#000" if self.var_motor.get() == "v7" else "#999")
         for control in (self.cb_neteado, self.cb_diferir, self.cb_baja_gen,
                         self.ent_umbral, self.cb_relajada, self.ent_ventana, self.ent_vigencia):
             control.configure(state="disabled" if es_horario else "normal")
@@ -282,6 +294,7 @@ class Interfaz(tk.Tk):
             panel["ATRIBUCION_TARIFA_TURBINA"] = self.var_atrib.get().split()[0]
         else:
             panel["TARIFA_CONFIGURACION"] = self.var_tarifa.get()
+            panel["HORAS_SIN_HISTORIA"] = self.var_horas_sin_historia.get()
         return panel
 
     def _rutas(self) -> dict:
@@ -398,6 +411,7 @@ class Interfaz(tk.Tk):
         self.var_relajada.set(p.get("ACTIVAR_BUSQUEDA_RELAJADA", 1))
         self.var_ventana.set(str(p.get("VENTANA_CUARTOS_HORA", 2)))
         self.var_vigencia.set(str(p.get("VIGENCIA_INSTRUCCION_RIO_MIN", 30)))
+        self.var_horas_sin_historia.set(p.get("HORAS_SIN_HISTORIA", "cota_inferior"))
         atrib = p.get("ATRIBUCION_TARIFA_TURBINA", "prorrata")
         for i, v in enumerate(self.cb_atrib["values"]):
             if v.startswith(atrib):
