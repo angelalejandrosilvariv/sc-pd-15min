@@ -9,12 +9,20 @@ LLAVE_RIO = ['FECHA_HORA_RIO', 'Central_Relacionada_RIO']
 
 
 def horas_cota_inferior(inicio_ciclo, primera_fecha_datos, horas_detenida_ciclo):
-    """Horas observables sin generar, solo cuando falta un ciclo anterior."""
+    """Horas observables sin generar, solo cuando falta un ciclo anterior.
+
+    Acepta escalares o Series alineadas (``inicio_ciclo`` y
+    ``horas_detenida_ciclo`` con el mismo indice). Devuelve NaN donde el ciclo
+    ya tiene ``Horas_Detenida_Ciclo`` conocidas.
+    """
     inicio = pd.to_datetime(inicio_ciclo)
-    horas = (inicio - pd.Timestamp(primera_fecha_datos)).total_seconds() / 3600
+    primera = pd.Timestamp(primera_fecha_datos)
     if isinstance(horas_detenida_ciclo, pd.Series):
-        return pd.Series(horas, index=horas_detenida_ciclo.index).where(
-            horas_detenida_ciclo.isna())
+        if not isinstance(inicio, pd.Series):
+            inicio = pd.Series(inicio, index=horas_detenida_ciclo.index)
+        horas = (inicio - primera).dt.total_seconds() / 3600
+        return horas.where(horas_detenida_ciclo.isna())
+    horas = (inicio - primera).total_seconds() / 3600
     return horas if pd.isna(horas_detenida_ciclo) else np.nan
 
 

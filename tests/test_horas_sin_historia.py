@@ -54,3 +54,15 @@ def test_columnas_y_guia_exportan_la_trazabilidad():
                     columnas.index('Horas_Detenida_Ciclo') + 3] == [
                         'Horas_Cota_Inferior', 'Horas_Detenida_Estimada']
     assert crear_guia_lectura()['Columna'].str.contains('Horas_Cota_Inferior').any()
+
+
+def test_cota_vectorizada_sobre_series_del_motor():
+    # main() la llama con Series: Inicio_Ciclo_Global por bloque y Horas_Detenida_Ciclo.
+    inicio = pd.Series(pd.to_datetime(['2026-08-18 06:45', '2026-08-18 06:45', '2026-08-23 20:45']))
+    horas = pd.Series([np.nan, np.nan, 133.0])
+
+    cota = horas_cota_inferior(inicio, pd.Timestamp('2026-07-01'), horas)
+
+    assert cota.iloc[0] == cota.iloc[1] == 48 * 24 + 6.75
+    assert np.isnan(cota.iloc[2])
+    assert cota.index.equals(horas.index)

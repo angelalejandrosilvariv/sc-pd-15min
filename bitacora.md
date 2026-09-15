@@ -74,6 +74,8 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2608 con empalme 2607 (interfaz, umbral 0,5 MWh) | — | **971.292.712** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **1.063.758.505** | 1.028.628.659 |
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
+| 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
+| 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
 
 **Trabajo siguiente, en orden sugerido**
 
@@ -96,6 +98,31 @@ para las variantes (nada de "opción A/B"). Un modelo nuevo es un archivo nuevo,
 nunca una modificación del v7.
 
 ## Updates
+
+### 2026-09-15 — Claude — Verificación de la spec 28 (PR #50) con datos reales: corrección de un crash
+
+- **Tipo:** revisión + corrección + prueba.
+- **Origen:** PR #50 de Codex (cota inferior de horas sin historia). La suite
+  pasaba (104) pero el motor abortaba con datos reales:
+  `horas_cota_inferior()` hacía `(Series − Timestamp).total_seconds()` — la
+  prueba solo cubría el camino escalar y `main()` la llama con Series.
+- **Cambios:** `src/fase1_integridad.py` — camino vectorizado con
+  `.dt.total_seconds()` y alineación de índice; `tests/test_horas_sin_historia.py`
+  — prueba nueva sobre Series como las del motor (105 pruebas).
+- **Validación con datos reales:** 2608 sin julio 857.661.488 → **910.213.848**
+  (+52,55 MM): de 60 ciclos sin historia, 48 pasan a Fría por cota (todos "inicia
+  y termina este mes"; YUNGAY-1/2 cobran 313.210 cada uno como en el Excel;
+  NEHUENCO-2 &1 +16,6 MM; ATACAMA-2 &1 +14,0 MM), 8 quedan "sin historia
+  suficiente" y 4 diferidos. 2606 con mayo 1.063.758.505 → **1.065.936.984**
+  (+2,18 MM, 3 ciclos: LOSGUINDOS, OLIVOS, NUEVAALDEA-2). Con julio empalmado el
+  efecto en agosto se limita a unidades que no generaron en julio.
+- **Observación:** con `TARIFA_CONFIGURACION = 'maxima'`, si la cota no supera el
+  umbral Fría de la configuración combinada pero sí el de una configuración
+  simple (umbral 0), gana la simple: NEHUENCO-2 &1 cobra la tarifa TG1 (18.000
+  USD) y no la TG1+TV1. Es el comportamiento pedido (cota inferior, conservador),
+  pero conviene tenerlo presente al leer ciclos con historia estimada.
+- **Pendientes:** ninguno de esta spec. Sigue abierto: valor de la vigencia
+  (spec 27), fuente del SSCC, paradas cortas, Pruebas vs RIO, EP + OM.
 
 ### 2026-09-15 — Codex (OpenAI) — Spec 28: cota inferior sin historia
 
