@@ -560,3 +560,49 @@ vigente `TOLERANCIA_CORTES_BLOQUES = 0`; decisión pendiente (2).
 Los 18,8 MM netos esconden 241,9 MM brutos que se compensan. Quitando los defectos del
 Excel, el motor queda **58 MM por debajo** del Excel en ciclos completos, y esa
 diferencia es casi toda resolución (margen por bloque) y la fuente del SSCC.
+
+---
+
+## Cuarta ronda (15-09): motor con specs 27 y 28 vs Excel corregido
+
+Corrida: `main` en `f820455` (tarifa máxima, `VIGENCIA_INSTRUCCION_RIO_MIN = 30`,
+`HORAS_SIN_HISTORIA = 'cota_inferior'`, umbral 1,0 MWh), **sin julio** (los archivos de
+julio están en `T:` y no se copiaron a local). Excel corregido, sin traspasos.
+
+| | Excel corregido | Motor | Δ |
+|---|---:|---:|---:|
+| Mes completo | 897.558.934 | **910.213.848** | +12,65 MM (+1,4%) |
+| Σ\|Δ\| por empresa, mes completo | | | **49,9 MM** (era 141,6) |
+| Solo ciclos del mes, sin herencia | 914.259.268 | **910.213.848** | −4,05 MM (−0,4%) |
+| Pares idénticos al peso | | | **210 de 353** (era 198) |
+
+**Advertencia de lectura.** Sin julio, los ciclos que ya generaban a la hora 1 quedan
+"sin historia suficiente" y el motor no cobra su partida — exactamente lo que hace el
+Excel con los `&1`. Esa coincidencia explica buena parte del acercamiento en el mes
+completo (NUEVARENCA &1, SANISIDRO-1 &1, MEJILLONES &1 pagan solo detención, igual que
+el Excel) y también el −12,5 MM de COLBUN en ciclos del mes: NEHUENCO-2 &1 (2-ago, cota
+44 h) cobra la tarifa TG1 (16,6 MM) porque la cota no alcanza el umbral de 90 h de la
+configuración combinada; con julio empalmado tendría sus horas reales y cobraría
+26,7 MM. Con julio, esos ciclos vuelven a cobrarse como el 14-09.
+
+**Qué cambió respecto de la tercera ronda por efecto de las specs 27 y 28:**
+
+| Empresa | Δ tercera ronda (con julio) | Δ ahora (sin julio) | Por qué |
+|---|---:|---:|---|
+| SGA | +14,1 | **+5,0** | spec 27 rechaza 7 detenciones de CORONEL con instrucción de 12–24 h antes (−8,0); el Excel tampoco las pagaba |
+| GMETROPOLITANA | +19,1 | **+15,2** | spec 27 rechaza NUEVARENCA &5 (−8,6); +4,6 es &1 sin julio (artefacto) |
+| ENEL | +2,4 | −5,5 | ATACAMA-2 &1 y SANISIDRO-1 &1 con cota / sin julio |
+| COLBUN | −2,4 | −12,5 | NEHUENCO-2 &1 con cota TG1 (artefacto sin julio, −10) |
+| ORAZUL | −0,7 | **−0,05** | spec 28: YUNGAY-1/2 cobran fría por cota, como el Excel |
+| INERSA | +0,1 | −0,4 | spec 28 (+0,26 TENOGAS &1) y spec 27 (−0,39 TENOGAS &16) |
+| EMELDA | +0,8 | +1,2 | spec 28 cobra EMELDA-1 &1 (Fría por cota); spec 27 rechaza det de EMELDA-2 |
+| TAMAKAYA, ENGIE, ANTILHUE, ENLASA, GM_HOLDINGS, QUICKSTART | | sin cambio | |
+
+Causas raíz sobre ciclos del mes (mismo método de la sección anterior): R6 tarifa
+±68,8 (neto −20,7), R9 margen −54,3, R3 instrucción mal asociada en el Excel +48,7, R1
+paradas cortas +35,5 (de los cuales ≈10,5 son ciclos de la hora 1 sin julio), R5 −18,8,
+R2/R4 +7,2, R7 +0,55, R1b −2,2. Detalle en `Diagnostico_2608_v2.xlsx` (scratchpad).
+
+Para cerrar agosto con la comparación definitiva hace falta correr con julio empalmado:
+`Reporte_PD_15min_2607_v2.csv`, `RIO_07_2026.xlsx` y `Costos_de_P-D_Consolidado_2607.xlsx`
+copiados a `Carpeta_de_Trabajo`.

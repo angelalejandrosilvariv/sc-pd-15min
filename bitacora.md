@@ -106,6 +106,18 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-15 — Claude — Agosto: motor con specs 27 y 28 vs Excel corregido
+
+- **Tipo:** análisis con datos reales.
+- **Cambios:** sección "Cuarta ronda" en `docs/informes/Brechas_2608_por_empresa.md`.
+- **Hallazgos:** sin julio, mes completo Excel 897,6 vs motor 910,2 MM (+1,4%);
+  Σ|Δ| por empresa 49,9 MM (era 141,6); ciclos del mes −0,4%, 210 de 353 pares
+  idénticos. SGA baja de +14,1 a +5,0 (spec 27) y ORAZUL queda en −0,05 (spec 28).
+  Parte del acercamiento es artefacto de correr sin julio (los ciclos de la hora 1
+  no cobran partida, como el Excel; NEHUENCO-2 &1 cobra tarifa TG1 por cota).
+- **Pendientes:** repetir con julio empalmado cuando los tres archivos de julio
+  estén en `Carpeta_de_Trabajo`.
+
 ### 2026-09-15 — Claude — Verificación de la spec 28 (PR #50) con datos reales: corrección de un crash
 
 - **Tipo:** revisión + corrección + prueba.
