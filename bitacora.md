@@ -92,6 +92,30 @@ nunca una modificación del v7.
 
 ## Updates
 
+### 2026-09-15 — Claude — Diagnóstico de causa raíz de las diferencias en ciclos completos del mes
+
+- **Tipo:** análisis con datos reales.
+- **Origen:** pedido de un diagnóstico preciso del porqué de las diferencias.
+- **Cambios:** sección "Diagnóstico de causa raíz" en
+  `docs/informes/Brechas_2608_por_empresa.md`; `scripts_brechas_2608/diagnostico.py`
+  (descomposición exacta del ΔSC por ciclo en efecto partida/detención/margen y
+  asignación a causa raíz con los internos de `xHyC`, `PARTIDAS_DETENCIONES` y las
+  `Obs_*` del motor).
+- **Hallazgos:** +18,8 MM netos = 241,9 MM brutos. Causas: R3 el Excel busca la
+  instrucción RIO por clave hora-reloj de la hora en que arranca la configuración del
+  MAXIFS y pierde las instrucciones emitidas minutos antes (+66,4 MM, 16 ciclos;
+  52 partidas y 53 detenciones con `Instrucción` vacía en agosto); R9 convexidad del
+  truncamiento con CMg/CV variables dentro de la hora (−61,4 MM; verificado
+  SANISIDRO-2: +60,6 MM por bloque vs hora); R6 conjunto de configuraciones que
+  compite por la tarifa (±47,3, neto +0,9); R5 `Presta SSCC = 1` en 400 de 414
+  partidas del Excel → OT siempre paga, motor exige SSCC en el comentario (−25,3);
+  R1 paradas cortas (+25,0); R2 flags de la macro (+9,7); R4 lista Pruebas (+4,5);
+  R7 PO (+0,55); R8 sin historia (−0,9). Balance: defectos del Excel +76,7;
+  resolución −37,1; reglas por decisión −19,9; motor −0,9. Corrige la nota del
+  14-09: NUEVARENCA &4 es R3 (hora-reloj), no lista Pruebas.
+- **Pendientes:** decisiones (2) paradas cortas, (5) Pruebas vs RIO, SSCC (fuente del
+  flag: lista del Excel vs comentario RIO), (9) EP+OM; spec (10)/R8.
+
 ### 2026-09-15 — Claude — Tercera ronda: solo ciclos completos del mes, sin herencia de julio
 
 - **Tipo:** análisis con datos reales.

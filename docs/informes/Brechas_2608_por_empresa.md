@@ -438,3 +438,125 @@ con motivo OM. Son **28,1 MM** que el Excel deja de cobrar a ENEL.
 - **Diferencias de regla propias del motor**, ya conocidas: tarifa restringida al
   combustible instruido (spec 25; −27 MM en SANISIDRO-2 contra un Excel que ignora el
   combustible) y margen truncado por bloque (−19,9 MM; a favor de las empresas).
+
+---
+
+## Diagnóstico de causa raíz (15-09): por qué difieren los ciclos completos del mes
+
+Método: sobre los 357 pares + 26 ciclos no apareados de la tercera ronda, la diferencia
+de SC de cada ciclo se descompuso **exactamente** en tres efectos por sustitución
+secuencial — `SC(P,D,M) = MAX(0, P + D − M)`: efecto partida = `SC(P_motor, D_excel,
+M_excel) − SC(P_excel, D_excel, M_excel)`, efecto detención y efecto margen análogos;
+los tres suman el ΔSC del ciclo (verificado: Σ efectos = +18.815.375 = ΔSC total). Cada
+efecto se asignó a una causa raíz leyendo los internos de ambos modelos: en el Excel
+las hojas `Sobrecosto_PD xHyC` (flags `Partida`/`Detencion`, costos U/V, `Disponible`,
+`Conf despachada RIO`) y `PARTIDAS_DETENCIONES` (columnas `Instrucción`, `Presta SSCC`,
+`Monto Partidas/Detenciones`); en el motor `Obs_Partida/Detencion`, `Config_Tarifa_*`
+y `Horas_Detenida_Ciclo`. Script: `scripts_brechas_2608/diagnostico.py`; detalle por
+ciclo en `Diagnostico_2608.xlsx` (hoja `Efectos`).
+
+| Causa raíz | Efectos | Neto (CLP) | Bruto (CLP) | Naturaleza |
+|---|---:|---:|---:|---|
+| **R3** Excel no asocia la instrucción RIO al ciclo (factor operacional 0) | 16 | **+66.411.863** | 66.411.863 | defecto del Excel |
+| **R9** Margen: truncamiento por bloque (motor) vs por hora (Excel) | 47 | **−61.420.666** | 61.420.666 | resolución (convexidad) |
+| **R6** Tarifa: configuración que fija la tarifa | 47 | +888.793 | 47.328.113 | regla, dos sentidos |
+| **R5** Motor rechaza por RIO donde el Excel paga | 13 | −25.296.154 | 25.296.154 | regla: fuente SSCC / `&1` |
+| **R1** Parada corta: ciclo que solo existe en el motor | 13 | +24.967.808 | 24.967.808 | resolución, decisión |
+| **R2** Excel no marca la detención / partida | 12 | +9.732.238 | 9.732.238 | defecto del Excel |
+| **R4** Excel anula por lista Pruebas / combustible | 11 | +4.528.532 | 4.528.532 | fuente distinta, decisión |
+| **R8** Motor sin historia (horas nulas → partida 0) | 3 | −888.670 | 888.670 | debilidad del motor |
+| **R7** Tarifa: política PO de mitad de mes | 107 | +554.712 | 554.712 | defecto del Excel |
+| R1b Ciclo solo en el Excel (apareo) | 3 | −692.449 | 692.449 | resolución |
+| **Total** | | **+18.815.375** | 241.850.573 | |
+
+### R3 — el Excel busca la instrucción en la hora-reloj equivocada (+66,4 MM)
+
+Mecanismo, con las celdas: `PARTIDAS_DETENCIONES!Instrucción` se obtiene por
+`VLOOKUP` sobre `Instrucciones RIO` con la clave `AAMMDDH + relacionada` de la **hora en
+que la configuración que fija el MAXIFS empieza a generar**. La instrucción del CEN se
+emite minutos **antes** de la partida y cae en la hora anterior:
+
+| Ciclo | Partida en xHyC (hora clave) | Instrucción RIO (hora) | `Instrucción` que lee el Excel | Partida Excel | Motor |
+|---|---|---|---|---:|---:|
+| ATACAMA-2 &4 | 17-ago h6 (`2608176`) | PMT/OM 04:55 (h5) | vacío → 0 | 0 | 13.962.570 |
+| ATACAMA-2 &13 | 29-ago h10 (`26082910`) | PMT/OM 03:57 (h4) | vacío | 0 | 14.146.812 |
+| SANISIDRO-1 &11 | 27-ago h21 | OM 19:30 y 19:56 (h20) | vacío | 0 | 16.101.546 |
+| NUEVARENCA &4 | 16-ago h17 | OM 15:00 (h16), 17:01 (h18) | vacío | 0 | 24.441.188 |
+| CANDELARIA-1 &6 | 22-ago h3 (`2608223`) | PCP/OM 02:24–02:54 (h3) **y una fila 02:54 con MOTIVO en blanco** | vacío (el VLOOKUP devuelve la fila en blanco) | 0 | 856.658 |
+
+El motor cruza cada bloque con la **última instrucción vigente** (`merge_asof`
+backward) y, si falta, busca en ±30 min (`ACTIVAR_BUSQUEDA_RELAJADA`). Son partidas
+instruidas con OM que el Excel deja en 0: 52 partidas y 53 detenciones del Excel tienen
+`Instrucción` vacía en agosto; 16 de ellas están en ciclos completos apareados y suman
+66,4 MM. Corrige la atribución del 14-09: NUEVARENCA &4 es R3, no lista Pruebas.
+
+### R9 — truncar por bloque acredita más margen que truncar por hora (−61,4 MM)
+
+`Margen = MAX(0, CMg − CV) × USD × Gen`. El Excel lo evalúa por hora con el CMg y CV
+horarios; el motor por cuarto de hora. Como `MAX(0, ·)` es convexa, la suma de bloques
+truncados es **siempre ≥** la hora truncada cuando CMg o CV varían dentro de la hora.
+Verificado en SANISIDRO-2 con el reporte 2608_v2: CMg varía dentro de la hora en 293 de
+573 horas con generación y CV en 553; el margen del mes es 644,2 MM truncando por bloque
+contra 583,5 MM truncando el promedio horario: **+60,6 MM** solo por convexidad
+(observado en el cruce: 642 vs 565). Es la única causa de las 47 en que el motor acredita
+menos SC en todos los casos salvo uno. No es defecto de nadie: es la resolución actuando
+sobre el truncamiento; `MARGEN_NETEADO_POR_CICLO` no lo cambia.
+
+### R6 — qué configuración fija la tarifa (±47,3 MM, neto +0,9)
+
+Ambos cobran "la configuración más cara del ciclo", pero sobre conjuntos distintos:
+
+- **Excel:** `MAXIFS(xHyC!U, ciclo, Partida="SI")` — solo configuraciones que tienen
+  **hora de partida propia** dentro del ciclo, sin filtro efectivo de combustible
+  (`AF` queda vacío cuando no hay PP/PMT en la hora clave, y entonces `AG = 1`).
+- **Motor (spec 25):** toda configuración que **generó** en el ciclo, restringida al
+  combustible instruido en la apertura.
+
+Resultado en dos sentidos: SANISIDRO-2 −11,8 MM (Excel toma GN_B con RIO instruyendo
+GN_A), NUEVARENCA −4,5; pero SANISIDRO-1 +12,7 y NEHUENCO-2 +4,4 (el motor toma una
+configuración `FSTVU`/combinada que generó sin "partir" por sí misma). Neto ≈ 0.
+
+### R5 — el motor rechaza por RIO donde el Excel paga (−25,3 MM)
+
+Dos sub-causas exactas, leídas en `PARTIDAS_DETENCIONES`:
+
+1. **OT + SSCC.** El Excel paga OT si `Presta SSCC = 1`, y esa columna vale 1 en 400 de
+   414 partidas: en la práctica **OT siempre paga** (39 partidas y 23 detenciones OT
+   pagadas en agosto). El motor exige que el `COMENTARIO` del RIO mencione
+   SSCC/CTF/CSF/CPF: rechaza 5 partidas OT (8,4 MM base) y 6 detenciones OT (11,2 MM).
+   Casos: KELAR-TG12 &1 −7,7; SANISIDRO-1 &5 −4,5; TOCOPILLA-U16 &2 −3,3.
+2. **`&1` sin instrucción.** `IF(AND(RIGHT(N,2)="&1", P=""), 1, 0)`: HUASCO-3 −5,55
+   (1 hora, 7 MWh); EMELDA-1 &1 −0,9; MEJILLONES &4 det −2,2.
+
+### R1 — paradas que solo existen a 15 minutos (+25,0 MM)
+
+13 ciclos del motor sin contraparte en el Excel porque la interrupción cabe dentro de
+una hora con generación: NUEVARENCA 13-ago 10:00–11:00 (+19,9), CORONEL 6,75 h (+1,4),
+ATACAMA-1 (+1,3), ANTILHUE 75 min (+1,0), LLANOSBLANCOS/CHAGUAL/TENOGAS (+1,1). Regla
+vigente `TOLERANCIA_CORTES_BLOQUES = 0`; decisión pendiente (2).
+
+### R2, R4, R7, R8 — el resto
+
+- **R2 (+9,7):** la macro del Excel no pone `Detencion = SI` en 8 cierres de CORONEL ni
+  `Partida = SI` en 2 (última hora con poca generación); el RIO dice OM.
+- **R4 (+4,5):** el Excel anula por su hoja `Pruebas` (`Disponible = 0`) o por
+  combustible (`Conf despachada RIO = 0`) donde el RIO no dice EP: EMELDA, CORONEL
+  7-ago 03:00, LOSVIENTOS, SANJAVIER.
+- **R7 (+0,55):** 107 partidas/detenciones de ENLASA con la tarifa de la PO `260801` en
+  vez de la `260805` (16,11 → 22,02 USD).
+- **R8 (−0,9):** YUNGAY-1/2 y TENOGAS &1 sin ciclo anterior en dos meses de datos: el
+  motor deja `Horas_Detenida_Ciclo` nula y no cobra; debería usar la cota inferior.
+
+### Balance del diagnóstico
+
+| Quién explica la diferencia | Neto |
+|---|---:|
+| Defectos del Excel (R3 + R2 + R7) | +76,7 MM a favor del motor |
+| Resolución 15 min sobre reglas idénticas (R9 + R1 + R1b) | −37,1 MM |
+| Reglas distintas por decisión (R5 SSCC/`&1`, R4 Pruebas, R6 configuración) | −19,9 MM |
+| Debilidad del motor (R8) | −0,9 MM |
+| **Total** | **+18,8 MM** |
+
+Los 18,8 MM netos esconden 241,9 MM brutos que se compensan. Quitando los defectos del
+Excel, el motor queda **58 MM por debajo** del Excel en ciclos completos, y esa
+diferencia es casi toda resolución (margen por bloque) y la fuente del SSCC.
