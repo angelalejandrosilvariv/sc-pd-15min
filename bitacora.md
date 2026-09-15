@@ -92,6 +92,25 @@ nunca una modificación del v7.
 
 ## Updates
 
+### 2026-09-15 — Claude — Tercera ronda: solo ciclos completos del mes, sin herencia de julio
+
+- **Tipo:** análisis con datos reales.
+- **Origen:** el dueño del proyecto pidió comparar solo ciclos que inician y
+  terminan en agosto, porque el margen heredado del Excel no está actualizado.
+- **Cambios:** sección "Tercera ronda" en `docs/informes/Brechas_2608_por_empresa.md`;
+  scripts `solo_mes.py` y `solo_mes2.py` (apareo ciclo a ciclo Excel↔motor por
+  central y traslape, descomposición por causa) en `docs/informes/scripts_brechas_2608/`.
+- **Hallazgos:** sobre los mismos ciclos y con el SC del Excel recalculado sin las
+  columnas de ciclo inconcluso, **Excel 914,3 MM vs motor 933,1 MM (+2,1%)**; 198 de
+  357 pares idénticos al peso; ENEL queda en 0% (sus +36 MM eran herencia). La
+  desviación bruta (207,6 MM) se reparte en: filtro de partida 43,7 (ATACAMA-2 &4/&13
+  +28,1: mecanismo nuevo (11), el Excel atribuye la instrucción PMT/OM al ciclo
+  equivocado y anula dos partidas instruidas), tarifa+margen SANISIDRO-2 −27,4
+  (combustible instruido, spec 25), paradas cortas +25,0, filtros de detención 20,6
+  (SGA +6,6), margen por bloque vs hora −19,9.
+- **Pendientes:** decisiones (2), (5), (9); spec (10); llevar (11) al CEN junto con
+  (1), (3), (4), (6b), (7), (8).
+
 ### 2026-09-15 — Claude — Segunda ronda: GUACOLDA, porcentajes altos y corrección del mecanismo (6)
 
 - **Tipo:** análisis con datos reales.

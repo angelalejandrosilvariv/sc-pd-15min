@@ -343,3 +343,98 @@ cobra fría (313 k cada una). Con julio empalmado el motor **sabe** que llevan a
 48 días detenidas; debería usar esa cota inferior (`Inicio_Ciclo − inicio de los datos`)
 y clasificar fría cuando ya supera el umbral. Es una mejora del motor, no una regla
 nueva; cabe como spec.
+
+---
+
+## Tercera ronda (15-09): solo ciclos que inician y terminan en agosto, sin herencia de julio
+
+Pedido: comparar únicamente los ciclos completos dentro del mes, porque el margen
+heredado del Excel no está actualizado. Definición usada:
+
+- **Excel corregido:** ciclos no traspasados que no generaban a la hora 1 del 1-ago.
+  SC recalculado desde sus propias columnas, `MAX(0, partida + detención − margen)`,
+  **ignorando** "Total Costos Partida ciclo inconcluso" y "Margen ciclo inconcluso".
+  366 ciclos.
+- **Motor:** `Estado_Ciclo_Mes = 'Inicia y termina este mes'`. 374 ciclos.
+- Apareo ciclo a ciclo por central y traslape temporal: 357 pares, 17 ciclos solo en
+  el motor, 9 solo en el Excel. Script: `scripts_brechas_2608/solo_mes2.py`;
+  detalle en `SoloMes_2608_pares.xlsx` (scratchpad).
+
+| Solo ciclos del mes | Excel corregido (sin herencia) | Motor | Δ |
+|---|---:|---:|---:|
+| SC P-D | 914.259.268 | 933.074.643 | **+18.815.375 (+2,1%)** |
+| Ciclos idénticos al peso | | | **198 de 357 pares** |
+| Σ\|Δ\| ciclo a ciclo | | | 207.602.030 |
+
+Los dos modelos, sobre los mismos ciclos y sin arrastre de julio, difieren 2,1% en
+total. La desviación bruta por ciclo (207,6 MM) se compensa en gran parte porque los
+mecanismos empujan en sentidos opuestos.
+
+### Descomposición por causa (357 pares + no apareados)
+
+| Causa | Ciclos | Δ neto | Δ bruto | Dónde |
+|---|---:|---:|---:|---|
+| Filtro de partida (uno paga, el otro no) | 10 | +14,7 | 43,7 | ATACAMA-2 &4 y &13 **+28,1** (Excel anula partidas instruidas, ver (11)); KELAR &1 −7,7 y HUASCO-3 −5,6 (regla `&1` del Excel, (8)) |
+| Tarifa partida + detención + margen | 11 | −40,3 | 40,3 | SANISIDRO-2 (8 ciclos, −27,4): Excel toma el máximo entre GN_A y GN_B, motor el combustible instruido (spec 25); NUEVARENCA &2 −9,4 |
+| Ciclo solo en el motor | 17 | +25,0 | 25,0 | paradas cortas (2): NUEVARENCA 19,9; CORONEL 1,4; ANTILHUE 1,0; QUICKSTART 0,7; ENEL 1,3 |
+| Filtro de detención | 17 | +0,4 | 20,6 | SGA +6,6 (Excel no marca, (3)); SANISIDRO-1 &5 −4,5 (FS/OT sin SSCC, motor rechaza); TOCOPILLA −3,3; MEJILLONES ±2,2 |
+| Margen | 32 | −19,9 | 19,9 | motor acredita más margen: ENEL −10,1, COLBUN −8,3 (NEHUENCO-2), SGA, BE FORESTALES — truncamiento por bloque vs por hora |
+| Filtro partida + filtro detención | 11 | +8,1 | 10,0 | SGA +6,9 (CORONEL), EMELDA +0,8, INERSA +0,4 |
+| Tarifa partida + tarifa detención | 56 | +9,4 | 9,4 | NEHUENCO-2 &2 +7,7 (motor toma una configuración que el Excel no considera porque no tiene hora de partida propia); ENLASA +0,5 (7) |
+| Filtro partida + margen | 2 | +8,7 | 8,7 | NUEVARENCA &5 +8,6 (lista Pruebas vs RIO, (5)) |
+| Otras combinaciones | 19 | +12,7 | 13,4 | tarifa partida sola +3,4 (SANISIDRO-1), tarifa detención −1,5, ciclos solo en Excel −0,7 |
+| Idéntico | 198 | 0 | 0 | |
+
+### Por empresa (solo ciclos del mes)
+
+| Empresa | Excel corregido | Motor | Δ | Δ % |
+|---|---:|---:|---:|---:|
+| ENEL_GENERACION | 486.396.459 | 488.764.728 | +2.368.268 | **0%** |
+| COLBUN | 177.903.088 | 175.470.261 | −2.432.827 | −1% |
+| TAMAKAYA_ENERGIA | 87.235.575 | 79.532.813 | −7.702.762 | −9% |
+| ENGIE | 52.785.791 | 49.552.726 | −3.233.065 | −6% |
+| GMETROPOLITANA | 26.273.313 | 45.359.932 | +19.086.619 | +73% |
+| SGA | 17.148.090 | 31.267.850 | +14.119.760 | +82% |
+| GM_HOLDINGS | 12.436.418 | 13.193.432 | +757.014 | +6% |
+| INERSA | 10.922.759 | 11.057.246 | +134.487 | +1% |
+| QUICKSTART | 8.474.327 | 8.982.417 | +508.091 | +6% |
+| BE FORESTALES | 8.320.906 | 7.077.431 | −1.243.475 | −15% |
+| LOS_GUINDOS | 7.374.556 | 7.374.556 | 0 | 0% |
+| GUACOLDA | 6.713.243 | 1.293.821 | −5.419.423 | −81% |
+| ANTILHUE | 3.852.834 | 4.656.334 | +803.500 | +21% |
+| COLMITO | 3.195.520 | 3.326.888 | +131.367 | +4% |
+| ENLASA | 1.653.932 | 2.377.955 | +724.022 | +44% |
+| ENORCHILE | 1.172.693 | 1.172.693 | 0 | 0% |
+| ORAZUL_CHILE | 1.041.872 | 361.250 | −680.622 | −65% |
+| EMELDA | 914.180 | 1.727.467 | +813.287 | +89% |
+| ELECTRICA_MOKA | 332.526 | 332.423 | −103 | 0% |
+| resto (< 200 k) | | | | |
+
+Con el arrastre de julio fuera, **ENEL queda en 0%** (+2,4 MM sobre 486): sus +36 MM
+del corte anterior eran herencia. ENGIE y COLBUN quedan dentro del ±6%. Lo que queda
+grande es lo mismo de las rondas anteriores: GMETROPOLITANA (paradas cortas y lista
+Pruebas) y SGA (detenciones que el Excel no marca).
+
+### (11) El Excel atribuye la instrucción RIO al ciclo equivocado — defecto del Excel
+
+ATACAMA-2, ciclos &4 (17-ago) y &13 (29-ago), 14,0 y 14,1 MM de partida fría cada uno.
+El RIO tiene la instrucción de partida **PMT / OM** a las 04:55 (17-ago) y 03:57
+(29-ago), diez minutos después del primer bloque con generación. El motor la encuentra
+y paga. En la hoja `Instrucciones RIO` del Excel esa fila queda con `Ciclo =
+ATACAMA-2TG2AB&0` y `Ciclo Partida siguiente = &1` — no se asocia al ciclo &4 / &13 —
+porque el Excel marca la hora de partida de la configuración que fija el `MAXIFS`
+(`TG2A+TG2B+TV2`, que entra a las 09:00) y no la de la turbina que arrancó a las 04:45.
+Resultado: `factor_operacional = 0`, partida 0, en dos arranques instruidos por el CEN
+con motivo OM. Son **28,1 MM** que el Excel deja de cobrar a ENEL.
+
+### Lo que este corte confirma sobre el motor
+
+- **A favor del motor**, con caso concreto: (3) detenciones no marcadas, (11)
+  instrucción atribuida al ciclo equivocado, (8) `&1` sin instrucción pagado, (7) PO
+  no actualizada, (6b) herencia de julio.
+- **Decisiones pendientes** que explican casi todo lo demás: (2) paradas de 45–75
+  minutos (+25,0 MM en total), (5) lista Pruebas vs RIO (+8,6), (9) partida EP con
+  detención OM (+1,3).
+- **Diferencias de regla propias del motor**, ya conocidas: tarifa restringida al
+  combustible instruido (spec 25; −27 MM en SANISIDRO-2 contra un Excel que ignora el
+  combustible) y margen truncado por bloque (−19,9 MM; a favor de las empresas).
