@@ -97,6 +97,13 @@ con spec en `docs/specs/NN-*.md`, tests y una entrada aquí. Nombres descriptivo
 para las variantes (nada de "opción A/B"). Un modelo nuevo es un archivo nuevo,
 nunca una modificación del v7.
 
+**Reparto de verificación**: Codex no tiene ni tendrá los archivos operacionales
+(reportes 15 min, RIO, costos PO, Excel horario); su entrega se valida con la suite
+sintética. La verificación con datos reales de cada PR la hace Claude en la máquina
+del dueño del proyecto: `pytest -q`, corrida completa de 2606 (con mayo) y 2608, y
+contraste con las cifras de referencia de arriba, registrando el resultado en esta
+bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
+
 ## Updates
 
 ### 2026-09-15 — Claude — Verificación de la spec 28 (PR #50) con datos reales: corrección de un crash
