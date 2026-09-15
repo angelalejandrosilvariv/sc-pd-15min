@@ -92,6 +92,27 @@ nunca una modificación del v7.
 
 ## Updates
 
+### 2026-09-15 — Claude — Segunda ronda: GUACOLDA, porcentajes altos y corrección del mecanismo (6)
+
+- **Tipo:** análisis con datos reales.
+- **Origen:** pregunta del dueño del proyecto: por qué GUACOLDA tiene pago en el
+  motor y por qué muchas empresas superan el 20% de diferencia.
+- **Cambios:** sección "Segunda ronda" en `docs/informes/Brechas_2608_por_empresa.md`
+  con la tabla completa (24 empresas, Δ en CLP y %), el caso GUACOLDA-1 paso a paso
+  y cuatro mecanismos nuevos: (6b) el Excel hereda partida y **todo el margen** del
+  ciclo inconcluso de julio al `&1` de agosto aunque sea otro ciclo físico (22
+  ciclos, 33.795 MM de margen heredado, 21 liquidan 0); (8) el Excel paga el `&1`
+  sin instrucción RIO (HUASCO-3, 5,55 MM); (9) partida EP + detención OM, el motor
+  paga la detención (GUACOLDA-1, 1,29 MM); (10) sin historia con dos meses de datos,
+  el motor deja la partida en 0 en vez de usar la cota inferior de horas (YUNGAY).
+- **Hallazgos:** los % altos están en empresas de pocos ciclos donde un filtro
+  sobre un ciclo de 1–2 MWh cambia el total en 50–200%; el 90% de la desviación en
+  CLP sigue en ENEL, GMETROPOLITANA, SGA, ENGIE y TAMAKAYA, todos con mecanismo
+  identificado. Se corrige la afirmación del 14-09 de que la partida de frontera
+  "se pierde en ambos meses": solo cuando julio no marcó el ciclo como inconcluso.
+- **Pendientes:** decisiones (2), (5), (9); spec para (10); revisar ENEL agosto
+  (+29,4 MM) con el mismo método.
+
 ### 2026-09-15 — Claude — Réplica del estudio de brechas con el Excel corregido
 
 - **Tipo:** análisis con datos reales.

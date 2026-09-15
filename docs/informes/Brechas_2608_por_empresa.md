@@ -234,3 +234,112 @@ Ambos aplican "la misma" regla; el resultado depende del tamaño del bloque.
 La corrección fue quirúrgica (dos centrales). El mismo mecanismo (4) puede seguir
 presente en otras: ENEL_GENERACION no cambió en el Excel corregido (ATACAMA en junio
 dejaba fuera el 62% de su energía) y sigue a +29,4 MM del motor.
+
+---
+
+## Segunda ronda (15-09): GUACOLDA y las diferencias porcentuales altas
+
+Tabla completa contra el Excel corregido, ordenada por |Δ| en CLP:
+
+| Empresa | Excel corregido | Motor | Δ | Δ % | Ciclos Excel / motor | Causa |
+|---|---:|---:|---:|---:|---|---|
+| ENEL_GENERACION | 471.058.535 | 500.476.466 | +29.417.931 | +6% | 85 / 87 | no revisado en detalle en agosto; en junio, (4) ATACAMA |
+| GMETROPOLITANA | 30.904.611 | 54.942.204 | +24.037.593 | +78% | 5 / 7 | (2), (5), (6), tarifa/margen |
+| SGA | 17.148.090 | 31.267.850 | +14.119.760 | +82% | 44 / 29 | (3) |
+| ENGIE | 52.785.791 | 66.476.785 | +13.690.993 | +26% | 7 / 10 | (6b) MEJILLONES &1; TOCOPILLA det por RIO |
+| TAMAKAYA_ENERGIA | 87.235.575 | 79.532.813 | −7.702.762 | −9% | 6 / 6 | KELAR &1: Excel paga partida 7,7 MM, RIO sin motivo para el motor |
+| GUACOLDA | 5.550.626 | 1.293.821 | −4.256.806 | −77% | 6 / 9 | (8) HUASCO-3 −5,55; (9) GUACOLDA-1 +1,29 |
+| COLBUN | 173.447.485 | 175.470.261 | +2.022.776 | +1% | 39 / 28 | — |
+| BE FORESTALES | 8.320.906 | 7.077.431 | −1.243.475 | −15% | 14 / 15 | ver réplica |
+| EMELDA | 914.180 | 1.727.467 | +813.287 | +89% | 3 / 3 | cruce RIO: cada modelo paga ciclos distintos de 1–2 MWh |
+| ANTILHUE | 3.852.834 | 4.656.334 | +803.500 | +21% | 4 / 5 | (2) |
+| GM_HOLDINGS | 12.436.418 | 13.193.432 | +757.014 | +6% | 9 / 9 | — |
+| ENLASA | 1.653.932 | 2.377.955 | +724.022 | +44% | 61 / 63 | (7) |
+| ORAZUL_CHILE | 1.041.872 | 361.250 | −680.622 | −65% | 4 / 4 | (10) YUNGAY sin historia |
+| QUICKSTART | 8.474.327 | 8.982.417 | +508.091 | +6% | 39 / 40 | — |
+| COLMITO | 2.820.033 | 3.326.888 | +506.855 | +18% | 11 / 11 | (6b) &1 recibe margen de julio; (4) |
+| INERSA | 10.922.759 | 11.057.246 | +134.487 | +1% | 30 / 30 | — |
+| ELEKTRAGEN | 48.321 | 161.455 | +113.135 | +234% | 3 / 3 | (5), (4) |
+| ENERGIA_SIETE | 51.778 | 15.040 | −36.739 | −71% | 15 / 15 | (4) |
+| NUEVA DEGAN | 0 | 9.901 | +9.901 | n/a | 0 / 2 | DEGAN-2 no existe en el Excel |
+| EMELVA | 5.061 | 0 | −5.061 | −100% | 1 / 1 | (8) |
+| ELECTRICA_MOKA, ENORCHILE, ON GROUP, LOS_GUINDOS | | | ≈ 0 | 0% | | idénticos |
+
+**Por qué hay tantos porcentajes altos.** Los % grandes están en empresas con pocos
+ciclos y montos chicos, donde un solo ciclo que pasa o no pasa un filtro cambia el total
+en 50–200%. En CLP, el 90% de la desviación absoluta está en cinco empresas
+(ENEL, GMETROPOLITANA, SGA, ENGIE, TAMAKAYA) y todas tienen mecanismo identificado.
+Las diferencias de filtro en ciclos de 1–2 MWh (EMELDA, EMELVA, ELEKTRAGEN, KELAR &1)
+son de la misma familia: el Excel busca la instrucción RIO en la hora exacta; el motor
+usa la última instrucción vigente (`merge_asof`) y una ventana de ±30 min. Cuando un
+ciclo dura 45 minutos, esa diferencia decide si se paga o no.
+
+### GUACOLDA: por qué el motor cobra 1,29 MM
+
+Es una sola detención: **GUACOLDA-1_CAR, 23-ago 00:45 → 09:45**, 309 MWh a 9 MW. La
+unidad llevaba 908 horas detenida (desde mediados de julio). Según el RIO:
+
+| Tramo | Consigna / motivo / estado | Filtro del motor |
+|---|---|---|
+| 00:45 | FS / OT / DF | — |
+| 01:00 → 04:45 | **EP / EP / PO** (pruebas) | partida rechazada por EP |
+| 05:00 → 08:45 | MT / OM / RO (mínimo técnico, operación) | — |
+| 09:00 → 09:45 | PS / OM / RO, luego FS / OM / DRO | detención aprobada (motivo OM) |
+
+El motor rechaza la partida (fue una prueba) y **cobra la detención** porque el RIO la
+registra con motivo OM. Margen 0 (CMg < CV toda la mañana).
+
+El Excel ve la misma partida (10,0 MM, fría) y la misma detención (1,16 MM), pero le
+suma un **margen de 905,8 MM heredado de julio** vía `Ciclos inconclusos` (columna
+"Margen ciclo inconcluso") y liquida 0. Ese margen es de un ciclo de julio que terminó
+a mediados de julio; nada tiene que ver con la prueba del 23 de agosto. Ver (6b).
+
+Los otros 4,26 MM de GUACOLDA van al revés: **HUASCO-3**, un ciclo de una hora y 7 MWh el
+13-ago con 730 h detenida. El Excel cobra la partida fría de 5,55 MM; el motor la
+rechaza porque el RIO no trae motivo. Es el mecanismo (8).
+
+Pregunta de regla que deja GUACOLDA-1: **una partida en pruebas (EP) seguida de una
+detención instruida con OM, ¿paga la detención?** Hoy el motor evalúa cada extremo por
+separado y la paga.
+
+### (6b) Corrección al mecanismo (6): lo que el Excel hace con los ciclos inconclusos
+
+El mecanismo (6) decía que la partida de un ciclo que cruza la frontera "se pierde en
+ambos meses". Es cierto para NUEVARENCA, pero incompleto. `Sobrecosto_Ciclo` tiene dos
+columnas, "Total Costos Partida ciclo inconcluso" y "Margen ciclo inconcluso", que
+traen desde la hoja `Ciclos inconclusos` (julio) la partida y **todo el margen** del
+ciclo que julio marcó como traspasado, y se lo suman al **primer ciclo de agosto (&1)**
+de la misma central. En agosto son 22 ciclos, con 127,0 MM de partida y **33.795 MM de
+margen** heredados.
+
+Dos problemas:
+
+1. Se pega al `&1` aunque sea otro ciclo físico. GUACOLDA-1: la prueba del 23-ago
+   recibe 905,8 MM de margen de un ciclo de julio. MEJILLONES &1 (fixed): 591 MM.
+   COLMITO &1: 4,7 MM sobre un ciclo de 45 min y 13 MWh.
+2. El margen heredado es el de todo el ciclo de julio, así que **anula cualquier costo
+   de agosto** en esa central: de los 22 ciclos con herencia, 21 liquidan 0.
+
+El motor no hereda nada: el ciclo de julio que cierra en agosto se liquida completo en
+agosto con su propio margen (spec 17); los ciclos nuevos de agosto se liquidan solos.
+
+### (8) `&1` sin instrucción RIO paga — regla del Excel
+
+`factor_operacional` del Excel paga el primer ciclo del mes (`&1`) aunque no haya
+instrucción RIO (regla 6 de `Reglas_Modelo_Horario.md`). El motor exige motivo, salvo
+que el ciclo no tenga historia (`REGLA_EXENCION = 'sin_historia'`); con julio empalmado
+casi todos tienen historia, así que no exime. Casos: HUASCO-3 (5,55 MM, 1 hora, 7 MWh),
+MAITENCILLO (EMELVA, 5 k), EMELDA-1 del 25-ago (0,9 MM, 1 MWh).
+
+### (9) Partida en pruebas con detención OM — decisión de regla
+
+GUACOLDA-1 del 23-ago (arriba). El motor paga la detención (1,29 MM).
+
+### (10) Sin historia con dos meses de datos — mejora pendiente del motor
+
+YUNGAY-1 y YUNGAY-2 (ORAZUL) parten el 18-ago sin haber generado en julio ni en agosto.
+`Horas_Detenida_Ciclo` queda nula → `Tipo_Partida = No_Aplica` → partida 0. El Excel
+cobra fría (313 k cada una). Con julio empalmado el motor **sabe** que llevan al menos
+48 días detenidas; debería usar esa cota inferior (`Inicio_Ciclo − inicio de los datos`)
+y clasificar fría cuando ya supera el umbral. Es una mejora del motor, no una regla
+nueva; cabe como spec.
