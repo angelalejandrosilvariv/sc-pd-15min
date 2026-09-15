@@ -690,6 +690,34 @@ también); R5 no cambia. Lo que queda abierto sigue siendo lo mismo: fuente del 
 (−19,6), paradas menores a una hora (+25,0), lista Pruebas vs RIO (+4,5) y la lectura
 del margen a 15 minutos (−54,3, a favor de las empresas).
 
+
+### Actualización 15-09 (tarde): Excel corregido v2
+
+El área volvió a corregir el Excel: quitó el **margen heredado** de julio de los `&1`
+(`Margen ciclo inconcluso` = 0 en todos salvo 4) y dejó la partida heredada solo en
+TOCOPILLA-U16 &1 (50,4 MM). Total sin traspasos 897,6 → **966,8 MM**.
+
+| | Excel corregido v2 | Motor | Δ |
+|---|---:|---:|---:|
+| Mes completo | 966.791.746 | 941.327.164 | **−25,46 MM (−2,6%)** |
+| Σ\|Δ\| por empresa | | | 87,1 MM |
+| Solo ciclos del mes | 914.259.268 | 914.820.834 | **+0,56 MM (+0,1%)** — sin cambio: la corrección no toca ciclos del mes |
+
+Mes completo por empresa (solo cambian ENGIE, GMETROPOLITANA, ENEL, COLBUN, GUACOLDA
+respecto de la tabla anterior; el resto idéntico):
+
+| Empresa | Excel v2 | Motor | Δ | Qué cambió |
+|---|---:|---:|---:|---|
+| ENGIE | 105.318.269 | 66.476.785 | **−38,8 MM** | TOCOPILLA-U16 &1: el Excel ahora cobra 50,4 MM de partida heredada de julio; el motor la rechaza: el RIO del 29-jul 13:42–16:43 dice **EP** "sincronizada en pruebas según IF 2026004027" (partida de prueba tras una falla) |
+| GMETROPOLITANA | 26.273.313 | 46.382.100 | +20,1 MM | NUEVARENCA &1 ya no cobra detención en el Excel (antes 4,6); el motor liquida el ciclo de julio (9,6) más los +10,5 de ciclos del mes |
+| ENEL | 486.396.459 | 488.764.728 | +2,4 MM | ATACAMA-2 &1 y otros `&1` pasan a cobrarse en el Excel (sin margen heredado): converge con el motor |
+| COLBUN | 177.903.088 | 175.470.261 | −2,4 MM | CANDELARIA-1/2 &1 pasan a cobrarse en el Excel (2,23 y 2,22 MM): **idénticos al motor al peso** |
+| GUACOLDA | 6.713.243 | 1.293.821 | −5,4 MM | GUACOLDA-1 &1 detención 1,16 ya se cobra en el Excel; queda HUASCO-3 (regla `&1`) |
+
+Con la herencia fuera, la brecha del mes completo se reduce a tres cosas: la partida en
+pruebas de TOCOPILLA-U16 (−50,3), los ciclos de julio que el motor liquida en agosto
+(MEJILLONES 16,9 y NUEVARENCA 9,6), y las diferencias de ciclos del mes ya diagnosticadas.
+
 ### Cifras de referencia para regresiones (agosto con julio, `main` f820455)
 
 | Corrida | Total |

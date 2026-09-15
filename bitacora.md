@@ -76,7 +76,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
 | 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
-| **2608 con empalme 2607, vigencia 30 + cota inferior (`main` f820455)** | — | **941.327.164** | 897.558.934 (corregido, sin traspasos) |
+| **2608 con empalme 2607, vigencia 30 + cota inferior (`main` f820455)** | — | **941.327.164** | 966.791.746 (corregido v2, sin traspasos; 914.259.268 en ciclos del mes) |
 
 **Trabajo siguiente, en orden sugerido**
 
@@ -106,6 +106,19 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-15 — Claude — Excel corregido v2 (sin margen heredado): comparación actualizada
+
+- **Tipo:** análisis con datos reales.
+- **Cambios:** subsección "Actualización 15-09 (tarde)" en la quinta ronda de
+  `docs/informes/Brechas_2608_por_empresa.md`.
+- **Hallazgos:** el Excel quitó el margen heredado de julio; total sin traspasos
+  897,6 → 966,8 MM. Mes completo Excel 966,8 vs motor 941,3 (−2,6%); ciclos del mes
+  sin cambio (+0,1%). COLBUN queda −1% con CANDELARIA-1/2 &1 idénticas al peso. La
+  brecha grande nueva es TOCOPILLA-U16 &1: el Excel cobra 50,4 MM de partida
+  heredada de julio que el motor rechaza por EP (RIO 29-jul "sincronizada en pruebas
+  según IF 2026004027"). Pendiente confirmar con el área si esa partida corresponde.
+- **Pendientes:** los mismos.
 
 ### 2026-09-15 — Claude — Agosto definitivo: motor `main` con julio empalmado vs Excel corregido
 
