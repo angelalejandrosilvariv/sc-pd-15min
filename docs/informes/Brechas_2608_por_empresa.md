@@ -186,3 +186,51 @@ mecanismo (4).
 Scripts de este análisis en `docs/informes/scripts_brechas_2608/` (rutas locales
 escritas a mano; `xhyc_central.py <patron>` extrae las filas hora-central del Excel para
 una central y los demás las cruzan contra `Reporte_Sobrecostos_PD_Final.xlsx`).
+
+---
+
+## Réplica con el Excel corregido (`Sobrecostos_PD_2608 pre fixed.xlsm`, 15-09-2026)
+
+Mismo cruce, misma salida del motor, contra la versión corregida del Excel.
+
+**Qué cambió en el Excel.** Solo dos centrales; el resto de `Sobrecosto_Ciclo` es
+idéntico peso a peso:
+
+| Central | Original | Corregido | Qué se arregló |
+|---|---:|---:|---|
+| MEJILLONES-CTM3_TG1+TV1 | 12 ciclos, SC 108.930.275 | **6 ciclos, SC 49.519.666** | `xHyC` ahora incluye la configuración `_GNL_P` (656 filas vs 599): los ciclos coinciden uno a uno con los del motor. Mecanismo (1) resuelto. |
+| CMPCCORDILLERA | margen 12.007.920, SC 9.175.027 | **margen 61.458.014, SC 8.320.906** | `xHyC` ahora incluye `GN_B` (17 horas): el ciclo del 12-ago acredita 45,3 MM de margen (motor 43,9). Mecanismo (4) resuelto para esta central. |
+
+Total del Excel sin traspasos: 957.823.663 → **897.558.934**. Motor: 971.292.712 (+8,2%).
+Suma de |Δ| por empresa: 174,4 MM → **141,6 MM**.
+
+**Las diez empresas contra el Excel corregido:**
+
+| Empresa | Excel corregido | Motor | Δ | Qué queda |
+|---|---:|---:|---:|---|
+| ENGIE | 52.785.791 | 66.476.785 | **+13.690.993** | (6) frontera: ciclo 29-jul → 2-ago, motor cobra partida+det 16,9 MM, Excel 0; TOCOPILLA det 3,3 MM que el motor rechaza por RIO; det de MEJILLONES &4/&5 cruzadas entre RIO y Pruebas (se compensan) |
+| GMETROPOLITANA | 30.904.611 | 54.942.204 | +24.037.593 | sin cambio: (2) +19,9, (5) +8,6, (6) +5,0, tarifa/margen −9,4 |
+| SGA | 17.148.090 | 31.267.850 | +14.119.760 | sin cambio: (3) detenciones no marcadas en CORONEL |
+| BE FORESTALES | 8.320.906 | 7.077.431 | −1.243.475 | (4) resuelto. Queda: &13 tarifa Excel 1,09 MM (máximo entre GN_A y GN_B) vs motor 0,71 (GN_A instruido, spec 25); margen de ciclos cortos truncado por hora (Excel 0) vs por bloque (motor 80–210 k); det &2 no marcada; det &14 rechazada por RIO |
+| ANTILHUE | 3.852.834 | 4.656.334 | +803.500 | sin cambio: (2) |
+| ENLASA | 1.653.932 | 2.377.955 | +724.022 | sin cambio: (7) PO del 5-ago sigue sin aplicarse |
+| COLMITO | 2.820.033 | 3.326.888 | +506.855 | sin cambio |
+| ELEKTRAGEN | 48.321 | 161.455 | +113.135 | sin cambio |
+| ENERGIA_SIETE | 51.778 | 15.040 | −36.739 | sin cambio |
+| NUEVA DEGAN | 0 | 9.901 | +9.901 | sin cambio: DEGAN-2 sigue sin existir en el Excel |
+
+**Lectura.** La corrección confirma el diagnóstico: al agregar las configuraciones que
+faltaban en `xHyC`, el Excel converge al motor exactamente en los dos mecanismos que
+se le atribuían (partidas fantasma y energía fuera del margen). Los otros cinco
+mecanismos siguen intactos porque no se tocaron: detenciones no marcadas (3),
+frontera (6), PO de mitad de mes (7), y las dos decisiones abiertas (2) y (5).
+
+Un hallazgo nuevo, menor, en CMPCCORDILLERA: en ciclos cortos el Excel acredita
+margen 0 donde el motor acredita 80–210 k CLP. Es la resolución aplicada al
+truncamiento: una hora con cuartos positivos y negativos se netea antes de truncar en
+el Excel, mientras el motor trunca cuarto a cuarto (`MARGEN_NETEADO_POR_CICLO = 0`).
+Ambos aplican "la misma" regla; el resultado depende del tamaño del bloque.
+
+La corrección fue quirúrgica (dos centrales). El mismo mecanismo (4) puede seguir
+presente en otras: ENEL_GENERACION no cambió en el Excel corregido (ATACAMA en junio
+dejaba fuera el 62% de su energía) y sigue a +29,4 MM del motor.

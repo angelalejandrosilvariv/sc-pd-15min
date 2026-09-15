@@ -92,6 +92,24 @@ nunca una modificación del v7.
 
 ## Updates
 
+### 2026-09-15 — Claude — Réplica del estudio de brechas con el Excel corregido
+
+- **Tipo:** análisis con datos reales.
+- **Origen:** el área entregó `Sobrecostos_PD_2608 pre fixed.xlsm`; el dueño del
+  proyecto pidió repetir el cruce por empresa contra esa versión.
+- **Cambios:** sección "Réplica con el Excel corregido" en
+  `docs/informes/Brechas_2608_por_empresa.md`; scripts `cmp_fixed.py`,
+  `xhyc_fixed.py`, `ciclos_fixed.py` en `docs/informes/scripts_brechas_2608/`.
+- **Hallazgos:** la corrección tocó solo MEJILLONES-CTM3 (agrega la configuración
+  `_GNL_P` a `xHyC`: 12 → 6 ciclos, coinciden uno a uno con el motor) y
+  CMPCCORDILLERA (agrega `GN_B`: margen 12,0 → 61,5 MM). Confirma los mecanismos
+  (1) y (4) del informe. Excel sin traspasos 957,8 → 897,6 MM; motor 971,3 MM
+  (+8,2%); Σ|Δ| por empresa 174,4 → 141,6 MM. Los mecanismos (2), (3), (5), (6)
+  y (7) siguen intactos; ENEL no cambió (+29,4 MM vs motor).
+- **Validación:** `Sobrecosto_Ciclo` original vs corregido comparado central a
+  central: solo esas dos cambian.
+- **Pendientes:** los mismos del 14-09.
+
 ### 2026-09-14 — Claude — Agosto con julio: brechas por empresa explicadas ciclo a ciclo (siete mecanismos)
 
 - **Tipo:** análisis con datos reales + documentación.
