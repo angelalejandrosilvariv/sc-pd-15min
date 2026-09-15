@@ -606,3 +606,94 @@ R2/R4 +7,2, R7 +0,55, R1b −2,2. Detalle en `Diagnostico_2608_v2.xlsx` (scratch
 Para cerrar agosto con la comparación definitiva hace falta correr con julio empalmado:
 `Reporte_PD_15min_2607_v2.csv`, `RIO_07_2026.xlsx` y `Costos_de_P-D_Consolidado_2607.xlsx`
 copiados a `Carpeta_de_Trabajo`.
+
+---
+
+## Quinta ronda (15-09): comparación definitiva de agosto — motor `main` con julio empalmado vs Excel corregido
+
+Reemplaza la cuarta ronda (que corrió sin julio). Julio copiado a `Carpeta_de_Trabajo`
+desde `T:` (solo lectura): `Reporte_PD_15min_2607_v2.csv`, `RIO_07_2026.xlsx`,
+`Costos_de_P-D_Consolidado_2607.xlsx`. Motor: `main` en `f820455` — tarifa máxima
+(spec 25), vigencia RIO 30 min (spec 27), cota inferior de horas (spec 28), umbral
+1,0 MWh. Reporte de agosto `2608_v2` (mismo margen que el reporte original en todas las
+empresas con ciclos completos). Excel corregido, sin traspasos.
+
+| | Excel corregido | Motor | Δ |
+|---|---:|---:|---:|
+| Mes completo | 897.558.934 | **941.327.164** | +43,77 MM (+4,9%) |
+| Σ\|Δ\| por empresa, mes completo | | | **71,4 MM** (14-09: 141,6) |
+| Solo ciclos del mes, sin herencia | 914.259.268 | **914.820.834** | **+0,56 MM (+0,1%)** |
+| Pares idénticos al peso | | | **207 de 352** |
+
+Sobre los mismos ciclos, los dos modelos coinciden en 0,1%. La diferencia del mes
+completo (+43,8 MM) es casi toda frontera: el motor liquida en agosto los ciclos que
+venían de julio (MEJILLONES-CTM3 16,9 MM, NUEVARENCA 9,6 MM: 26,5 MM en 8 ciclos
+"viene del mes anterior") que el Excel deja en 0 con el margen heredado de julio
+(mecanismo 6b), más lo que el Excel no cobra en sus `&1` por falta de horas.
+
+### Mes completo por empresa
+
+| Empresa | Excel corregido | Motor | Δ | Δ % |
+|---|---:|---:|---:|---:|
+| ENEL_GENERACION | 471.058.535 | 488.764.728 | +17.706.193 | +4% |
+| GMETROPOLITANA | 30.904.611 | 46.382.100 | +15.477.489 | +50% |
+| ENGIE | 52.785.791 | 66.476.785 | +13.690.993 | +26% |
+| TAMAKAYA_ENERGIA | 87.235.575 | 79.532.813 | −7.702.762 | −9% |
+| SGA | 17.148.090 | 22.118.186 | +4.970.096 | +29% |
+| GUACOLDA | 5.550.626 | 1.293.821 | −4.256.806 | −77% |
+| COLBUN | 173.447.485 | 175.470.261 | +2.022.776 | +1% |
+| BE FORESTALES | 8.320.906 | 6.928.482 | −1.392.423 | −17% |
+| ANTILHUE | 3.852.834 | 4.656.334 | +803.500 | +21% |
+| GM_HOLDINGS | 12.436.418 | 13.193.432 | +757.014 | +6% |
+| ENLASA | 1.653.932 | 2.377.955 | +724.022 | +44% |
+| QUICKSTART | 8.474.327 | 8.982.417 | +508.091 | +6% |
+| COLMITO | 2.820.033 | 3.326.888 | +506.855 | +18% |
+| INERSA | 10.922.759 | 10.539.074 | −383.685 | −4% |
+| EMELDA | 914.180 | 1.226.701 | +312.521 | +34% |
+| ELEKTRAGEN, ORAZUL, ENERGIA_SIETE, NUEVA DEGAN, EMELVA | | | < 0,12 MM | |
+| ELECTRICA_MOKA, ENORCHILE, ON GROUP, LOS_GUINDOS | | | 0 | 0% |
+
+### Qué hicieron las specs 27 y 28 respecto de la corrida del 14-09 (ambas con julio)
+
+Total 971.292.712 → **941.327.164 (−29,97 MM)**.
+
+| Empresa | Δ | Ciclos |
+|---|---:|---|
+| ENEL | −11,7 | SANISIDRO-1 &1 (31-jul → 1-ago): partida 15,0 MM rechazada por vigencia; el Excel también le da 0 |
+| SGA | −9,1 | 7 detenciones de CORONEL con instrucción de 12–24 h antes (spec 27); el Excel tampoco las pagaba |
+| GMETROPOLITANA | −8,6 | NUEVARENCA &5: PP/OM 90 min antes y PMT/OM 31 min después, rechazada por vigencia; el Excel también da 0 (R3) |
+| INERSA | −0,5 | TENOGAS &16 por vigencia (−0,39) y &1 por cota (+0,26 vs 14-09 con partida 0) |
+| EMELDA | −0,5 | detención de EMELDA-2 por vigencia |
+| ORAZUL | **+0,6** | YUNGAY-1/2 cobran fría por cota (spec 28), igual que el Excel |
+| BE FORESTALES | −0,15 | detención de CMPC &2 por vigencia |
+
+Con julio empalmado la spec 28 solo actúa en 4 ciclos (YUNGAY-1/2, TENOGAS &1,
+SANJAVIER-2: 0,89 MM), que es su alcance previsto. La spec 27 rechaza 5 partidas y 12
+detenciones; en todos los casos con contraparte en el Excel, el Excel tampoco pagaba.
+
+### Causas raíz sobre ciclos del mes (mismo método de la sección "Diagnóstico")
+
+| Causa | Neto | Bruto |
+|---|---:|---:|
+| R9 margen por bloque vs por hora | −54,3 | 54,3 |
+| R3 Excel no asocia la instrucción al ciclo | +48,7 | 48,7 |
+| R6 configuración que fija la tarifa | +0,9 | 47,3 |
+| R5 motor rechaza por RIO (SSCC / `&1`) | −25,3 | 25,3 |
+| R1 paradas cortas | +25,0 | 25,0 |
+| R2 + R4 flags y lista Pruebas del Excel | +7,2 | 7,2 |
+| R7 PO de mitad de mes | +0,55 | 0,55 |
+| R1b apareo | −2,2 | 2,2 |
+| **Total** | **+0,56** | 210,5 |
+
+R3 baja de 66,4 a 48,7 MM porque la spec 27 ahora rechaza NUEVARENCA &5 (el Excel
+también); R5 no cambia. Lo que queda abierto sigue siendo lo mismo: fuente del SSCC
+(−19,6), paradas menores a una hora (+25,0), lista Pruebas vs RIO (+4,5) y la lectura
+del margen a 15 minutos (−54,3, a favor de las empresas).
+
+### Cifras de referencia para regresiones (agosto con julio, `main` f820455)
+
+| Corrida | Total |
+|---|---:|
+| Motor v7 tarifa máxima, vigencia 30, cota inferior, con julio | **941.327.164** |
+| Excel corregido sin traspasos | 897.558.934 |
+| Excel corregido, solo ciclos del mes sin herencia | 914.259.268 |

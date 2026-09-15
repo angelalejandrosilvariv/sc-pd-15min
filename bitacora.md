@@ -76,6 +76,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
 | 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
+| **2608 con empalme 2607, vigencia 30 + cota inferior (`main` f820455)** | — | **941.327.164** | 897.558.934 (corregido, sin traspasos) |
 
 **Trabajo siguiente, en orden sugerido**
 
@@ -105,6 +106,25 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-15 — Claude — Agosto definitivo: motor `main` con julio empalmado vs Excel corregido
+
+- **Tipo:** análisis con datos reales.
+- **Origen:** el dueño del proyecto entregó las rutas de julio en `T:`; se copiaron
+  (solo lectura) a `Carpeta_de_Trabajo` como `Reporte_PD_15min_2607_v2.csv`,
+  `RIO_07_2026.xlsx` y `Costos_de_P-D_Consolidado_2607.xlsx`.
+- **Cambios:** sección "Quinta ronda" en `docs/informes/Brechas_2608_por_empresa.md`
+  (reemplaza la cuarta, que corrió sin julio); scripts `correr_2608_julio.py`,
+  `solo_mes2_v3.py`, `diagnostico_v3.py` en `scripts_brechas_2608/`.
+- **Hallazgos:** mes completo Excel 897,6 vs motor **941,3 MM (+4,9%)**, Σ|Δ| por
+  empresa 71,4 MM (14-09: 141,6). **Ciclos del mes sin herencia: 914,3 vs 914,8 MM
+  (+0,1%)**, 207 de 352 pares idénticos al peso. La diferencia del mes completo es
+  frontera: 26,5 MM de ciclos de julio liquidados en agosto que el Excel anula con
+  margen heredado. Specs 27+28 vs corrida del 14-09: −29,97 MM (ENEL −11,7 por
+  SANISIDRO-1 &1 de frontera; SGA −9,1; GMETROPOLITANA −8,6; ORAZUL +0,6), en todos
+  los casos con contraparte el Excel también daba 0.
+- **Pendientes:** decisiones abiertas sin cambio (SSCC, paradas cortas, Pruebas vs
+  RIO, EP+OM, valor de la vigencia).
 
 ### 2026-09-15 — Claude — Agosto: motor con specs 27 y 28 vs Excel corregido
 
