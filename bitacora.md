@@ -122,6 +122,20 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-16 — Codex (OpenAI) — Spec 30: resolución configurable del margen
+
+- **Tipo:** especificación + implementación + prueba.
+- **Origen:** causa R9 de `docs/informes/Brechas_2608_por_empresa.md` y solicitud de
+  reproducir dentro del v7 el truncamiento horario del Excel.
+- **Cambios:** se agregó `RESOLUCION_MARGEN = 'bloque' | 'hora'`, con `'bloque'`
+  como default sin regresión; la función pura `margen_por_hora()` agrega por central
+  y hora, calcula el margen y lo reparte por generación. El runner, la interfaz, la
+  consola y `Guia_Lectura` exponen/documentan la selección. No se modificaron los
+  motores Turbina ni Reglas del Horario.
+- **Validación:** `pytest -q` y pruebas dedicadas en
+  `tests/test_resolucion_margen.py`.
+- **Pendientes:** Claude verificará las cifras con los datos reales.
+
 ### 2026-09-16 — Claude — Decisiones 5 a 8 cerradas; TOCOPILLA-U16 &1 aclarado
 
 - **Tipo:** decisión + análisis con datos reales.

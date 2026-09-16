@@ -174,6 +174,13 @@ CALCULAR_MARGEN_EN_EL_MOTOR = 1  # 1 = el motor calcula el margen unitario como
 # medicion sobre 2606 y la evidencia de que el horario usa el criterio 0.
 MARGEN_NETEADO_POR_CICLO = 0
 
+# Resolucion temporal usada para calcular y truncar el margen. 'bloque' conserva
+# el comportamiento historico de 15 minutos; 'hora' reproduce la regla del Excel
+# horario y reparte el resultado nuevamente a los bloques para no alterar el
+# resto del pipeline. Ver docs/specs/30-resolucion-margen.md.
+RESOLUCION_MARGEN = 'bloque'
+RESOLUCIONES_MARGEN_VALIDAS = ('bloque', 'hora')
+
 # Cuando una central puede operar bajo mas de una configuracion (ej. turbina
 # sola vs ciclo combinado con turbina a vapor), el costo de partida/detencion
 # hoy se decide con la configuracion del bloque cronologicamente PRIMERO/
@@ -725,9 +732,65 @@ def calcular_margen_bloques(reporte, calcular_en_motor=1, netear_por_ciclo=0):
     return np.where(margen_unitario > 0, margen_unitario * generacion, 0)
 
 
+def margen_por_hora(reporte, calcular_en_motor=1, netear_por_ciclo=0):
+    """Calcula el margen a resolucion horaria y lo reparte por generacion.
+
+    La agrupacion es por central y hora-reloj, incluso si la hora contiene menos
+    de cuatro bloques. CMg y CV se ponderan por generacion (promedio simple si la
+    generacion horaria es cero) y el dolar siempre usa promedio simple. Cuando el
+    margen se netea por ciclo se conserva aqui el signo de la hora.
+    """
+    requeridas = ['Central', 'FECHA_HORA', 'GENERACION']
+    if calcular_en_motor == 1:
+        requeridas += ['CMg', 'CV', 'Dolar']
+    else:
+        requeridas += ['CMg-CV']
+    faltan = [c for c in requeridas if c not in reporte.columns]
+    if faltan:
+        sys.exit(f"ERROR: RESOLUCION_MARGEN='hora' requiere columnas ausentes "
+                 f"en el reporte: {faltan}")
+
+    trabajo = pd.DataFrame(index=reporte.index)
+    trabajo['_central'] = reporte['Central']
+    trabajo['_hora'] = pd.to_datetime(reporte['FECHA_HORA'], errors='coerce').dt.floor('h')
+    trabajo['_gen'] = pd.to_numeric(reporte['GENERACION'], errors='coerce').fillna(0.0)
+    claves = [trabajo['_central'], trabajo['_hora']]
+    gen_h = trabajo['_gen'].groupby(claves, dropna=False).transform('sum')
+
+    if calcular_en_motor == 1:
+        def promedio_horario(nombre, ponderado=True):
+            valores = pd.to_numeric(reporte[nombre], errors='coerce')
+            simple = valores.groupby(claves, dropna=False).transform('mean')
+            if not ponderado:
+                return simple
+            suma = (valores.fillna(0) * trabajo['_gen']).groupby(
+                claves, dropna=False).transform('sum')
+            return (suma / gen_h).where(gen_h != 0, simple).fillna(0)
+
+        cmg_h = promedio_horario('CMg')
+        cv_h = promedio_horario('CV')
+        dolar_h = promedio_horario('Dolar', ponderado=False).fillna(0)
+        margen_h = (cmg_h - cv_h) * dolar_h * gen_h
+    else:
+        unitario = pd.to_numeric(reporte['CMg-CV'], errors='coerce')
+        simple = unitario.groupby(claves, dropna=False).transform('mean')
+        suma = (unitario.fillna(0) * trabajo['_gen']).groupby(
+            claves, dropna=False).transform('sum')
+        unitario_h = (suma / gen_h).where(gen_h != 0, simple).fillna(0)
+        margen_h = unitario_h * gen_h
+
+    if netear_por_ciclo != 1:
+        margen_h = margen_h.clip(lower=0)
+    proporcion = (trabajo['_gen'] / gen_h).where(gen_h != 0, 0.0)
+    return np.asarray(margen_h * proporcion, dtype=float)
+
+
 def crear_guia_lectura():
     """Construye el glosario y las formulas que permiten auditar cada ciclo."""
     filas = [
+        ('RESOLUCION_MARGEN', "'bloque' calcula y trunca el margen cada 15 minutos (default); "
+         "'hora' agrega por Central y hora-reloj, calcula el margen horario y lo reparte entre "
+         "sus bloques en proporcion a la generacion."),
         ('Tipo_Partida', 'Tramo de partida determinado con las horas detenidas y los umbrales base.'),
         ('Horas_Cota_Inferior / Horas_Detenida_Estimada',
          'Para el ciclo sin anterior conocido: horas desde el primer FECHA_HORA cargado y marca de que la cota se uso para demostrar el tramo Fria. Horas_Detenida_Ciclo queda nula y conserva la exencion RIO sin_historia.'),
@@ -881,6 +944,9 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
     globals().update(panel or {})
+    if RESOLUCION_MARGEN not in RESOLUCIONES_MARGEN_VALIDAS:
+        sys.exit(f"ERROR: RESOLUCION_MARGEN='{RESOLUCION_MARGEN}' no es valido. "
+                 f"Opciones: {RESOLUCIONES_MARGEN_VALIDAS}")
 
     # ==========================================
     # UTILIDADES
@@ -984,12 +1050,17 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
 
     # Con MARGEN_NETEADO_POR_CICLO=0 el margen por bloque es cero o positivo; con 1
     # conserva el signo y se trunca al agregar el ciclo (compactar_resumen_ciclos).
-    reporte_sin_ceros['Margen'] = calcular_margen_bloques(
-        reporte_sin_ceros, CALCULAR_MARGEN_EN_EL_MOTOR, MARGEN_NETEADO_POR_CICLO)
+    if RESOLUCION_MARGEN == 'hora':
+        reporte_sin_ceros['Margen'] = margen_por_hora(
+            reporte_sin_ceros, CALCULAR_MARGEN_EN_EL_MOTOR, MARGEN_NETEADO_POR_CICLO)
+    else:
+        reporte_sin_ceros['Margen'] = calcular_margen_bloques(
+            reporte_sin_ceros, CALCULAR_MARGEN_EN_EL_MOTOR, MARGEN_NETEADO_POR_CICLO)
 
     print("\n" + "=" * 78)
     print("  CRITERIO DE MARGEN")
     print("=" * 78)
+    print(f"  RESOLUCION ACTIVA: {RESOLUCION_MARGEN.upper()}")
     if CALCULAR_MARGEN_EN_EL_MOTOR == 1:
         print("  ACTIVO: calculado en el motor -> (CMg - CV) x Dolar, sobre todas las filas")
         print("          (mismo criterio que el modelo horario).")
@@ -998,6 +1069,12 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         print("          (solo poblada en filas Tipo = 'C.Frec').")
     print(f"  Margen total del mes con el criterio activo: "
           f"{reporte_sin_ceros['Margen'].sum():,.0f} CLP")
+    if RESOLUCION_MARGEN == 'hora':
+        referencia_bloque = calcular_margen_bloques(
+            reporte_sin_ceros, CALCULAR_MARGEN_EN_EL_MOTOR,
+            MARGEN_NETEADO_POR_CICLO)
+        print(f"  (Referencia: a resolucion bloque seria "
+              f"{referencia_bloque.sum():,.0f} CLP.)")
     if all(c in reporte_sin_ceros.columns for c in ['CMg', 'CV', 'Dolar', 'CMg-CV']):
         otro = calcular_margen_bloques(
             reporte_sin_ceros, 0 if CALCULAR_MARGEN_EN_EL_MOTOR == 1 else 1,

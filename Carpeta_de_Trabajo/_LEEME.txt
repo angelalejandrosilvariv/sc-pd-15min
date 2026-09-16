@@ -22,8 +22,9 @@ etc.) y corre los scripts con F5 en Spyder, en este orden:
    variables NOMBRE_... al inicio del archivo con los nombres exactos
    de tus archivos de este mes (deben estar en esta misma carpeta).
    Genera: Reporte_Sobrecostos_PD_Final.xlsx
-   Interruptores al inicio del archivo: MARGEN_NETEADO_POR_CICLO (dejar
-   en 0) y TARIFA_CONFIGURACION ("maxima" = la configuracion mas cara
+   Interruptores al inicio del archivo: RESOLUCION_MARGEN ("bloque" = calculo
+   vigente de 15 min; "hora" = regla horaria para contraste),
+   MARGEN_NETEADO_POR_CICLO (dejar en 0) y TARIFA_CONFIGURACION ("maxima" = la configuracion mas cara
    del ciclo, decision vigente; "instruida" = la que instruyo el RIO,
    solo para comparar) y VIGENCIA_INSTRUCCION_RIO_MIN (30 = la instruccion
    RIO debe estar a menos de 30 min de la partida/detencion; 0 = sin limite) y

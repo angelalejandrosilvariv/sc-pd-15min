@@ -32,6 +32,10 @@ NOMBRE_SALIDA = "Reporte_Sobrecostos_PD_Final.xlsx"
 # tal como viene (solo poblada en filas Tipo = 'C.Frec').
 CALCULAR_MARGEN_EN_EL_MOTOR = 1
 
+# Resolucion del margen: "bloque" conserva el calculo de 15 minutos (default);
+# "hora" agrega CMg/CV/Generacion por hora y reproduce esa regla del horario.
+RESOLUCION_MARGEN = "bloque"
+
 # Cuando se descarta el margen negativo. 0 = bloque a bloque, igual que el modelo
 # horario (deja esto salvo que el cambio de criterio este aprobado). 1 = deja que
 # los bloques negativos compensen dentro del ciclo y trunca recien el total.
@@ -75,6 +79,7 @@ def main() -> None:
     }
     motor.main(rutas, {
         "CALCULAR_MARGEN_EN_EL_MOTOR": CALCULAR_MARGEN_EN_EL_MOTOR,
+        "RESOLUCION_MARGEN": RESOLUCION_MARGEN,
         "MARGEN_NETEADO_POR_CICLO": MARGEN_NETEADO_POR_CICLO,
         "TARIFA_CONFIGURACION": TARIFA_CONFIGURACION,
         "VIGENCIA_INSTRUCCION_RIO_MIN": VIGENCIA_INSTRUCCION_RIO_MIN,
