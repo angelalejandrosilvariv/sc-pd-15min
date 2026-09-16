@@ -89,6 +89,8 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2606 con empalme 2605, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **1.063.758.505** | 1.028.628.659 |
 | 2607 con empalme 2606, `main` f820455 | — | **1.343.830.997** | (Excel de julio no comparado) |
 | 2608 con empalme 2607, `RESOLUCION_MARGEN = 'hora'` (spec 30, solo para contraste) | — | 999.211.996 | 966.791.746 |
+| **2608 con empalme 2607, `main` con erratum spec 25 (16-09)** | — | **939.959.962** | 966.791.746 |
+| **2606 con empalme 2605, `main` con erratum spec 25 (16-09)** | — | **1.065.608.599** | 1.028.628.659 |
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
 | 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
@@ -122,6 +124,35 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-16 — Claude — Verificación de la spec 31 (PR #54) con datos reales: cuatro correcciones y un erratum de la spec 25
+
+- **Tipo:** revisión + corrección + prueba.
+- **Origen:** PR #54 de Codex (paquete de auditoría CEN). Suite verde (117); con la
+  salida real de agosto el paquete se generaba pero el libro no abría en Excel y los
+  checks no cerraban.
+- **Correcciones en `scripts/generar_entrega_cen.py` y el motor:** (1) referencias
+  estructuradas completas `Tabla[[#This Row],[Col]]` — con la forma corta que emite
+  xlsxwriter Excel pide reparar el archivo; (2) el motor exporta `CMg`, `CV`, `Dolar`
+  y `UNIDAD GENERADORA` en `Detalle_15Min` (faltaban: `Check_Margen` fallaba en 111
+  ciclos); (3) hoja nueva `Detalle_Frontera` con los bloques del mes anterior de los
+  ciclos vivos en el mes, que el paquete concatena (sin ella el margen de 4 ciclos de
+  frontera no se reproducía); (4) candidatas con filtro de combustible por extremo y
+  `MAXIFS` separado para partida y detención; `COUNTIF` en los resúmenes (el
+  `COUNTIFS` de tres argumentos era inválido) y validación por rango.
+- **Erratum spec 25:** el máximo se tomaba sobre `Costo_*_ML` del bloque (tarifa × dólar
+  de ese bloque), premiando el día de dólar más alto del ciclo. Ahora
+  `tarifa_valorizada_al_extremo()`: USD de la configuración × dólar del bloque de
+  apertura/cierre. Agosto 941.327.164 → **939.959.962** (−1,37 MM, 30 ciclos, hasta
+  2,7% en ciclos de julio→agosto); junio 1.065.936.984 → **1.065.608.599**.
+- **Validación:** paquete de agosto abierto en Excel por COM sin reparación y
+  recalculado: `Check_SC` = 0 y `Check_Margen` = 0 en 390/390 ciclos; `Candidatas`
+  reproduce `Costo_Partida_Base` salvo diferidos (base 0 por regla); `Resumen_Empresa`
+  y `Resumen_Central` suman 939.959.962. 120 pruebas (3 nuevas). `--tablas-dinamicas`
+  no crea tablas dinámicas (solo avisa); las hojas `SUMIFS` son la salida oficial.
+- **Pendientes:** el PR #53 (`codex/formaliza-script-comparar-con-excel-horario-lh58m0`)
+  duplica trabajo ya mezclado (#52 y #54); cerrarlo sin mezclar. Regenerar la defensa
+  v2 con las cifras del erratum (diferencia < 0,2%; las conclusiones no cambian).
 
 ### 2026-09-16 — Codex (OpenAI) — Spec 31: entrega de auditoría CEN
 

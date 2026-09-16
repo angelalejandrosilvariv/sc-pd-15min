@@ -47,3 +47,43 @@ def test_genera_siete_archivos_y_diccionario_completo(tmp_path):
     for nombre in ("parametros", "bloques", "ciclos", "candidatas_tarifa", "empresas"):
         df = pd.read_csv(destino / f"SCPD_2608_{nombre}.csv")
         assert set(df.columns).issubset(set(dic.loc[dic.archivo == nombre, "columna"]))
+
+
+# --- hallazgos de la verificacion con datos reales (16-09) -----------------------------------
+
+def test_referencias_estructuradas_completas():
+    """xlsxwriter expande [@Col] a [[#This Row],Col] y Excel no abre el libro: hay que
+    escribir Tabla[[#This Row],[Col]]."""
+    from generar_entrega_cen import _referencias_completas
+    assert (_referencias_completas("=[@SC_recalc]-[@[Total SC_PD]]", "Ciclos")
+            == "=Ciclos[[#This Row],[SC_recalc]]-Ciclos[[#This Row],[Total SC_PD]]")
+    assert (_referencias_completas("=SUMIFS(Bloques[Margen_recalc],Bloques[Etiqueta_Relacionada],[@Etiqueta_Relacionada])", "Ciclos")
+            == "=SUMIFS(Bloques[Margen_recalc],Bloques[Etiqueta_Relacionada],Ciclos[[#This Row],[Etiqueta_Relacionada]])")
+
+
+def test_libro_no_contiene_referencias_cortas(tmp_path):
+    import zipfile, re
+    test_genera_siete_archivos_y_diccionario_completo(tmp_path)
+    libro = next(tmp_path.rglob("SCPD_2608_Auditoria.xlsx"))
+    with zipfile.ZipFile(libro) as z:
+        xml = "".join(z.read(n).decode("utf-8", "ignore") for n in z.namelist() if n.startswith("xl/"))
+    assert "[[#This Row]," in xml
+    assert not re.search(r"(?<![A-Za-z\]])\[\[#This Row\],", xml), "referencia sin nombre de tabla"
+
+
+def test_bloques_del_mes_anterior_entran_desde_detalle_frontera(tmp_path):
+    """Los ciclos que vienen del mes anterior traen su margen completo: sin los bloques de
+    ese mes (hoja Detalle_Frontera) el recalculo por bloque no cierra."""
+    test_genera_siete_archivos_y_diccionario_completo(tmp_path)
+    reporte = tmp_path / "Reporte_Sobrecostos_PD_Final.xlsx"
+    hojas = pd.read_excel(reporte, sheet_name=None)
+    frontera = hojas["Detalle_15Min"].head(2).copy()
+    frontera["FECHA_HORA"] = pd.Timestamp("2026-07-31 23:30"); frontera["Etiqueta_Relacionada"] = "C0&1"
+    with pd.ExcelWriter(reporte) as w:
+        for nombre, df in hojas.items():
+            df.to_excel(w, sheet_name=nombre, index=False)
+        frontera.to_excel(w, sheet_name="Detalle_Frontera", index=False)
+    destino = generar_entrega(reporte, tmp_path / "salida2")
+    bloques = pd.read_csv(destino / "SCPD_2608_bloques.csv")
+    assert (pd.to_datetime(bloques.FECHA_HORA) < "2026-08-01").sum() == 2
+    assert bloques.groupby("Etiqueta_Relacionada").size()["C0&1"] == 6

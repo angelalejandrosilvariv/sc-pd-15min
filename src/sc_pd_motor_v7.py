@@ -510,6 +510,27 @@ def combustible_configuracion(configuraciones):
     return gn.where(gn.notna(), diesel).astype(object).where(lambda s: s.notna(), '').str.lstrip('_')
 
 
+def tarifa_valorizada_al_extremo(bloques, tipo, llave):
+    """Tarifa en CLP de cada bloque, valorizada al dolar del extremo del ciclo.
+
+    Costo_{tipo}_ML trae la tarifa de la configuracion del bloque multiplicada por
+    el dolar de ESE bloque. Comparar bloques por ese valor haria ganar al dia de
+    dolar mas alto del ciclo, no a la configuracion mas cara. Aqui la tarifa en
+    USD (constante por configuracion dentro del ciclo) se valoriza al dolar del
+    bloque de apertura (partida) o de cierre (detencion), que es el instante en
+    que ocurre el costo. Si faltan Costo_{tipo} o Valor_Dolar (detalles armados
+    en pruebas) se usa Costo_{tipo}_ML tal cual.
+    """
+    ml = pd.to_numeric(bloques[f'Costo_{tipo}_ML'], errors='coerce').fillna(0)
+    if f'Costo_{tipo}' not in bloques.columns or 'Valor_Dolar' not in bloques.columns:
+        return ml
+    usd = pd.to_numeric(bloques[f'Costo_{tipo}'], errors='coerce').fillna(0)
+    extremo = 'first' if tipo == 'Partida' else 'last'
+    dolar = pd.to_numeric(bloques['Valor_Dolar'], errors='coerce').groupby(
+        [bloques[c] for c in llave]).transform(extremo)
+    return (usd * dolar).fillna(ml)
+
+
 def tarifa_configuracion_maxima(resumen_relacionada, compacto):
     """Sustituye la tarifa del primer/ultimo bloque por la mas cara del ciclo.
 
@@ -539,7 +560,8 @@ def tarifa_configuracion_maxima(resumen_relacionada, compacto):
         instruido = {'Partida': pd.Series('', index=bloques.index),
                      'Detencion': pd.Series('', index=bloques.index)}
     for tipo in ('Partida', 'Detencion'):
-        tarifa = pd.to_numeric(bloques[f'Costo_{tipo}_ML'], errors='coerce').fillna(0)
+        tarifa = tarifa_valorizada_al_extremo(bloques, tipo, llave)
+        bloques[f'_Tarifa_{tipo}'] = tarifa
         filtro = pd.to_numeric(bloques[f'Filtro_CostoCero_{tipo}'], errors='coerce').fillna(1)
         comb_instruido = combustible_configuracion(instruido[tipo])
         mismo_combustible = (comb_instruido == '') | (comb_propio == comb_instruido)
@@ -558,6 +580,10 @@ def tarifa_configuracion_maxima(resumen_relacionada, compacto):
         ganadores[destino] = bloques.loc[idx_p, origen].values
     for destino, origen in _CAMPOS_TARIFA_DETENCION.items():
         ganadores[destino] = bloques.loc[idx_d, origen].values
+    # La tarifa base es la del ganador valorizada al dolar de la apertura / cierre,
+    # no el Costo_*_ML del bloque que resulto maximo.
+    ganadores['Costo_Partida_Base'] = bloques.loc[idx_p, '_Tarifa_Partida'].values
+    ganadores['Costo_Detencion_Base'] = bloques.loc[idx_d, '_Tarifa_Detencion'].values
     ganadores['Configs_En_Ciclo'] = bloques.groupby(llave)['Central'].nunique()
     ganadores['Excluida_Combustible_Partida'] = bloques.groupby(llave)['_Excluida_Combustible_Partida'].first()
     ganadores['Excluida_Combustible_Detencion'] = bloques.groupby(llave)['_Excluida_Combustible_Detencion'].first()
@@ -598,6 +624,11 @@ def candidatas_tarifa_configuracion(resumen_relacionada):
     rio = b['Configuracion RIO'] if 'Configuracion RIO' in b else pd.Series('', index=b.index)
     b['_rio_p'] = rio.groupby([b[c] for c in llave]).transform('first')
     b['_rio_d'] = rio.groupby([b[c] for c in llave]).transform('last')
+    for tipo in ('Partida', 'Detencion'):
+        # misma valorizacion que tarifa_configuracion_maxima(): USD x dolar del extremo,
+        # calculada ANTES de quedarse con una fila por configuracion (el extremo es
+        # el primer/ultimo bloque del ciclo completo).
+        b[f'Costo_{tipo}_ML'] = tarifa_valorizada_al_extremo(b, tipo, llave)
     # Una fila por configuración; las tarifas son propias de la configuración.
     b = b.drop_duplicates(llave + ['Central'], keep='first').copy()
     for tipo, rio_col in [('Partida', '_rio_p'), ('Detencion', '_rio_d')]:
@@ -608,7 +639,12 @@ def candidatas_tarifa_configuracion(resumen_relacionada):
         b[f'_valor_{tipo}'] = tarifa * pasa_comb.astype(int) * pasa_cero
         b[f'_pasa_comb_{tipo}'] = pasa_comb
     b['combustible_instruido'] = combustible_configuracion(b['_rio_p'])
-    b['pasa_combustible'] = (b['_pasa_comb_Partida'] & b['_pasa_comb_Detencion']).astype(int)
+    b['combustible_instruido_detencion'] = combustible_configuracion(b['_rio_d'])
+    # El filtro de combustible se evalua por extremo: la partida contra la instruccion
+    # de apertura y la detencion contra la de cierre (pueden ser combustibles distintos).
+    b['pasa_combustible_partida'] = b['_pasa_comb_Partida'].astype(int)
+    b['pasa_combustible_detencion'] = b['_pasa_comb_Detencion'].astype(int)
+    b['pasa_combustible'] = b['pasa_combustible_partida']
     b['pasa_costo_cero'] = (pd.to_numeric(b.get('Filtro_CostoCero_Partida', 1), errors='coerce')
                              .fillna(1).astype(bool)
                              & pd.to_numeric(b.get('Filtro_CostoCero_Detencion', 1), errors='coerce')
@@ -621,7 +657,8 @@ def candidatas_tarifa_configuracion(resumen_relacionada):
         b[f'elegida_{tipo.lower()}'] = (candidata & orden.eq(1)).astype(int)
     columnas = ['Etiqueta_Relacionada', *llave, 'Central', 'Costo_Partida_ML',
                 'Costo_Detencion_ML', 'combustible_propio', 'combustible_instruido',
-                'pasa_combustible', 'pasa_costo_cero', 'elegida_partida', 'elegida_detencion']
+                'combustible_instruido_detencion', 'pasa_combustible_partida',
+                'pasa_combustible_detencion', 'pasa_costo_cero', 'elegida_partida', 'elegida_detencion']
     return b[[c for c in columnas if c in b.columns]].reset_index(drop=True)
 
 
@@ -1413,6 +1450,9 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                     'Empresa', 'Inicio_Ciclo_Global', 'Termino_Ciclo_Global', 'Horas_Detenida_Ciclo',
                     'Inicio_Generacion_Central', 'Termino_Generacion_Central',
                     'FECHA_HORA', 'GENERACION', 'Margen', 'Llave_FHC', 'Llave_FHC_Inicio', 'Llave_FHC_Fin']
+        # Insumos del margen por bloque, para que el paquete de auditoria (spec 31)
+        # pueda recalcular MAX(0, CMg - CV) x Dolar x Gen fila por fila. Solo export.
+        columnas += [c for c in ('UNIDAD GENERADORA', 'CMg', 'CV', 'Dolar') if c in resumen.columns]
         return resumen[columnas].sort_values(by=['FECHA_HORA', 'Central_Relacionada'])
 
 
@@ -2539,6 +2579,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # 15. RECONCILIACION Y EXPORTACION
     # ==========================================
     detalle_mes = resumen_relacionada[resumen_relacionada['FECHA_HORA'] >= f_min_actual].copy()
+    # Bloques del mes anterior de los ciclos presentes en este mes (vienen del mes
+    # anterior, terminen o no aqui). Van en hoja aparte para no alterar Detalle_15Min
+    # ni la reconciliacion: el paquete de auditoria (spec 31) los necesita para que
+    # Margen_Suma_Ciclo se pueda recalcular bloque a bloque.
+    detalle_frontera = resumen_relacionada[
+        (resumen_relacionada['FECHA_HORA'] < f_min_actual)
+        & resumen_relacionada['Etiqueta_Relacionada'].isin(df_compacto['Etiqueta_Relacionada'])].copy()
     print_audit_summary()
 
     gen_csv_mes = reporte_actual['GENERACION'].sum()
@@ -2564,6 +2611,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                  'SC_por_Empresa': df_empresa,
                  'Resumen_Ciclos_PD': df_compacto,
                  'Detalle_15Min': detalle_mes,
+                 'Detalle_Frontera': detalle_frontera,
                  'Auditoria_Pasos': pd.DataFrame(_audit_log)}
         if AUDITAR_INSTRUCCION_RIO == 1:
             hojas['Cobertura_Instruccion_RIO'] = cobertura_export

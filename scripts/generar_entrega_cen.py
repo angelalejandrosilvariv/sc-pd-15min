@@ -74,6 +74,19 @@ def _formula_col(ws, fila0, fila1, col, formula, formato=None):
         ws.fill_down(fila0, col, fila1, col)
 
 
+_REF_FILA = re.compile(r"\[@\[?([^\]]+?)\]?\]")
+
+
+def _referencias_completas(formula: str, tabla: str) -> str:
+    """Convierte ``[@Col]`` / ``[@[Col]]`` en ``Tabla[[#This Row],[Col]]``.
+
+    xlsxwriter expande ``@`` a ``[[#This Row],Col]`` (sin el nombre de la tabla ni
+    los corchetes internos), y Excel rechaza el libro al abrirlo. La forma larga es
+    la que el formato de archivo exige.
+    """
+    return _REF_FILA.sub(lambda m: f"{tabla}[[#This Row],[{m.group(1)}]]", formula)
+
+
 def _tabla(writer, hoja: str, df: pd.DataFrame, nombre: str, formulas: dict | None = None):
     df.to_excel(writer, sheet_name=hoja, index=False, startrow=0)
     ws = writer.sheets[hoja]
@@ -83,7 +96,7 @@ def _tabla(writer, hoja: str, df: pd.DataFrame, nombre: str, formulas: dict | No
     for c in df.columns:
         item = {"header": str(c)}
         if c in formulas:
-            item["formula"] = formulas[c]
+            item["formula"] = _referencias_completas(formulas[c], nombre)
         columnas.append(item)
     if ncols:
         ws.add_table(0, 0, max(1, nfilas), ncols - 1,
@@ -129,6 +142,15 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     reporte = Path(reporte).resolve()
     hojas = pd.read_excel(reporte, sheet_name=list(HOJAS))
     ciclos, detalle = hojas["Resumen_Ciclos_PD"].copy(), hojas["Detalle_15Min"].copy()
+    # Bloques del mes anterior de los ciclos liquidados este mes (hoja opcional del motor):
+    # sin ellos el margen de los ciclos de frontera no se puede recalcular.
+    try:
+        frontera = pd.read_excel(reporte, sheet_name="Detalle_Frontera")
+        if len(frontera):
+            detalle = pd.concat([frontera, detalle], ignore_index=True, sort=False)
+    except ValueError:
+        pass
+    detalle = detalle.sort_values(["Etiqueta_Relacionada", "FECHA_HORA"], kind="stable").reset_index(drop=True)
     empresas, guia = hojas["SC_por_Empresa"].copy(), hojas["Guia_Lectura"].copy()
     aamm = _aamm(ciclos)
     destino = Path(carpeta_salida) if carpeta_salida else reporte.parent / f"Entrega_SCPD_{aamm}"
@@ -181,7 +203,7 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     libro = destino / f"{pref}Auditoria.xlsx"
     ciclos_x = ciclos.assign(Margen_recalc=0., Costo_Partida_recalc=0., Costo_Detencion_recalc=0., SC_recalc=0., Check_SC=0., Check_Margen=0.)
     bloques_x = bloques.assign(Margen_recalc=0.)
-    cand_x = candidatas.assign(Tarifa_max_recalc=0.)
+    cand_x = candidatas.assign(Tarifa_max_recalc=0., Tarifa_max_recalc_detencion=0.)
     f_bloque = "=MAX(0,[@CMg]-[@CV])*[@Dolar]*[@GENERACION]"
     formulas_b = {"Margen_recalc": f_bloque} if panel_efectivo.get("MARGEN_NETEADO_POR_CICLO", 0) == 0 and panel_efectivo.get("RESOLUCION_MARGEN", "bloque") == "bloque" else {}
     formulas_c = {
@@ -190,7 +212,9 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
         "Costo_Detencion_recalc": "=[@Costo_Detencion_Base]*[@Filtro_Conf_Detencion]*[@Filtro_Disp_Detencion]*[@Filtro_Op_Detencion]*[@Filtro_CostoCero_Detencion]",
         "SC_recalc": "=MAX(0,[@Costo_Partida_recalc]+[@Costo_Detencion_recalc]-[@Margen_Suma_Ciclo])",
         "Check_SC": "=[@SC_recalc]-[@[Total SC_PD]]", "Check_Margen": "=[@Margen_recalc]-[@Margen_Suma_Ciclo]"}
-    formulas_can = {"Tarifa_max_recalc": '=MAXIFS(Candidatas[Costo_Partida_ML],Candidatas[Etiqueta_Relacionada],[@Etiqueta_Relacionada],Candidatas[pasa_combustible],1,Candidatas[pasa_costo_cero],1)'}
+    formulas_can = {
+        "Tarifa_max_recalc": '=MAXIFS(Candidatas[Costo_Partida_ML],Candidatas[Etiqueta_Relacionada],[@Etiqueta_Relacionada],Candidatas[pasa_combustible_partida],1,Candidatas[pasa_costo_cero],1)',
+        "Tarifa_max_recalc_detencion": '=MAXIFS(Candidatas[Costo_Detencion_ML],Candidatas[Etiqueta_Relacionada],[@Etiqueta_Relacionada],Candidatas[pasa_combustible_detencion],1,Candidatas[pasa_costo_cero],1)'}
     with pd.ExcelWriter(libro, engine="xlsxwriter") as writer:
         wb = writer.book
         leeme = wb.add_worksheet("Leeme"); writer.sheets["Leeme"] = leeme
@@ -208,13 +232,14 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
         for hoja, campo in (("Resumen_Empresa", "Empresa"), ("Resumen_Central", "Central_Relacionada")):
             r = _resumen_sumifs(ciclos, campo); r.to_excel(writer, sheet_name=hoja, index=False)
             ws = writer.sheets[hoja]; ws.freeze_panes(1, 0)
-            if len(r): ws.data_validation(1, 0, len(r), 0, {"validate": "list", "source": r[campo].tolist()})
+            if len(r): ws.data_validation(1, 0, len(r), 0, {"validate": "list", "source": f"=$A$2:$A${len(r) + 1}"})
             # Fórmulas legibles y recalculables, una por entidad.
             for fila in range(1, len(r) + 1):
-                criterio = f"${chr(65)}{fila + 1}"
-                for col, origen in enumerate(["Etiqueta_Relacionada", "Costo_Partida_Efectivo", "Costo_Detencion_Efectivo", "Margen_Suma_Ciclo", "Total SC_PD"], 1):
-                    fun = "COUNTIFS" if col == 1 else "SUMIFS"
-                    ws.write_formula(fila, col, f'={fun}(Ciclos[{campo}],{criterio},Ciclos[{origen}])')
+                criterio = f"$A{fila + 1}"
+                ws.write_formula(fila, 1, f'=COUNTIF(Ciclos[{campo}],{criterio})')
+                for col, origen in enumerate(["Costo_Partida_Efectivo", "Costo_Detencion_Efectivo", "Margen_Suma_Ciclo", "Total SC_PD"], 2):
+                    ws.write_formula(fila, col, f'=SUMIFS(Ciclos[{origen}],Ciclos[{campo}],{criterio})')
+            ws.set_column(0, 0, 32); ws.set_column(1, 5, 18)
         diccionario.to_excel(writer, sheet_name="Diccionario", index=False); writer.sheets["Diccionario"].freeze_panes(1, 0)
         wb.set_calc_mode("auto")
     if tablas_dinamicas:

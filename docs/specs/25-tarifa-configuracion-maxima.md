@@ -158,3 +158,21 @@ Suite completa: **87 pruebas**.
    `Excluida_Combustible_*` lo delata.
 3. **El motor Turbina no aplica esta regla**: su unidad de ciclo es la máquina y
    la mezcla de configuraciones se resuelve con `ATRIBUCION_TARIFA_TURBINA`.
+
+## 7. Erratum 16-09-2026 — valorización al dólar del extremo
+
+La implementación original comparaba las candidatas por `Costo_Partida_ML` del bloque,
+es decir tarifa USD × dólar **de ese bloque**, y tomaba el máximo. En un ciclo de varios
+días eso hacía ganar al bloque del dólar más alto, no a la configuración más cara, y
+valorizaba la partida a un dólar distinto del de su fecha (hasta +2,7% en GUACOLDA-4,
+julio→agosto). Detectado al construir el paquete de auditoría (spec 31): el `MAXIFS` de
+la hoja `Candidatas` no reproducía `Costo_Partida_Base` en 36 ciclos.
+
+Corrección (`tarifa_valorizada_al_extremo()`): cada candidata se valoriza como tarifa
+USD de su configuración × dólar del **bloque de apertura** (partida) o **de cierre**
+(detención); la ganadora fija `Costo_*_Base` con ese valor. Sin `Costo_*`/`Valor_Dolar`
+en el detalle (pruebas sintéticas) se conserva `Costo_*_ML`. Impacto: 2608 con julio
+941.327.164 → **939.959.962** (−1,37 MM, 30 ciclos); 2606 con mayo 1.065.936.984 →
+**1.065.608.599** (−0,33 MM). La vista `candidatas_tarifa_configuracion()` usa la misma
+valorización, por lo que el `MAXIFS` del libro reproduce la tarifa base en todos los
+ciclos no diferidos.
