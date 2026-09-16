@@ -579,6 +579,52 @@ def tarifa_configuracion_maxima(resumen_relacionada, compacto):
     return salida
 
 
+def candidatas_tarifa_configuracion(resumen_relacionada):
+    """Devuelve la tabla auditable de configuraciones candidatas a tarifa máxima.
+
+    Es una vista de los mismos insumos y filtros usados por
+    :func:`tarifa_configuracion_maxima`; no interviene en el cálculo del motor.
+    Se conserva una fila por ciclo y configuración (la primera aparición resuelve
+    empates, igual que ``idxmax`` en la función de liquidación).
+    """
+    llave = ['Central_Relacionada', 'Ciclo_ID_Relacionada']
+    b = resumen_relacionada.copy()
+    if b.empty:
+        return pd.DataFrame(columns=['Etiqueta_Relacionada', *llave, 'Central',
+            'Costo_Partida_ML', 'Costo_Detencion_ML', 'combustible_propio',
+            'combustible_instruido', 'pasa_combustible', 'pasa_costo_cero',
+            'elegida_partida', 'elegida_detencion'])
+    b['combustible_propio'] = combustible_configuracion(b['Central'])
+    rio = b['Configuracion RIO'] if 'Configuracion RIO' in b else pd.Series('', index=b.index)
+    b['_rio_p'] = rio.groupby([b[c] for c in llave]).transform('first')
+    b['_rio_d'] = rio.groupby([b[c] for c in llave]).transform('last')
+    # Una fila por configuración; las tarifas son propias de la configuración.
+    b = b.drop_duplicates(llave + ['Central'], keep='first').copy()
+    for tipo, rio_col in [('Partida', '_rio_p'), ('Detencion', '_rio_d')]:
+        instruido = combustible_configuracion(b[rio_col])
+        pasa_comb = (instruido == '') | (b['combustible_propio'] == instruido)
+        pasa_cero = pd.to_numeric(b.get(f'Filtro_CostoCero_{tipo}', 1), errors='coerce').fillna(1).astype(int)
+        tarifa = pd.to_numeric(b.get(f'Costo_{tipo}_ML', 0), errors='coerce').fillna(0)
+        b[f'_valor_{tipo}'] = tarifa * pasa_comb.astype(int) * pasa_cero
+        b[f'_pasa_comb_{tipo}'] = pasa_comb
+    b['combustible_instruido'] = combustible_configuracion(b['_rio_p'])
+    b['pasa_combustible'] = (b['_pasa_comb_Partida'] & b['_pasa_comb_Detencion']).astype(int)
+    b['pasa_costo_cero'] = (pd.to_numeric(b.get('Filtro_CostoCero_Partida', 1), errors='coerce')
+                             .fillna(1).astype(bool)
+                             & pd.to_numeric(b.get('Filtro_CostoCero_Detencion', 1), errors='coerce')
+                             .fillna(1).astype(bool)).astype(int)
+    for tipo in ('Partida', 'Detencion'):
+        maximo = b.groupby(llave)[f'_valor_{tipo}'].transform('max')
+        # sólo la primera candidata empatada es la elegida
+        candidata = b[f'_valor_{tipo}'].eq(maximo) & maximo.gt(0)
+        orden = candidata.astype(int).groupby([b[c] for c in llave]).cumsum()
+        b[f'elegida_{tipo.lower()}'] = (candidata & orden.eq(1)).astype(int)
+    columnas = ['Etiqueta_Relacionada', *llave, 'Central', 'Costo_Partida_ML',
+                'Costo_Detencion_ML', 'combustible_propio', 'combustible_instruido',
+                'pasa_combustible', 'pasa_costo_cero', 'elegida_partida', 'elegida_detencion']
+    return b[[c for c in columnas if c in b.columns]].reset_index(drop=True)
+
+
 def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
                              netear_por_ciclo=0, tarifa_configuracion='instruida'):
     """Resume los bloques por ciclo sin perder los insumos de su liquidacion."""
@@ -2510,6 +2556,10 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     print(f"\nExportando a: {RUTA_SALIDA} ...")
     with pd.ExcelWriter(RUTA_SALIDA, engine='xlsxwriter') as writer:
         hojas = {'Guia_Lectura': crear_guia_lectura(),
+                 'Parametros_Motor': pd.DataFrame(
+                     [{'interruptor': n, 'valor': v} for n, v in sorted(globals().items())
+                      if n.isupper() and not n.startswith('RUTA_')
+                      and isinstance(v, (str, int, float, bool))]),
                  'Waterfall_Costos': df_auditoria_costos,
                  'SC_por_Empresa': df_empresa,
                  'Resumen_Ciclos_PD': df_compacto,

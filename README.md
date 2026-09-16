@@ -150,6 +150,11 @@ El flujo exporta hojas de auditoría y conciliación, incluyendo:
 - `Auditoria_Pasos`
 - `Cobertura_Instruccion_RIO` cuando está habilitada
 
+La spec 31 agrega un paquete autocontenido para el Coordinador. Use **Generar
+entrega CEN** en la interfaz o `Carpeta_de_Trabajo/correr_entrega.py`; se crean seis
+CSV reproducibles y un libro de auditoría con tablas, fórmulas y checks en
+`Entrega_SCPD_<AAMM>/`. Véase `docs/specs/31-entrega-auditoria-cen.md`.
+
 ## Pruebas
 
 Las pruebas no ejecutan el pipeline completo contra datos productivos. Se concentran en:

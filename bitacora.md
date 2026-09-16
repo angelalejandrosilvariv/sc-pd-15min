@@ -123,6 +123,16 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-16 — Codex (OpenAI) — Spec 31: entrega de auditoría CEN
+
+- **Tipo:** implementación + especificación + prueba.
+- **Origen:** solicitud de paquete reproducible para auditoría del Coordinador.
+- **Cambios:** generador de seis CSV y libro Excel con tablas/fórmulas/checks,
+  hashes e inventario del panel; función pública de candidatas de tarifa máxima;
+  runner y botón sobre la última salida en la interfaz.
+- **Validación:** suite `pytest -q` y compilación de los scripts.
+- **Pendientes:** Claude verificará agosto real, incluidas las diferencias cero.
+
 ### 2026-09-16 — Claude — Defensa del modelo, versión 2
 
 - **Tipo:** documentación.

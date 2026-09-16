@@ -15,6 +15,7 @@ import queue
 import sys
 import threading
 import traceback
+import subprocess
 from pathlib import Path
 
 import tkinter as tk
@@ -214,6 +215,8 @@ class Interfaz(tk.Tk):
         f_run.grid(row=4, column=0, sticky="ew", pady=(0, 6))
         self.btn_run = ttk.Button(f_run, text="▶  Ejecutar", command=self._ejecutar)
         self.btn_run.pack(side="left")
+        self.btn_entrega = ttk.Button(f_run, text="Generar entrega CEN", command=self._generar_entrega)
+        self.btn_entrega.pack(side="left", padx=(8, 0))
         self.lbl_estado = ttk.Label(f_run, text="Listo.", foreground="#666")
         self.lbl_estado.pack(side="left", padx=12)
         ttk.Button(f_run, text="Abrir carpeta de salida", command=self._abrir_carpeta).pack(side="right")
@@ -374,12 +377,35 @@ class Interfaz(tk.Tk):
             sys.stdout = stdout_original
             self.cola_log.put(("__FIN__", exito))
 
+    def _generar_entrega(self):
+        """Genera la entrega sobre la última salida seleccionada, sin bloquear la UI."""
+        ruta = Path(self.var_salida.get().strip())
+        if not ruta.exists():
+            messagebox.showerror("Falta la salida", "Ejecute el motor o seleccione una salida existente.")
+            return
+        self.lbl_estado.configure(text="Generando entrega CEN…", foreground="#b8720a")
+        def correr():
+            try:
+                script = RAIZ / "scripts" / "generar_entrega_cen.py"
+                proceso = subprocess.run([sys.executable, str(script), str(ruta)],
+                                         capture_output=True, text=True, check=True)
+                self.cola_log.put(proceso.stdout)
+                self.cola_log.put(("__FIN_ENTREGA__", True))
+            except Exception:
+                self.cola_log.put(traceback.format_exc())
+                self.cola_log.put(("__FIN_ENTREGA__", False))
+        threading.Thread(target=correr, daemon=True).start()
+
     def _vaciar_log(self):
         try:
             while True:
                 item = self.cola_log.get_nowait()
                 if isinstance(item, tuple) and item[0] == "__FIN__":
                     self._terminar(item[1])
+                elif isinstance(item, tuple) and item[0] == "__FIN_ENTREGA__":
+                    self.lbl_estado.configure(
+                        text="Entrega CEN lista." if item[1] else "Error al generar entrega CEN.",
+                        foreground="#2f6b46" if item[1] else "#b00020")
                 else:
                     self.txt.configure(state="normal")
                     self.txt.insert("end", item)
