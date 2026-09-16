@@ -123,6 +123,23 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-16 — Claude — Defensa del modelo, versión 2
+
+- **Tipo:** documentación.
+- **Cambios:** `docs/informes/Defensa_Modelo_15min.html` reescrito (mismo diseño,
+  contenido nuevo). Reemplaza la versión del 10-09, que defendía la tarifa instruida
+  (spec 15) y los 24 ciclos contestables; esa regla ya no está vigente.
+- **Contenido:** (1) veredicto: sobre los mismos ciclos agosto cierra en +0,1% con
+  207 de 352 pares al peso; (2) el experimento de junio como historia (94,8% regla) y
+  la adopción de la regla del horario (spec 25); (3) tabla de reglas vigentes con su
+  spec; (4) agosto ciclo a ciclo, dos alcances, por empresa; (5) descomposición
+  exacta por causa raíz y balance por familia (defectos del Excel +52,4 / −18,0,
+  resolución −31,5, reglas propias −2,4); (6) nueve defectos del Excel con celda,
+  monto y estado; (7) resolución demostrada con la spec 30 (R9 54,3 → 2,9 MM) y las
+  paradas cortas; (8) cierre y límites declarados.
+- **Pendientes:** actualizar el cruce ciclo a ciclo de junio con el motor actual
+  (hoy solo el total: 1.065.936.984 vs 1.028.628.659).
+
 ### 2026-09-16 — Claude — Verificación de las specs 29 y 30 (PR #51 y #52) con datos reales
 
 - **Tipo:** revisión + corrección + prueba.

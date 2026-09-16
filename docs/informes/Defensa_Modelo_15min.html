@@ -342,57 +342,46 @@
 <div class="wrap">
 
 <header class="masthead">
-  <p class="eyebrow">Sobrecostos de Partida y Detención · Junio 2026</p>
-  <h1>Por qué el modelo de 15 minutos difiere del horario</h1>
-  <p class="standfirst">La diferencia con el Excel horario casi no tiene que ver con los 15 minutos. Alimentando nuestro motor con el <em>mismo reporte horario</em>, el 94,8% de la brecha sigue ahí: es diferencia de reglas de cálculo, no de resolución.</p>
+  <p class="eyebrow">Sobrecostos de Partida y Detención · Junio y Agosto 2026 · versión 2 — 16 de septiembre</p>
+  <h1>Por qué el modelo de 15 minutos difiere del horario — y dónde ya no difiere</h1>
+  <p class="standfirst">Sobre los mismos ciclos, los dos modelos liquidan agosto con una diferencia de <strong>0,1%</strong> y 207 de 352 ciclos calzan al peso. Lo que queda tiene nombre, celda y monto: defectos verificables del Excel horario y la resolución del margen, que se demuestra con el propio motor cambiando un interruptor.</p>
   <div class="meta">
-    <span>Experimento controlado sobre Reporte_PD_2606</span>
-    <span>Contraste: Copia de Sobrecostos_PD_2606 def.xlsm</span>
-    <span>Junio 2026</span>
+    <span>Motor v7 · specs 25 a 30</span>
+    <span>Contraste: Sobrecostos_PD_2608 pre fixed.xlsm (v2) y Copia de Sobrecostos_PD_2606 def.xlsm</span>
+    <span>Reemplaza la versión del 10 de septiembre</span>
   </div>
 </header>
 
 <div class="verdict">
-  <h2>Las dos cosas que hay que saber</h2>
-  <p><strong>Primero: la brecha es de reglas.</strong> Corrimos nuestro motor con el reporte horario del propio modelo de referencia — mismo mes, mismo RIO, mismos costos, misma resolución. De los 234,8 millones de diferencia, <strong>222,6 millones (94,8%) sobreviven</strong> a igualar la resolución.</p>
+  <h2>Las tres cosas que hay que saber</h2>
+  <p><strong>Primero: donde se comparan los mismos ciclos, los modelos coinciden.</strong> Agosto, ciclos que inician y terminan en el mes, sin arrastre del mes anterior: Excel 914,3 millones, motor 914,8 millones. <strong>207 de 352 pares idénticos hasta el último peso.</strong></p>
   <div class="splitbar">
     <div class="splitbar-track">
-      <div class="splitbar-a"><span>222.631.112 CLP · 94,8% — diferencia de REGLA</span></div>
+      <div class="splitbar-a" style="flex:0 0 58.8%"><span>207 ciclos idénticos al peso · 58,8%</span></div>
       <div class="splitbar-b"></div>
     </div>
     <div class="splitbar-key">
-      <span><i class="swatch sw-a"></i>Regla — persiste con el mismo dato horario</span>
-      <span><i class="swatch sw-b"></i>Resolución — 12.194.797 CLP · 5,2%</span>
+      <span><i class="swatch sw-a"></i>Idénticos</span>
+      <span><i class="swatch sw-b"></i>145 pares con alguna diferencia — 210,5 millones brutos que se compensan hasta +0,56</span>
     </div>
   </div>
-  <p><strong>Segundo: donde los dos modelos se miden en igualdad de condiciones, coinciden exactamente.</strong> En ENEL, cuatro de sus seis centrales calzan <em>peso a peso</em> con el Excel sobre el mismo dato: mismos bloques dentro del ciclo, misma generación, mismo margen por MWh. Las dos que difieren son las que operan bajo varias configuraciones.</p>
-  <p>Ese es el argumento: no vemos cosas distintas, aplicamos reglas distintas — y sobre cada regla hay evidencia documental de cuál corresponde.</p>
+  <p><strong>Segundo: la brecha que existía era de reglas y ya está resuelta.</strong> El experimento de junio mostró que el 94,8% de la diferencia sobrevivía a igualar la resolución. La regla dominante —qué configuración fija la tarifa— se adoptó como la del horario (spec 25), y con eso la desviación por empresa bajó de 255 a 134 millones en junio y a 87 en agosto.</p>
+  <p><strong>Tercero: lo que sigue difiriendo se descompone exactamente</strong> en tres familias: defectos del Excel con celda identificable (52 millones que el Excel deja de cobrar y 18 que cobra de más), la resolución de 15 minutos aplicada a las mismas reglas (−31 millones netos) y reglas propias del motor que se compensan entre sí (−2 millones), cada una con interruptor para reproducir el criterio del horario.</p>
 </div>
 
 <section>
   <div class="sec-head">
-    <span class="sec-num">EL EXPERIMENTO</span>
-    <h2 class="sec-title">Separar la regla de la resolución</h2>
+    <span class="sec-num">CÓMO LLEGAMOS AQUÍ</span>
+    <h2 class="sec-title">El experimento de junio: separar la regla de la resolución</h2>
     <span class="chip chip-neutral">Control</span>
   </div>
-
   <div class="col">
-    <p>Durante mucho tiempo la comparación fue indirecta: dos modelos, dos fuentes de datos, dos resultados. Imposible saber qué parte de la diferencia venía de la resolución y qué parte de las reglas.</p>
-    <p>El control es sencillo. Alimentar <strong>nuestro motor con el reporte horario</strong>, y comparar contra el Excel que usa ese mismo reporte. Todo lo que sobreviva es regla.</p>
-    <p>Dos validaciones previas dejan el montaje limpio:</p>
-    <ul>
-      <li>El mapeo de <span class="m">Hora</span> (1 a 24) a marca de tiempo se verificó agregando el reporte de 15 minutos a hora: <strong>97,2% de 182.703 pares central-hora calzan exactos</strong> con la convención hora 1 = 00:00, contra 72,7% de la alternativa.</li>
-      <li>La generación total de las dos fuentes es idéntica: <strong>4.272.938,04 MWh</strong>. Es la misma energía, contada con distinto detalle.</li>
-    </ul>
-    <p>Las dos corridas del motor usan solo junio, sin empalme del mes anterior, con los mismos interruptores. Lo único que cambia entre ellas es la resolución del dato de entrada.</p>
+    <p>Durante mucho tiempo la comparación fue indirecta: dos modelos, dos fuentes, dos resultados. El control fue alimentar <strong>nuestro motor con el reporte horario</strong> del propio Excel y comparar contra el Excel que usa ese mismo reporte. Todo lo que sobreviviera sería regla.</p>
   </div>
-
   <div class="tbl-wrap">
     <table>
-      <caption>Las tres corridas — sobrecosto P-D total, junio 2026</caption>
-      <thead>
-        <tr><th>Corrida</th><th>Dato de entrada</th><th class="num">SC P-D (CLP)</th></tr>
-      </thead>
+      <caption>Junio 2026 — las tres corridas</caption>
+      <thead><tr><th>Corrida</th><th>Dato de entrada</th><th class="num">SC P-D (CLP)</th></tr></thead>
       <tbody>
         <tr><td><strong>Excel horario</strong></td><td>Reporte horario</td><td class="num">1.028.628.659</td></tr>
         <tr><td><strong>Motor sobre dato horario</strong></td><td>Reporte horario</td><td class="num">805.997.547</td></tr>
@@ -400,329 +389,187 @@
       </tbody>
     </table>
   </div>
-
-  <figure>
-    <div class="chartbox">
-      <svg viewBox="0 0 700 200" width="100%" height="200" role="img" aria-label="Descomposición: 222,6 millones por regla, 12,2 millones por resolución">
-        <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)" letter-spacing="1">DESCOMPOSICIÓN DE LA BRECHA DE 234,8 MILLONES</text>
-        <rect x="0" y="42" width="628" height="34" fill="var(--grid)"></rect>
-        <rect x="628" y="42" width="34" height="34" fill="var(--signal)"></rect>
-        <line x1="0" y1="86" x2="662" y2="86" stroke="var(--rule)" stroke-width="1"></line>
-
-        <text x="12" y="64" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--surface)">REGLA · 94,8%</text>
-        <text x="0" y="112" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--grid)" font-weight="600">−222.631.112 CLP</text>
-        <text x="0" y="132" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="var(--ink-2)">Persiste con el mismo dato horario</text>
-
-        <text x="662" y="112" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--signal)" font-weight="600">−12.194.797 CLP</text>
-        <text x="662" y="132" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="var(--ink-2)">Resolución · 5,2%</text>
-
-        <text x="0" y="172" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">El neto de la resolución es chico, pero mueve 151,8 millones en valor absoluto entre empresas: se compensa.</text>
-      </svg>
-    </div>
-    <figcaption>La resolución no es despreciable por empresa — ENGIE baja 61,0 millones por resolución y ENEL sube 45,4, y casi se cancelan. Lo que no hace es explicar la brecha agregada.</figcaption>
-  </figure>
-
-  <div class="tbl-wrap">
-    <table>
-      <caption>Las seis empresas que concentran cada efecto</caption>
-      <thead>
-        <tr><th>Empresa</th><th class="num">Excel horario</th><th class="num">Motor · dato horario</th><th class="num">Motor · dato 15 min</th><th class="num">Efecto regla</th><th class="num">Efecto resolución</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>TAMAKAYA</td><td class="num">197.379.263</td><td class="num">80.812.948</td><td class="num">92.127.262</td><td class="num neg">−116.566.315</td><td class="num">+11.314.314</td></tr>
-        <tr><td>ENEL_GENERACION</td><td class="num">204.469.296</td><td class="num">132.879.742</td><td class="num">178.254.441</td><td class="num neg">−71.589.554</td><td class="num">+45.374.699</td></tr>
-        <tr><td>ENGIE</td><td class="num">221.198.623</td><td class="num">208.809.569</td><td class="num">147.778.217</td><td class="num">−12.389.054</td><td class="num neg">−61.031.352</td></tr>
-        <tr><td>COLBUN</td><td class="num">139.755.784</td><td class="num">121.261.449</td><td class="num">107.064.497</td><td class="num">−18.494.335</td><td class="num">−14.196.952</td></tr>
-        <tr><td>SGA</td><td class="num">15.142.052</td><td class="num">25.161.791</td><td class="num">31.916.069</td><td class="num">+10.019.738</td><td class="num">+6.754.278</td></tr>
-        <tr><td>CARDONES SA</td><td class="num">24.523.580</td><td class="num">20.060.594</td><td class="num">20.060.594</td><td class="num">−4.462.986</td><td class="num"><strong>0</strong></td></tr>
-        <tr class="total"><td>Total</td><td class="num">1.028.628.659</td><td class="num">805.997.547</td><td class="num">793.802.750</td><td class="num">−222.631.112</td><td class="num">−12.194.797</td></tr>
-      </tbody>
-    </table>
-  </div>
-
   <div class="col">
-    <p class="pull">ENGIE es el caso inverso de TAMAKAYA: <strong>su brecha es 83% resolución</strong> (−61,0 de −73,4 millones). Sobre dato horario casi calzamos con el Excel: 208,8 contra 221,2 millones.</p>
+    <p>De los 234,8 millones de diferencia, <strong>222,6 (94,8%) persistían con el mismo dato horario</strong>. Y en las centrales de una sola configuración —QUINTERO-1/2, SANISIDRO-1/2— el margen calzaba <em>peso a peso</em>: mismos bloques, misma energía, mismo CLP/MWh. La brecha no era de medición; era una sola regla: el horario cobra la configuración <strong>más cara</strong> que pasó por el ciclo (<span class="m">MAXIFS</span> sobre las horas de partida), el motor cobraba la que <strong>instruyó el RIO</strong>.</p>
+    <p class="pull">La decisión del 14 de septiembre fue adoptar la regla del horario. Con ella, TAMAKAYA (KELAR) y ENGIE —dos de los tres casos que concentraban la brecha de junio— quedaron dentro del 10%; ENEL siguió arriba por la energía que el Excel deja fuera del margen de ATACAMA (defecto 7).</p>
   </div>
 </section>
 
 <section>
   <div class="sec-head">
-    <span class="sec-num">CAUSA 1</span>
-    <h2 class="sec-title">El margen no es fuente de divergencia</h2>
-    <span class="chip chip-ok">Los modelos coinciden</span>
+    <span class="sec-num">LAS REGLAS</span>
+    <h2 class="sec-title">Qué aplica el motor hoy</h2>
+    <span class="chip chip-ok">Decidido</span>
   </div>
-
-  <div class="col">
-    <p>La primera lectura de las cifras sugiere que acreditamos casi el doble de margen que el horario: 137.247 millones contra 70.227. Esa comparación es inválida, y conviene desarmarla antes de que alguien la use en contra.</p>
-    <p>Se estaban comparando perímetros distintos. Dos correcciones:</p>
-    <ul>
-      <li>Nuestro <span class="m">Margen_Suma_Ciclo</span> incluye los bloques de <strong>mayo</strong> de los ciclos de frontera — <strong>24.403.845.099 CLP</strong> que el horario liquida en otro mes.</li>
-      <li>El horario aparta 28 ciclos como <span class="m">"Se traspasa al próximo mes"</span>. Son las centrales base grandes (SANTAMARIA, ANGAMOS, COCHRANE) y concentran <strong>80.469.823.404 CLP</strong> de margen. Excluirlos distorsiona todo.</li>
-    </ul>
-    <p>Puestos en el mismo perímetro —solo bloques de junio— los dos modelos prácticamente calzan:</p>
-  </div>
-
-  <figure>
-    <div class="chartbox">
-      <svg viewBox="0 0 700 190" width="100%" height="190" role="img" aria-label="Margen por MWh: horario 37.340 CLP, 15 minutos 37.714 CLP">
-        <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)" letter-spacing="1">CLP DE MARGEN POR MWh GENERADO DENTRO DE CICLOS</text>
-        <line x1="150" y1="34" x2="150" y2="150" stroke="var(--rule-2)" stroke-width="1"></line>
-        <text x="142" y="66" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--ink)">Horario</text>
-        <rect x="150" y="46" width="446" height="30" fill="var(--rule-2)"></rect>
-        <text x="606" y="66" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--ink)">37.340</text>
-        <text x="142" y="120" text-anchor="end" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="var(--ink)">15 minutos</text>
-        <rect x="150" y="100" width="450" height="30" fill="var(--grid)"></rect>
-        <text x="610" y="120" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">37.714</text>
-        <line x1="150" y1="150" x2="660" y2="150" stroke="var(--rule)" stroke-width="1"></line>
-        <text x="150" y="172" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-2)">Diferencia: +1,0%</text>
-      </svg>
-    </div>
-    <figcaption>Margen acreditado por unidad de energía generada dentro de ciclos, junio 2026. Las dos reglas de precio son la misma; lo que cambia es cuánta energía queda encerrada en ciclos.</figcaption>
-  </figure>
-
   <div class="tbl-wrap">
     <table>
-      <caption>Mismo perímetro — solo bloques de junio</caption>
-      <thead>
-        <tr><th>Concepto</th><th class="num">Horario</th><th class="num">15 minutos</th><th class="num">Diferencia</th></tr>
-      </thead>
+      <caption>Interruptores vigentes y su origen</caption>
+      <thead><tr><th>Regla</th><th>Valor</th><th>Igual al horario</th><th>Spec</th></tr></thead>
       <tbody>
-        <tr><td>Margen acreditado (CLP)</td><td class="num">109.136.016.442</td><td class="num">112.843.401.035</td><td class="num">+3,4%</td></tr>
-        <tr><td>Generación dentro de ciclos (MWh)</td><td class="num">2.922.786,95</td><td class="num">2.992.087,57</td><td class="num">+2,4%</td></tr>
-        <tr class="total"><td>Margen por MWh (CLP)</td><td class="num">37.340</td><td class="num">37.714</td><td class="num">+1,0%</td></tr>
+        <tr><td>Tarifa del ciclo con varias configuraciones</td><td>la más cara que generó en el ciclo, dentro del combustible instruido por el RIO</td><td>sí (el horario ignora el combustible cuando no hay PP en la hora clave)</td><td>25</td></tr>
+        <tr><td>Truncamiento del margen negativo</td><td>bloque a bloque, sin netear en el ciclo</td><td>sí (<span class="m">xHyC!Y</span> trunca por fila)</td><td>23</td></tr>
+        <tr><td>Resolución del margen</td><td>15 minutos; con <span class="m">'hora'</span> reproduce la horaria</td><td>configurable</td><td>30</td></tr>
+        <tr><td>Instrucción RIO que justifica la partida o detención</td><td>dada dentro de ±30 min del inicio o término</td><td>más estricto (el horario acepta la hora-reloj)</td><td>27</td></tr>
+        <tr><td>Primer ciclo sin ciclo anterior en los datos</td><td>fría si la cota inferior de horas supera el umbral</td><td>similar (el horario asume detenida desde el día 1)</td><td>28</td></tr>
+        <tr><td>Interrupción de la generación</td><td>toda interrupción es una detención y lo que sigue una partida</td><td>no aplica: el horario no ve paradas menores a una hora</td><td>—</td></tr>
+        <tr><td>OT como motivo válido</td><td>solo si el comentario del RIO menciona SSCC/CTF/CSF/CPF</td><td>misma fuente, misma intención (ver defecto 2)</td><td>—</td></tr>
+        <tr><td>Ciclos que cruzan el mes</td><td>se liquidan completos el mes en que terminan</td><td>no: el horario los hereda al <span class="m">&amp;1</span> del mes siguiente</td><td>17</td></tr>
       </tbody>
     </table>
-  </div>
-
-  <h3>La prueba definitiva: cuatro centrales que calzan peso a peso</h3>
-  <div class="col">
-    <p>El experimento permite ir más allá del agregado. Con el mismo reporte horario, comparamos bloque a bloque qué energía queda dentro de cada ciclo de ENEL:</p>
-  </div>
-
-  <div class="tbl-wrap">
-    <table>
-      <caption>ENEL — bloques y margen dentro de ciclos, mismo dato horario</caption>
-      <thead>
-        <tr><th>Central</th><th class="num">Bloques Excel</th><th class="num">Bloques motor</th><th class="num">MWh Excel</th><th class="num">MWh motor</th><th class="num">CLP/MWh Excel</th><th class="num">CLP/MWh motor</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>QUINTERO-1</td><td class="num">438</td><td class="num">438</td><td class="num">32.961</td><td class="num">32.961</td><td class="num">26.208</td><td class="num">26.208</td></tr>
-        <tr><td>QUINTERO-2</td><td class="num">456</td><td class="num">456</td><td class="num">34.711</td><td class="num">34.711</td><td class="num">25.657</td><td class="num">25.657</td></tr>
-        <tr><td>SANISIDRO-1</td><td class="num">714</td><td class="num">714</td><td class="num">221.105</td><td class="num">221.105</td><td class="num">41.121</td><td class="num">41.121</td></tr>
-        <tr><td>SANISIDRO-2</td><td class="num">718</td><td class="num">718</td><td class="num">237.232</td><td class="num">237.232</td><td class="num">42.667</td><td class="num">42.667</td></tr>
-        <tr><td>ATACAMA-1TG1AB</td><td class="num">472</td><td class="num neg">1.045</td><td class="num">28.691</td><td class="num neg">75.255</td><td class="num">20.407</td><td class="num">22.331</td></tr>
-        <tr><td>ATACAMA-2TG2AB</td><td class="num">322</td><td class="num neg">583</td><td class="num">17.914</td><td class="num neg">39.643</td><td class="num">25.839</td><td class="num">30.935</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="col">
-    <p><strong>En las cuatro primeras el resultado es idéntico hasta el último peso.</strong> Mismos bloques, misma generación, mismo margen por MWh. No hay margen de discusión: donde la central opera bajo una sola configuración, los dos modelos hacen exactamente lo mismo.</p>
-    <p>Las dos que difieren son precisamente las multi-configuración, y ahí <strong>el Excel deja energía fuera del ciclo</strong>: en ATACAMA-1 incluye 28.691 MWh de los 75.255 que la central generó mientras su ciclo estaba vivo. Su hoja <span class="m">Sobrecosto_PD xHyC</span> está indexada por configuración y no asigna clave de ciclo a todas, así que parte de la generación nunca entra al margen. El precio por MWh, en cambio, sigue siendo casi el mismo (20.407 contra 22.331).</p>
-    <p>Además, el truncamiento del margen negativo es <strong>idéntico</strong> en los dos modelos. La fórmula del horario trunca fila por fila antes de sumar el ciclo:</p>
-  </div>
-
-  <pre><code>Sobrecosto_PD xHyC!Y  = IF(X2-W2&lt;0, 0, X2-W2)        W=CV, X=CMg  → por fila hora-central
-Sobrecosto_PD xHyC!AB = Z2*Y2*AA2                      Margen = USD × diferencia × Gen
-Sobrecosto_Ciclo!E    = SUMIF(...AC:AC, A2, ...AB:AB)  suma los márgenes YA truncados
-Sobrecosto_Ciclo!H    = IF(C2+D2+F2&gt;E2+G2, C2+D2+F2-E2-G2, 0)   segundo clamp</code></pre>
-
-  <div class="col">
-    <p>Nuestro motor hace exactamente lo mismo, y las proporciones lo confirman: el horario trunca 8.276 de 19.510 filas (42,4%); nosotros 309.326 de 787.820 bloques (39,3%). Mismo fenómeno, distinta resolución.</p>
-    <p class="pull">Si alguien cuestiona el margen, la respuesta está cerrada: <strong>coincidimos en 1,0% por MWh y aplicamos la misma regla de truncamiento.</strong></p>
   </div>
 </section>
 
 <section>
   <div class="sec-head">
-    <span class="sec-num">CAUSA 2</span>
-    <h2 class="sec-title">La configuración cobrada — aquí está la plata</h2>
-    <span class="chip chip-neutral">94,2% respaldado</span>
+    <span class="sec-num">AGOSTO</span>
+    <h2 class="sec-title">La comparación ciclo a ciclo</h2>
+    <span class="chip chip-ok">+0,1% sobre los mismos ciclos</span>
   </div>
-
   <div class="col">
-    <p>El driver real es el costo, no el margen. El horario reconoce 2.299,4 millones de costo P-D en los ciclos que liquida; nosotros 1.694,8. La diferencia son <strong>604,6 millones</strong>, y se concentra en centrales que pueden operar como turbina sola o como ciclo combinado.</p>
-    <p>El motivo es deliberado y está documentado: la <strong>spec 15</strong> corrigió que el cruce mezclara sub-configuraciones hermanas en una sola bolsa. El documento del CEN «Reglas para Establecer los Registros de Instrucciones Operacionales» define que las instrucciones se registran <strong>por configuración</strong> — cada una con su propio historial. Mezclarlas es apartarse de cómo el RIO registra la información.</p>
-    <p>La consecuencia económica es grande porque el spread entre configuraciones lo es:</p>
+    <p>La comparación honesta exige dos cosas: el mismo conjunto de ciclos y ningún arrastre del mes anterior. El Excel suma al primer ciclo de agosto de cada central la partida y el margen del ciclo que julio dejó inconcluso; el motor liquida esos ciclos completos, con su propio margen, el mes en que cierran. Por eso se compara en dos alcances.</p>
   </div>
-
   <div class="tbl-wrap">
     <table>
-      <caption>Tarifa de partida fría — configuraciones de KELAR, 1 de junio</caption>
-      <thead>
-        <tr><th>Configuración</th><th class="num">Partida fría (USD)</th><th>Qué es</th></tr>
-      </thead>
+      <caption>Agosto 2026 — Excel corregido (v2) vs motor con julio empalmado</caption>
+      <thead><tr><th>Alcance</th><th class="num">Excel</th><th class="num">Motor</th><th class="num">Δ</th><th>Lectura</th></tr></thead>
       <tbody>
-        <tr><td><span class="m">KELAR-TG1_TG1_GN_B</span></td><td class="num">1.663</td><td>Turbina a gas sola</td></tr>
-        <tr><td><span class="m">KELAR-TG1_TG1+0.5TV_GN_B</span></td><td class="num">42.210</td><td>Turbina + medio vapor</td></tr>
-        <tr><td><span class="m">KELAR-TG12_TG1+TG2+TV1_GN_B</span></td><td class="num">94.034</td><td>Ciclo combinado completo</td></tr>
+        <tr><td>Mes completo, sin traspasados</td><td class="num">966.791.746</td><td class="num">941.327.164</td><td class="num neg">−25.464.582 (−2,6%)</td><td>incluye frontera y herencia</td></tr>
+        <tr class="total"><td>Solo ciclos que inician y terminan en agosto, sin herencia</td><td class="num">914.259.268</td><td class="num">914.820.834</td><td class="num pos">+561.566 (+0,1%)</td><td>352 pares · 207 idénticos</td></tr>
       </tbody>
     </table>
   </div>
-
-  <div class="col">
-    <p>Un factor de <strong>57×</strong> entre la más barata y la más cara. Elegir mal la configuración pesa mucho más que cualquier discusión sobre el margen.</p>
-
-    <h3>La prueba: qué dice el RIO en el instante de la partida</h3>
-    <p>Para cada uno de los 1.035 ciclos revisamos si el RIO contiene, en una ventana de −60 a +15 minutos alrededor del inicio, una instrucción de partida (<span class="m">CONSIGNAS = 'PP'</span>) de una configuración <em>distinta y más cara</em> que la que cobramos.</p>
-  </div>
-
   <div class="tbl-wrap">
     <table>
-      <caption>Respaldo documental de la configuración cobrada</caption>
-      <thead>
-        <tr><th>Situación</th><th class="num">Ciclos</th><th class="num">SC_PD (CLP)</th><th class="num">Participación</th></tr>
-      </thead>
+      <caption>Por empresa — solo ciclos del mes</caption>
+      <thead><tr><th>Empresa</th><th class="num">Excel</th><th class="num">Motor</th><th class="num">Δ</th><th class="num">Δ %</th><th>Causa dominante</th></tr></thead>
       <tbody>
-        <tr><td>Sin instrucción rival más cara — <strong>respaldado</strong></td><td class="num">1.011</td><td class="num">775.286.241</td><td class="num pos">94,2%</td></tr>
-        <tr><td>Con un «PP» de otra configuración más cara — <strong>contestable</strong></td><td class="num">24</td><td class="num">47.882.649</td><td class="num neg">5,8%</td></tr>
-        <tr class="total"><td>Total liquidado</td><td class="num">1.035</td><td class="num">823.168.889</td><td class="num">100%</td></tr>
+        <tr><td>ENEL_GENERACION</td><td class="num">486.396.459</td><td class="num">488.764.728</td><td class="num">+2.368.268</td><td class="num">0%</td><td>+45 instrucción mal asociada, −39 margen por bloque, −12 configuración</td></tr>
+        <tr><td>COLBUN</td><td class="num">177.903.088</td><td class="num">175.470.261</td><td class="num">−2.432.827</td><td class="num">−1%</td><td>margen por bloque −8,3, configuración +5,1</td></tr>
+        <tr><td>TAMAKAYA_ENERGIA</td><td class="num">87.235.575</td><td class="num">79.532.813</td><td class="num neg">−7.702.762</td><td class="num">−9%</td><td>KELAR &amp;1: OT sin SSCC (defecto 2 del Excel)</td></tr>
+        <tr><td>ENGIE</td><td class="num">52.785.791</td><td class="num">49.552.726</td><td class="num">−3.233.065</td><td class="num">−6%</td><td>TOCOPILLA &amp;2: OT sin SSCC</td></tr>
+        <tr><td>GMETROPOLITANA</td><td class="num">26.273.313</td><td class="num">36.799.829</td><td class="num neg">+10.526.516</td><td class="num">+40%</td><td>parada de 45 min +19,9; margen −4,9; configuración −4,5</td></tr>
+        <tr><td>SGA</td><td class="num">17.148.090</td><td class="num">22.118.186</td><td class="num neg">+4.970.096</td><td class="num">+29%</td><td>detenciones que la macro del Excel no marca</td></tr>
+        <tr><td>GUACOLDA</td><td class="num">6.713.243</td><td class="num">1.293.821</td><td class="num neg">−5.419.423</td><td class="num">−81%</td><td>HUASCO-3: <span class="m">&amp;1</span> sin instrucción pagado por el Excel</td></tr>
+        <tr><td>BE FORESTALES</td><td class="num">8.320.906</td><td class="num">6.928.482</td><td class="num">−1.392.423</td><td class="num">−17%</td><td>margen por bloque, configuración</td></tr>
+        <tr><td>Otras 16 empresas</td><td class="num">51.482.803</td><td class="num">54.359.988</td><td class="num">+2.877.185</td><td class="num">+6%</td><td>ninguna supera 1 millón</td></tr>
+        <tr class="total"><td>Total</td><td class="num">914.259.268</td><td class="num">914.820.834</td><td class="num">+561.566</td><td class="num">+0,1%</td><td></td></tr>
       </tbody>
     </table>
   </div>
-
-  <h3>Caso KELAR-TG12 — la mayor brecha individual</h3>
   <div class="col">
-    <p>KELAR explica 97.815.745 CLP de diferencia, el 48% del total. El horario cobra 6 ciclos; nosotros 7. Cuatro coinciden peso a peso. Los otros dos son toda la brecha:</p>
-  </div>
-
-  <div class="tbl-wrap">
-    <table>
-      <caption>KELAR-TG12 — costo de partida por ciclo</caption>
-      <thead>
-        <tr><th>Ciclo</th><th class="num">Horario</th><th class="num">15 minutos</th><th>Configuración que aplicamos</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>1 a 4</td><td class="num">≈ 7,4 M c/u</td><td class="num">≈ 7,4 M c/u</td><td>coinciden</td></tr>
-        <tr><td>5 — 21-jun 04:45</td><td class="num neg">60.094.624</td><td class="num">7.472.068</td><td><span class="m">KELAR-TG1_TG1_DIESEL</span></td></tr>
-        <tr><td>6 — 22-jun 02:45</td><td class="num neg">61.419.507</td><td class="num">7.472.068</td><td><span class="m">KELAR-TG1_TG1_DIESEL</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="col">
-    <p><strong>Ciclo 5 — nuestra posición es sólida.</strong> Los únicos registros del RIO alrededor del inicio son de la turbina sola. No hay ninguna instrucción de la configuración con vapor:</p>
-  </div>
-
-  <pre><code>2026-06-21 04:54   KELAR-TG1_TG1_DIESEL          RO / PS     0 MW
-2026-06-21 05:21   KELAR-TG1_TG1_DIESEL          DRO / FS    0 MW
-
-Ciclo nuestro: 04:45 → 05:15    ·    El horario cobró TG1+0.5TV como "caliente"</code></pre>
-
-  <div class="col">
-    <p>El horario aplicó una tarifa de ciclo combinado a un ciclo donde el RIO solo registra la turbina sola. Esa tarifa no tiene respaldo documental en ese instante.</p>
-  </div>
-
-  <div class="warnbox">
-    <h3>Ciclo 6 — aquí el horario tiene un argumento</h3>
-    <p>Hay que decirlo antes de que lo diga la contraparte. En el ciclo 6 el RIO muestra las dos configuraciones, y la instrucción de <em>partida</em> es de la combinada:</p>
-    <pre><code>2026-06-22 02:30   KELAR-TG1_TG1+0.5TV_DIESEL    DRO / PP    153 MW   ← instrucción de partida
-2026-06-22 02:44   KELAR-TG1_TG1_DIESEL          RO / PMT     95 MW   ← la que cobramos
-
-Ciclo nuestro: parte 02:45</code></pre>
-    <p>Nuestra regla toma el registro más cercano hacia atrás de la configuración exacta del bloque, y eso nos lleva al de 02:44. Pero a las 02:30 el RIO instruyó arrancar en ciclo combinado a 153 MW. La secuencia física es coherente con eso: la turbina a gas parte primero y el vapor entra después. El ciclo 7 (26-jun) repite el patrón.</p>
-    <p>Son exactamente los <strong>24 ciclos contestables</strong> del cuadro anterior. Conviene tener la respuesta preparada, no descubrirlo en la reunión.</p>
-  </div>
-
-  <div class="tbl-wrap">
-    <table>
-      <caption>Los 24 ciclos contestables, por empresa</caption>
-      <thead>
-        <tr><th>Empresa</th><th class="num">Ciclos</th><th class="num">Costo P-D en juego</th><th class="num">SC_PD efectivo</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>COLBUN</td><td class="num">9</td><td class="num">89.952.543</td><td class="num">0</td></tr>
-        <tr><td>ENGIE</td><td class="num">5</td><td class="num">30.511.671</td><td class="num">9.475.482</td></tr>
-        <tr><td>TAMAKAYA_ENERGIA</td><td class="num">2</td><td class="num">28.759.881</td><td class="num">28.759.881</td></tr>
-        <tr><td>ENEL_GENERACION</td><td class="num">7</td><td class="num">12.394.530</td><td class="num">9.647.286</td></tr>
-        <tr><td>GM_HOLDINGS</td><td class="num">1</td><td class="num">1.741.441</td><td class="num">0</td></tr>
-        <tr class="total"><td>Total</td><td class="num">24</td><td class="num">163.360.067</td><td class="num">47.882.649</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="col">
-    <p>Nótese que en 10 de los 24 el sobrecosto efectivo es <strong>cero</strong>: el margen del ciclo ya absorbió el costo, así que la discusión de configuración no mueve un peso. La exposición real se concentra en KELAR: 28,8 millones de los 47,9.</p>
+    <p>Los porcentajes altos están en empresas de pocos ciclos y montos chicos: un solo ciclo de 45 minutos que pasa o no un filtro mueve el total de GUACOLDA un 81%. En pesos, el 90% de la desviación está en cinco empresas y cada una tiene mecanismo identificado.</p>
   </div>
 </section>
 
 <section>
   <div class="sec-head">
-    <span class="sec-num">CAUSA 3</span>
-    <h2 class="sec-title">Lo que el horario no puede ver</h2>
-    <span class="chip chip-warn">Real, pero solo 5,2%</span>
+    <span class="sec-num">DIAGNÓSTICO</span>
+    <h2 class="sec-title">Descomposición exacta de la diferencia</h2>
+    <span class="chip chip-neutral">Σ efectos = ΔSC al peso</span>
   </div>
-
-  <div class="warnbox">
-    <h3>Corrección respecto de la versión anterior de este documento</h3>
-    <p>Una versión anterior presentaba esta causa como la explicación principal de la brecha. <strong>Es incorrecto.</strong> El experimento controlado la acota a <strong>12.194.797 CLP netos, el 5,2%</strong> de los 234,8 millones.</p>
-    <p>Los hechos que siguen son ciertos y verificables, pero describen una <em>ventaja de medición</em>, no el origen de la diferencia con el Excel. Llevarlos a una reunión como explicación de la brecha invita a la pregunta obvia — «¿y si corren su motor con nuestro dato horario?» — que ya tiene respuesta: la brecha se mantiene casi entera.</p>
-  </div>
-
   <div class="col">
-    <p>Dicho eso, la limitación de resolución es aritmética y no admite discusión de criterio. Agregar cuatro bloques de 15 minutos en una hora destruye información que no se puede recuperar, y eso importa para la calidad de la medición aunque no explique el monto.</p>
+    <p>Para cada par de ciclos la diferencia se descompuso en efecto partida, efecto detención y efecto margen por sustitución secuencial sobre <span class="m">MAX(0, P + D − M)</span>; los tres suman el ΔSC del ciclo. Cada efecto se asignó a una causa leyendo los internos de ambos modelos: en el Excel las hojas <span class="m">Sobrecosto_PD xHyC</span> y <span class="m">PARTIDAS_DETENCIONES</span>; en el motor las observaciones por ciclo. La herramienta que lo hace es ahora parte del repositorio (<span class="m">scripts/comparar_con_excel_horario.py</span>, spec 29).</p>
   </div>
-
-  <figure>
-    <div class="chartbox">
-      <svg viewBox="0 0 700 210" width="100%" height="210" role="img" aria-label="Minuto de inicio de los 1.035 ciclos: 347 en :00, 229 en :15, 225 en :30, 234 en :45">
-        <text x="0" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)" letter-spacing="1">MINUTO DE INICIO DE LOS 1.035 CICLOS DETECTADOS</text>
-        <line x1="60" y1="170" x2="660" y2="170" stroke="var(--rule-2)" stroke-width="1"></line>
-        <line x1="60" y1="40" x2="60" y2="170" stroke="var(--rule)" stroke-width="1"></line>
-
-        <rect x="100" y="46" width="96" height="124" fill="var(--rule-2)"></rect>
-        <text x="148" y="38" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--ink)">347</text>
-        <text x="148" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:00</text>
-
-        <rect x="248" y="88" width="96" height="82" fill="var(--grid)"></rect>
-        <text x="296" y="80" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">229</text>
-        <text x="296" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:15</text>
-
-        <rect x="396" y="90" width="96" height="80" fill="var(--grid)"></rect>
-        <text x="444" y="82" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">225</text>
-        <text x="444" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:30</text>
-
-        <rect x="544" y="86" width="96" height="84" fill="var(--grid)"></rect>
-        <text x="592" y="78" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="var(--grid)">234</text>
-        <text x="592" y="190" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink-2)">:45</text>
-
-        <text x="0" y="120" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">ciclos</text>
-      </svg>
-    </div>
-    <figcaption>Dos de cada tres ciclos empiezan en un instante que el modelo horario tiene que redondear. Si las partidas ocurrieran realmente en punto, las tres barras de la derecha serían cero.</figcaption>
-  </figure>
-
   <div class="tbl-wrap">
     <table>
-      <caption>Alcance de la limitación de resolución</caption>
-      <thead>
-        <tr><th>Evidencia</th><th class="num">Ciclos</th><th class="num">SC_PD asociado (CLP)</th></tr>
-      </thead>
+      <caption>Causas raíz — ciclos del mes, agosto 2026 (millones de CLP)</caption>
+      <thead><tr><th>Causa</th><th class="num">Efectos</th><th class="num">Neto</th><th class="num">Bruto</th><th>Naturaleza</th></tr></thead>
       <tbody>
-        <tr><td>Con al menos un límite en :15, :30 o :45</td><td class="num">909 de 1.035</td><td class="num">738.632.824</td></tr>
-        <tr><td>De duración menor a 1 hora</td><td class="num">263</td><td class="num">101.844.968</td></tr>
-        <tr><td>De duración menor a 2 horas</td><td class="num">455</td><td class="num">193.892.491</td></tr>
+        <tr><td>R9 Margen truncado por bloque (motor) vs por hora (Excel)</td><td class="num">46</td><td class="num neg">−54,3</td><td class="num">54,3</td><td>resolución — demostrada con la spec 30</td></tr>
+        <tr><td>R3 El Excel no asocia la instrucción RIO al ciclo</td><td class="num">10</td><td class="num pos">+48,7</td><td class="num">48,7</td><td>defecto del Excel</td></tr>
+        <tr><td>R6 Qué configuración fija la tarifa</td><td class="num">47</td><td class="num">+0,9</td><td class="num">47,3</td><td>regla, en los dos sentidos, se anula</td></tr>
+        <tr><td>R5 El motor rechaza por RIO donde el Excel paga</td><td class="num">11</td><td class="num neg">−25,3</td><td class="num">25,3</td><td>−18,0 defecto del Excel (SSCC), −6,5 regla <span class="m">&amp;1</span></td></tr>
+        <tr><td>R1 Paradas que solo existen a 15 minutos</td><td class="num">13</td><td class="num pos">+25,0</td><td class="num">25,0</td><td>resolución — decisión: se cobran</td></tr>
+        <tr><td>R2 La macro no marca la partida o la detención</td><td class="num">6</td><td class="num pos">+3,1</td><td class="num">3,1</td><td>defecto del Excel</td></tr>
+        <tr><td>R4 Anulada por lista Pruebas o combustible en el Excel</td><td class="num">9</td><td class="num pos">+4,0</td><td class="num">4,0</td><td>misma fuente (RIO) con llave horaria</td></tr>
+        <tr><td>R7 Política PO de mitad de mes no aplicada</td><td class="num">107</td><td class="num pos">+0,55</td><td class="num">0,55</td><td>defecto del Excel</td></tr>
+        <tr><td>R1b Ciclo solo en el Excel</td><td class="num">6</td><td class="num">−2,2</td><td class="num">2,2</td><td>resolución</td></tr>
+        <tr class="total"><td>Total</td><td class="num"></td><td class="num">+0,56</td><td class="num">210,5</td><td></td></tr>
       </tbody>
     </table>
   </div>
+  <div class="tbl-wrap">
+    <table>
+      <caption>Balance por quién explica la diferencia</caption>
+      <thead><tr><th>Familia</th><th class="num">Neto (millones)</th></tr></thead>
+      <tbody>
+        <tr><td>Defectos del Excel que dejan de cobrar (R3 + R2 + R7)</td><td class="num pos">+52,4</td></tr>
+        <tr><td>Defecto del Excel que cobra de más (SSCC con <span class="m">ISNUMBER</span>, dentro de R5)</td><td class="num neg">−18,0</td></tr>
+        <tr><td>Resolución de 15 minutos sobre reglas idénticas (R9 + R1 + R1b)</td><td class="num neg">−31,5</td></tr>
+        <tr><td>Reglas propias del motor (<span class="m">&amp;1</span> sin instrucción, Pruebas por RIO, configuración)</td><td class="num">−2,4</td></tr>
+        <tr class="total"><td>Total</td><td class="num">+0,56</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
+<section>
+  <div class="sec-head">
+    <span class="sec-num">EL EXCEL</span>
+    <h2 class="sec-title">Nueve defectos con celda y monto</h2>
+    <span class="chip chip-warn">Para el CEN</span>
+  </div>
   <div class="col">
-    <p>El 89,7% del sobrecosto vive en ciclos cuyos límites el modelo horario no puede representar, y 263 ciclos duran menos de una hora. <strong>Eso no significa que ahí esté la plata en disputa</strong> — el experimento muestra que el efecto neto es de 12,2 millones. Significa que nuestra medición del instante de partida y detención es más precisa, lo que importa para <span class="m">Horas_Detenida_Ciclo</span> y por lo tanto para el tramo tarifario.</p>
+    <p>No son diferencias de criterio: son fórmulas que no hacen lo que el propio Excel declara, o pasos manuales que no dejan rastro. Todos se verificaron leyendo las fórmulas del libro y contrastando el ciclo con el RIO.</p>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <caption>Defectos verificados en Sobrecostos_PD_2608 (y 2606 donde se indica)</caption>
+      <thead><tr><th class="num">#</th><th>Qué hace el Excel</th><th>Dónde</th><th class="num">Efecto agosto</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Busca la instrucción RIO de la partida con la clave hora-reloj de la hora en que arranca la configuración que fija el <span class="m">MAXIFS</span>. La instrucción del CEN se emite minutos antes y cae en la hora anterior: la partida queda sin motivo y no se paga. 52 partidas y 53 detenciones con <span class="m">Instrucción</span> vacía en agosto.</td><td><span class="m">PARTIDAS_DETENCIONES!Instrucción</span> = <span class="m">VLOOKUP(clave hora, 'Instrucciones RIO')</span></td><td class="num">48,7 MM no cobrados (ATACAMA-2 &amp;4 y &amp;13, SANISIDRO-1 &amp;11, NUEVARENCA &amp;4)</td><td><span class="chip chip-warn">Vigente</span></td></tr>
+        <tr><td class="num">2</td><td>La regla dice: OT paga si la central presta SSCC. <span class="m">Presta SSCC</span> se calcula con <span class="m">ISNUMBER</span> sobre un <span class="m">SUMIF</span>, que siempre es número. Vale 1 en 400 de 414 partidas: <strong>OT paga siempre</strong>, incluso con SSCC del ciclo = 0.</td><td><span class="m">PARTIDAS_DETENCIONES!Z = IF(ISNUMBER(VLOOKUP(N, Sobrecosto_Ciclo!A:S, 19, 0)), 1, 0)</span></td><td class="num">30,0 MM pagados por OT sin SSCC (KELAR &amp;1, SANISIDRO-1 &amp;5, TOCOPILLA-U16 &amp;2, MEJILLONES &amp;4)</td><td><span class="chip chip-warn">Vigente</span></td></tr>
+        <tr><td class="num">3</td><td>La macro no pone <span class="m">Detencion = SI</span> cuando la última hora del ciclo tiene poca generación; tampoco la partida en algunos casos. En CORONEL marca 12 detenciones de 21 ciclos reales; el RIO trae OM en todos los cierres.</td><td><span class="m">Sobrecosto_PD xHyC!Detencion</span> (VBA <span class="m">C_Detecta_partidas_detenciones</span>)</td><td class="num">≈ 11 MM no cobrados a SGA</td><td><span class="chip chip-warn">Vigente</span></td></tr>
+        <tr><td class="num">4</td><td>Aplica la política PO del día 1 a todo el mes. La PO 260805 sube la tarifa de PENON, TENO y TRAPEN de 16,11 a 22,02 USD y el Excel mantiene 16,11 en 107 partidas y detenciones.</td><td><span class="m">Sobrecosto_PD xHyC!Politica vigente</span> = 260801-1</td><td class="num">0,55 MM</td><td><span class="chip chip-warn">Vigente</span></td></tr>
+        <tr><td class="num">5</td><td>Suma al primer ciclo de agosto (<span class="m">&amp;1</span>) la partida y <strong>todo el margen</strong> del ciclo inconcluso de julio, aunque sea otro ciclo físico: 22 ciclos, 33.795 MM de margen heredado, 21 liquidan 0. GUACOLDA-1 recibió 905,8 MM de margen de julio sobre una prueba de 9 horas del 23 de agosto.</td><td><span class="m">Sobrecosto_Ciclo!F, G</span> desde <span class="m">Ciclos inconclusos</span></td><td class="num">≈ 69 MM anulados en la versión original</td><td><span class="chip chip-ok">Corregido en v2</span></td></tr>
+        <tr><td class="num">6</td><td>Paga el primer ciclo del mes aunque no exista instrucción RIO. HUASCO-3: una hora, 7 MWh, ninguna instrucción, partida fría de 5,55 MM.</td><td><span class="m">IF(AND(RIGHT(N,2)="&amp;1", P=""), 1, 0)</span></td><td class="num">6,5 MM</td><td><span class="chip chip-warn">Vigente</span></td></tr>
+        <tr><td class="num">7</td><td>La hoja <span class="m">xHyC</span> no contiene todas las configuraciones de la relacionada: la energía de las que faltan nunca entra al margen. Junio: ATACAMA-1 con 28.691 de 75.255 MWh (62% fuera). Agosto: MEJILLONES sin <span class="m">_GNL_P</span> (12 ciclos donde hubo 6, 61,6 MM de partidas fantasma) y CMPCCORDILLERA sin <span class="m">GN_B</span> (51,7 MM de margen).</td><td>Filas ausentes en <span class="m">Sobrecosto_PD xHyC</span></td><td class="num">61,6 MM + 51,7 MM de margen en la versión original</td><td><span class="chip chip-ok">Corregido en v1 para dos centrales; ATACAMA sin revisar</span></td></tr>
+        <tr><td class="num">8</td><td>Paga en agosto 50,4 MM de partida heredada de TOCOPILLA-U16 cuyo arranque (29-jul 14:30) el RIO registra como <span class="m">EP</span> "sincronizada en pruebas según IF 2026004027", tras una salida por falla (<span class="m">FS/OT/DF</span>). Pasa el filtro por el defecto 2. La partida instruida real de ese día (PMT/OM 03:53) ya se liquidó en julio.</td><td><span class="m">Sobrecosto_Ciclo!F</span> · TOCOPILLA-U16&amp;1</td><td class="num">50,3 MM</td><td><span class="chip chip-warn">Vigente en v2</span></td></tr>
+        <tr><td class="num">9</td><td>Excluye las centrales COGEN antes de cargar los datos, sin fórmula ni registro. Aplicando sus propias reglas al dato, aparecen 168,2 MM.</td><td>Carga manual</td><td class="num">—</td><td><span class="chip chip-neutral">Sin rastro</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col">
+    <p class="pull">Los defectos 1 y 2 van en sentidos opuestos y casi se cancelan en agosto (−48,7 y +30,0). Que el total cierre no significa que los ciclos estén bien liquidados: significa que dos errores se compensan.</p>
+  </div>
+</section>
 
-    <h3>Horas que el horario da por encendidas</h3>
-    <p>Hay 4.193 pares central-hora (2,31% del mes, 175 centrales) donde la suma horaria es positiva pero al menos un cuarto está en cero. Para el horario esa central estuvo operando toda la hora. Un ejemplo real:</p>
+<section>
+  <div class="sec-head">
+    <span class="sec-num">RESOLUCIÓN</span>
+    <h2 class="sec-title">Lo que sí es de los 15 minutos, demostrado con el mismo motor</h2>
+    <span class="chip chip-neutral">−29 millones netos en agosto</span>
+  </div>
+  <h3>El margen: convexidad, no criterio</h3>
+  <div class="col">
+    <p>La fórmula es la misma en los dos modelos: <span class="m">MAX(0, CMg − CV) × USD × Gen</span>, truncada antes de sumar el ciclo. El Excel la evalúa por hora con CMg y CV horarios; el motor cada 15 minutos. Como <span class="m">MAX(0,·)</span> es convexa, cuando CMg o CV varían dentro de la hora la suma de cuartos truncados es siempre mayor o igual que la hora truncada. En SANISIDRO-2 el CMg varía dentro de la hora en 293 de 573 horas con generación.</p>
+    <p>La spec 30 agregó al motor el interruptor <span class="m">RESOLUCION_MARGEN = 'hora'</span>: agrega CMg, CV y generación por hora-reloj antes de truncar. Mismo motor, misma regla, distinta resolución:</p>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <caption>Agosto 2026 — margen acreditado según resolución</caption>
+      <thead><tr><th>Central</th><th class="num">Por bloque (15 min)</th><th class="num">Por hora (spec 30)</th><th class="num">Excel</th></tr></thead>
+      <tbody>
+        <tr><td>SANISIDRO-2</td><td class="num">644.150.438</td><td class="num">587.876.094</td><td class="num">565.189.639</td></tr>
+        <tr><td>SANISIDRO-1</td><td class="num">656.234.754</td><td class="num">614.800.114</td><td class="num">600.114.832</td></tr>
+        <tr><td>NEHUENCO-2</td><td class="num">54.487.595</td><td class="num">41.069.441</td><td class="num">41.894.052</td></tr>
+        <tr class="total"><td>Causa R9 en ciclos del mes (neto / bruto)</td><td class="num">−54,3 / 54,3 MM</td><td class="num">−1,1 / 2,9 MM</td><td class="num"></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col">
+    <p>Con la resolución igualada la causa R9 desaparece: de 54,3 millones brutos a 2,9. <strong>No hay diferencia de criterio de margen entre los dos modelos; hay diferencia de dato.</strong> El motor mide con el dato que hoy publica el CEN a 15 minutos, y ese dato dice que las centrales se autocubren más de lo que el promedio horario deja ver. Es un efecto a favor de las empresas, no del sistema.</p>
   </div>
 
-  <pre><code>CORONEL_GN_A   ·   26 de junio, hora 21
-
-  Lo que ve el horario :  1 hora con 24,22 MWh — encendida
-  Lo que ve el 15min   :  21:00 = 0,00  |  21:15 = 4,27  |  21:30 = 9,97  |  21:45 = 9,97
-                          └── detenida ──┘</code></pre>
-
+  <h3>Las paradas que el horario no ve</h3>
   <div class="col">
-    <p>De 1.690 de esas horas la central estuvo detenida <strong>tres de los cuatro cuartos</strong>. No es ruido de medición: es operación real que la resolución horaria promedia hasta hacerla desaparecer.</p>
-    <p>Esto también explica por qué detectamos más ciclos en las mismas centrales — ATACAMA-1 35 contra 27, CORONEL 35 contra 29 — sin que eso signifique cobrar más: nuestro costo total es menor, porque cada ciclo se tarifica con su configuración exacta.</p>
+    <p>Trece ciclos del motor no existen en el Excel porque la interrupción cabe dentro de una hora con generación: NUEVARENCA el 13 de agosto de 10:00 a 11:00 (tres cuartos en cero, partida caliente de 18,6 MM más detención), ANTILHUE 75 minutos, CORONEL 6,75 horas que el Excel mantiene como un solo ciclo. Son 25,0 millones. La decisión fue cobrarlas: son detenciones y partidas reales, y la definición de ciclo vigente no tolera ninguna interrupción.</p>
   </div>
+  <pre><code>NUEVARENCA_TG1+TV1   ·   13 de agosto
+
+  Lo que ve el horario :  hora 11 con generación — encendida toda la hora
+  Lo que ve el 15 min  :  10:00 = 0  |  10:15 = 0  |  10:30 = 0  |  10:45 = 0  |  11:00 = 36 MW
+                          └────────── detenida 45 min ──────────┘  partida caliente</code></pre>
 </section>
 
 <section>
@@ -730,34 +577,31 @@ Ciclo nuestro: parte 02:45</code></pre>
     <span class="sec-num">CIERRE</span>
     <h2 class="sec-title">Cómo queda la defensa</h2>
   </div>
-
   <div class="tbl-wrap">
     <table>
       <caption>Resumen por causa</caption>
-      <thead>
-        <tr><th>Causa</th><th>Efecto en la brecha</th><th>Posición</th></tr>
-      </thead>
+      <thead><tr><th>Causa</th><th>Efecto</th><th>Posición</th></tr></thead>
       <tbody>
-        <tr><td>Criterio de margen</td><td>Ninguno — 4 centrales calzan peso a peso</td><td><span class="chip chip-ok">Cerrado</span></td></tr>
-        <tr><td>Configuración cobrada</td><td>Driver principal — 94,8% de la brecha</td><td><span class="chip chip-neutral">94,2% respaldado</span></td></tr>
-        <tr><td>Energía dentro del ciclo</td><td>El Excel deja fuera 62% en ATACAMA-1</td><td><span class="chip chip-ok">Evidencia por bloque</span></td></tr>
-        <tr><td>Resolución temporal</td><td>Solo 12,2 M netos (5,2%)</td><td><span class="chip chip-warn">Menor de lo pensado</span></td></tr>
+        <tr><td>Configuración que fija la tarifa</td><td>Era el 94,8% de la brecha de junio; adoptada la regla del horario</td><td><span class="chip chip-ok">Cerrado (spec 25)</span></td></tr>
+        <tr><td>Criterio de margen</td><td>Idéntico; la diferencia es resolución y se reproduce con un interruptor</td><td><span class="chip chip-ok">Cerrado (spec 30)</span></td></tr>
+        <tr><td>Instrucción RIO mal asociada, SSCC con <span class="m">ISNUMBER</span>, detenciones no marcadas, PO vieja</td><td>Defectos del Excel con celda: 52 MM que deja de cobrar y 18 que cobra de más, en ciclos del mes</td><td><span class="chip chip-warn">Reportar al CEN</span></td></tr>
+        <tr><td>Herencia de ciclos inconclusos y configuraciones fuera de <span class="m">xHyC</span></td><td>Corregidos por el área tras el diagnóstico</td><td><span class="chip chip-ok">Resuelto</span></td></tr>
+        <tr><td>Paradas menores a una hora</td><td>+25,0 MM; el horario no puede verlas</td><td><span class="chip chip-ok">Decidido: se cobran</span></td></tr>
+        <tr><td>TOCOPILLA-U16 &amp;1 (50,4 MM)</td><td>Partida en pruebas tras falla que el Excel paga por el defecto 2</td><td><span class="chip chip-warn">Confirmar con el área</span></td></tr>
       </tbody>
     </table>
   </div>
-
   <div class="col">
-    <p>El argumento ya no es «vemos cosas que ustedes no ven». Es más fuerte que eso:</p>
-    <p class="pull"><strong>Sobre su propio dato horario coincidimos exactamente donde la central tiene una sola configuración, y diferimos solo donde ustedes dejan energía fuera del ciclo o mezclan configuraciones hermanas.</strong></p>
-    <p>Los 24 ciclos contestables hay que resolverlos antes, no durante. La pregunta abierta —y es una decisión de negocio, no de código— es si una instrucción de partida <span class="m">PP</span> de la configuración combinada debe fijar la tarifa del ciclo aunque la turbina arranque sola primero.</p>
-    <p>La resolución de 15 minutos sigue siendo la forma correcta de medir la operación, y el regulador ya se movió en esa dirección. Pero es un argumento de calidad de medición, no de monto.</p>
+    <p>El argumento ya no es «vemos cosas que ustedes no ven», ni «aplicamos reglas distintas». Es este:</p>
+    <p class="pull"><strong>Con las mismas reglas y los mismos ciclos, los dos modelos coinciden en 0,1%. Lo que difiere son fórmulas del Excel que no hacen lo que declaran —con celda y monto— y un dato de mejor resolución, cuyo efecto se reproduce con el propio motor.</strong></p>
+    <p>Cada regla del motor es un interruptor documentado: quien quiera ver el número del horario lo obtiene cambiando un valor, y quien quiera discutir una regla tiene la spec, la prueba y la cifra de impacto.</p>
   </div>
 </section>
 
 <div class="footer">
-  <p><strong>Reproducibilidad.</strong> Las corridas del experimento usan <span class="m">Reporte_PD_2606.csv</span> (horario, adaptado solo en el formato de fecha) y <span class="m">Reporte_PD_15min_2606.csv</span>, ambas sin empalme del mes anterior, con el mismo RIO, los mismos costos consolidados y los mismos interruptores. El contraste se extrajo de las hojas <span class="m">Sobrecosto_Ciclo</span> y <span class="m">Sobrecosto_PD xHyC</span> del libro del modelo, y la agregación por empresa fue validada peso a peso contra su propia hoja <span class="m">RESUMEN</span>.</p>
-  <p><strong>Límites declarados.</strong> El «efecto regla» incluye el tratamiento de ciclos de frontera: nuestras corridas van sin mayo, mientras el Excel usa su hoja <span class="m">Ciclos inconclusos</span> y difiere 28 ciclos. Es una diferencia de regla legítima, pero no tarifaria, y convendría aislarla. Aparte, el propio libro presenta una inconsistencia interna que no se persiguió: su <span class="m">Sobrecosto_Ciclo</span> reporta 29.903 millones de margen para ENEL mientras la suma de <span class="m">Sobrecosto_PD xHyC</span> da 22.017 millones; la tabla por bloques de este documento compara xHyC contra nuestro detalle, que es la comparación homogénea.</p>
-  <p>Respaldos: <span class="m">Descomposicion_Regla_vs_Resolucion.xlsx</span>, <span class="m">ENEL_Regla_Excel_vs_Motor.xlsx</span>, <span class="m">Exposicion_Config_Partida.xlsx</span> y <span class="m">Puente_por_Central.xlsx</span>.</p>
+  <p><strong>Reproducibilidad.</strong> Motor v7 en <span class="m">main</span> con specs 25 a 30 (tarifa máxima, vigencia 30 min, cota inferior, comparador, resolución del margen). Agosto: <span class="m">Reporte_PD_15min_2608_v2.csv</span> con <span class="m">Reporte_PD_15min_2607_v2.csv</span> empalmado, RIO y costos de ambos meses. Contraste: <span class="m">Sobrecostos_PD_2608 pre fixed.xlsm</span> (versión 2, sin margen heredado). La comparación ciclo a ciclo se genera con <span class="m">Carpeta_de_Trabajo/correr_comparacion.py</span> y reproduce al peso las tablas de este documento. Detalle completo, con fórmulas y casos, en <span class="m">docs/informes/Brechas_2608_por_empresa.md</span> y <span class="m">docs/informes/Reglas_Modelo_Horario.md</span>.</p>
+  <p><strong>Límites declarados.</strong> Junio se comparó contra el Excel original, que aún arrastra herencia y configuraciones ausentes; con el motor actual el total de junio es 1.065.936.984 contra 1.028.628.659 (+3,6%), sin cruce ciclo a ciclo actualizado. El valor de 30 minutos de vigencia rechaza una partida programada con PP 90 minutos antes (NUEVARENCA &amp;5, 24,4 MM) que el Excel tampoco paga; la spec 27 deja la sensibilidad para 60 y 120. La cota inferior de horas (spec 28) puede elegir una configuración simple cuando la combinada no alcanza su umbral; con el mes anterior empalmado actúa solo en unidades que no generaron en ese mes.</p>
+  <p><strong>Cifras de referencia.</strong> Agosto con julio: motor 941.327.164; Excel v2 sin traspasados 966.791.746; ciclos del mes 914.820.834 vs 914.259.268. Julio con junio: 1.343.830.997. Junio con mayo: 1.065.936.984.</p>
 </div>
 
 </div>
