@@ -98,6 +98,8 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 
 **Trabajo siguiente, en orden sugerido**
 
+0. **Spec 32** (entrega con el formato del Excel horario): Codex implementa, Claude
+   verifica con agosto. Reemplaza el libro de la spec 31.
 1. ~~Spec + tests para el motor Reglas del Horario~~ — hecho (spec 26, Codex).
 2. ~~Conseguir julio 2026~~ — hecho; agosto corre con empalme (971,3 MM, +1,4% vs
    Excel). Queda revisar `CMg` nulo en el reporte `2608_v2` si se vuelve a usar.
@@ -124,6 +126,32 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-16 — Claude — Spec 32: el entregable al Coordinador debe tener el formato del Excel horario
+
+- **Tipo:** especificación + decisión.
+- **Origen:** revisión del paquete `Entrega_SCPD_2608` generado por la spec 31. Decisión
+  del dueño del proyecto: *"el entregable debe tener un formato lo más parecido al Excel
+  horario que ya existe"*. Las tablas `Ciclos`/`Bloques`/`Candidatas` con nombres del
+  motor no sirven a quien audita con el libro horario en la cabeza.
+- **Cambios:** `docs/specs/32-entrega-formato-excel-horario.md`. El libro se reconstruye
+  con las hojas, encabezados y letras de columna del `Sobrecostos_PD_AAMM.xlsm`
+  (`Menu`, `Costos_de_P-D`, `Pruebas`, `Instrucciones RIO`, `Central_Empresa`,
+  `Sobrecosto_PD xHyC`, `PARTIDAS_DETENCIONES`, `Sobrecosto_Ciclo`, `RESUMEN`, `Ciclos
+  inconclusos`) a resolución de 15 minutos, con la misma cadena de fórmulas
+  `xHyC → PARTIDAS_DETENCIONES → Sobrecosto_Ciclo → RESUMEN` (`SUMIF`/`MAXIFS` por letra,
+  rangos acotados). Las columnas del motor van a la derecha de la última del Excel.
+  Cuatro diferencias de regla quedan visibles en la fórmula y declaradas en `Leeme`:
+  tarifa al dólar del extremo (`USD apertura ciclo`), filtros EP/operacional en la
+  instrucción del extremo (multiplican en `PARTIDAS_DETENCIONES!S/T`), vigencia ±30 y
+  `Presta SSCC` desde el comentario. El motor solo gana tres hojas de export
+  (`RIO_Usado`, `Costos_PD_Usados`, `Central_Empresa`). Los CSV pasan a ser el volcado
+  de esas mismas hojas. La estructura del Excel horario se levantó del libro v2 de
+  agosto con `openpyxl` (encabezados y fórmulas de la fila 2 de cada hoja).
+- **Validación:** ninguna todavía. Codex implementa con pruebas sintéticas (§9); Claude
+  verifica con agosto (§10): checks en cero en 390 ciclos, `RESUMEN!G1` = 939.959.962.
+- **Pendientes:** implementación (Codex); refrescar la Defensa v2 con el erratum de la
+  spec 25 (941,3 → 940,0 MM); cerrar PR #53 (duplicado de #52/#54).
 
 ### 2026-09-16 — Claude — Verificación de la spec 31 (PR #54) con datos reales: cuatro correcciones y un erratum de la spec 25
 
