@@ -91,3 +91,78 @@ def test_familias_de_causa_raiz():
     causas = " ".join(efectos.Causa)
     for codigo in ("R1 ", "R1b", "R2 ", "R3 ", "R4 ", "R5 ", "R6 ", "R7 ", "R9 "):
         assert codigo in causas
+
+
+# --- forma real del libro del CEN (hallada al correr con datos): columnas repetidas, filas vacias,
+# --- herencia del mes anterior y empalme con el mes anterior en la salida del motor ---------------
+
+def _libro_real(tmp_path):
+    """Como el libro real: 'Sobrecosto_Ciclo' trae ademas 'Copia Ciclo' y 'Ciclo', encabezados
+    vacios repetidos y filas en blanco bajo la tabla; un &1 hereda partida y margen de julio."""
+    ruta = tmp_path / "horario_real.xlsx"
+    ciclos = pd.DataFrame([
+        ["A&1", 1, 100, 20, 10, 40, 500, 0, "EMP", "A&1", "EMP", None, None, "A", 0],
+        ["A&2", 1, 100, 20, 10, 0, 0, 110, "EMP", "A&2", "EMP", None, None, "A", 0],
+        [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None],
+        [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None],
+    ], columns=["Ciclo de operación", "Ciclo completo", "Total Costos Partida", "Total Costos Detención",
+                "Total Margen", "Total Costos Partida ciclo inconcluso", "Margen ciclo inconcluso",
+                "Total Sobrecosto_P-D", "Empresa", "Copia Ciclo", "Cuadro de pagos?", None, None, "Ciclo", "SSCC"])
+    x = pd.DataFrame([
+        [260801, 1, "A_CFG", 1, "A&1", "SI", 0, 100, 0, 1, 1, 1, 10, 1, 1],
+        [260805, 3, "A_CFG", 1, "A&2", "SI", 0, 100, 0, 1, 1, 1, 10, 1, 1],
+        [260805, 4, "A_CFG", 1, "A&2", 0, "SI", 0, 20, 1, 1, 1, 0, 1, 1],
+    ], columns=["fecha", "hora", "central", "generacion", "Ciclo de operación", "Partida",
+                "Detencion", "COSTO_PARTIDA [$]", "COSTO_DETENCION [$]", "CMg", "CV", "USD",
+                "Margen", "Disponible (1) / Pruebas (0)", "Conf despachada RIO"])
+    pdx = pd.DataFrame([["A&2", "P", "D", "OM", "", 1, 100, 20]], columns=[
+        "Clave Ciclo ", "Proceso_Partida", "proceso_detencion", "Instrucción", "Operación",
+        "Presta SSCC", "Monto Partidas", "Monto Detenciones"])
+    with pd.ExcelWriter(ruta, engine="openpyxl") as w:
+        ciclos.to_excel(w, sheet_name="Sobrecosto_Ciclo", index=False)
+        x.to_excel(w, sheet_name="Sobrecosto_PD xHyC", index=False)
+        pdx.to_excel(w, sheet_name="PARTIDAS_DETENCIONES", index=False)
+    return ruta
+
+
+def _salida_motor_con_empalme(tmp_path):
+    ruta = tmp_path / "motor.xlsx"
+    motor = pd.DataFrame([
+        # ciclo de julio que cierra en agosto: no debe fijar el mes de comparacion
+        ["A&1", "A", "EMP", "Viene del mes anterior", "2026-07-30 10:00", "2026-08-01 02:00",
+         100, 20, 10, 110, "Aprobado", "Aprobado", "A_CFG", "A_CFG", "Fria", 1, 1],
+        ["A&2", "A", "EMP", "Inicia y termina este mes", "2026-08-05 02:15", "2026-08-05 03:30",
+         100, 20, 10, 110, "Aprobado", "Aprobado", "A_CFG", "A_CFG", "Fria", 1, 1],
+    ], columns=["Etiqueta_Relacionada", "Central_Relacionada", "Empresa", "Estado_Ciclo_Mes", "Inicio_Ciclo",
+                "Termino_Ciclo", "Costo_Partida_Efectivo", "Costo_Detencion_Efectivo", "Margen_Suma_Ciclo",
+                "Total SC_PD", "Obs_Partida", "Obs_Detencion", "Config_Tarifa_Partida", "Config_RIO_Usada_Partida",
+                "Tipo_Partida", "Vigencia_RIO_Partida", "Vigencia_RIO_Detencion"])
+    with pd.ExcelWriter(ruta, engine="openpyxl") as w:
+        motor.to_excel(w, sheet_name="Resumen_Ciclos_PD", index=False)
+    return ruta
+
+
+def test_libro_real_columnas_repetidas_y_filas_vacias(tmp_path):
+    c, x, _ = leer_excel_horario(_libro_real(tmp_path))
+    e = preparar_ciclos_excel(c, x)
+
+    assert list(e.Ciclo) == ["A&1", "A&2"]            # sin filas vacias
+    assert e.columns.is_unique                        # 'Ciclo' ya no choca con la columna auxiliar
+    assert e.set_index("Ciclo").loc["A&1", "Herencia_M"] == 500
+
+
+def test_comparar_usa_el_mes_de_los_ciclos_propios_y_cierra_la_herencia(tmp_path):
+    from comparar_con_excel_horario import comparar
+    hojas = comparar(_salida_motor_con_empalme(tmp_path), _libro_real(tmp_path), tmp_path / "cmp.xlsx")
+    r = hojas["Resumen"].set_index("Alcance")
+
+    # El mes es agosto (los ciclos propios), no julio (minimo de Inicio_Ciclo del empalme).
+    assert r.loc["Solo ciclos del mes", "Ciclos_Excel"] == 1
+    assert r.loc["Solo ciclos del mes", "Ciclos_Motor"] == 1
+    assert r.loc["Solo ciclos del mes", "Delta"] == 0
+    # Mes completo: el SC publicado del &1 es 0 por el margen heredado (100+20+40-10-500 < 0);
+    # la descomposicion debe cerrar contra ese SC, no contra las columnas propias.
+    assert r.loc["Mes completo", "SC_Excel"] == 110
+    pares = hojas["Pares"]; fila = pares[(pares.Alcance == "Mes completo") & (pares.Excel == "A&1")].iloc[0]
+    assert fila.Ex_SC == 0 and fila.Ex_P == 140 and fila.Ex_M == 510
+    assert abs(fila.Efecto_P + fila.Efecto_D + fila.Efecto_M - fila.dSC) < 2

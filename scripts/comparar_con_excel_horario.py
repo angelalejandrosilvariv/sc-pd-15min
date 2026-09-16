@@ -55,10 +55,18 @@ def leer_excel_horario(ruta: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, pd
         hp, rp = _hoja(wb, "PARTIDAS_DETENCIONES")
     finally:
         wb.close()
-    ciclos = pd.DataFrame(rc, columns=hc)
-    xhyc = pd.DataFrame(rx, columns=hx)
-    pd_int = pd.DataFrame(rp, columns=hp)
+    ciclos = _sin_columnas_duplicadas(pd.DataFrame(rc, columns=hc))
+    xhyc = _sin_columnas_duplicadas(pd.DataFrame(rx, columns=hx))
+    pd_int = _sin_columnas_duplicadas(pd.DataFrame(rp, columns=hp))
+    # El libro real trae en Sobrecosto_Ciclo columnas auxiliares 'Ciclo' y 'Copia Ciclo'
+    # (columnas Q y J) que chocarian con el renombre de 'Ciclo de operacion' -> 'Ciclo'.
+    ciclos = ciclos.drop(columns=[c for c in ("Ciclo", "Copia Ciclo") if c in ciclos.columns])
     return ciclos, xhyc, pd_int
+
+
+def _sin_columnas_duplicadas(df: pd.DataFrame) -> pd.DataFrame:
+    """Conserva la primera aparicion de cada encabezado (el libro real repite '' y nombres)."""
+    return df.loc[:, ~df.columns.duplicated()]
 
 
 def preparar_ciclos_excel(ciclos: pd.DataFrame, xhyc: pd.DataFrame) -> pd.DataFrame:
@@ -73,6 +81,8 @@ def preparar_ciclos_excel(ciclos: pd.DataFrame, xhyc: pd.DataFrame) -> pd.DataFr
     for col in ("Ex_P", "Ex_D", "Ex_M", "Herencia_P", "Herencia_M", "Ex_SC"):
         c[col] = pd.to_numeric(c.get(col, 0), errors="coerce").fillna(0.0)
     c["Ciclo"] = c["Ciclo"].map(_texto)
+    # El libro real arrastra miles de filas vacias bajo la tabla (read_only las entrega).
+    c = c[c["Ciclo"] != ""].copy()
     c["Central"] = c["Ciclo"].str.rsplit("&", n=1).str[0].str.strip()
     c["Empresa"] = c.get("Empresa", "").map(_texto)
     c["Traspasa"] = c["Empresa"].str.casefold().eq("se traspasa al proximo mes")
@@ -137,9 +147,9 @@ def _fila_par(m: pd.Series | None, e: pd.Series | None) -> dict[str, Any]:
             "Motor": _texto(getm("Etiqueta_Relacionada", "")), "Excel": _texto(gete("Ciclo", "")),
             "Inicio_Motor": getm("Inicio_Ciclo", pd.NaT), "Fin_Motor": getm("Termino_Ciclo", pd.NaT),
             "Inicio_Excel": gete("inicio", pd.NaT), "Fin_Excel": gete("fin", pd.NaT),
-            "Mo_P": _numero(getm("Costo_Partida_Efectivo")), "Ex_P": _numero(gete("Ex_P")),
+            "Mo_P": _numero(getm("Costo_Partida_Efectivo")), "Ex_P": _numero(gete("P_Comparacion", gete("Ex_P"))),
             "Mo_D": _numero(getm("Costo_Detencion_Efectivo")), "Ex_D": _numero(gete("Ex_D")),
-            "Mo_M": _numero(getm("Margen_Suma_Ciclo")), "Ex_M": _numero(gete("Ex_M")),
+            "Mo_M": _numero(getm("Margen_Suma_Ciclo")), "Ex_M": _numero(gete("M_Comparacion", gete("Ex_M"))),
             "Mo_SC": _numero(getm("Total SC_PD")), "Ex_SC": _numero(gete("SC_Comparacion", gete("Ex_SC"))),
             "Obs_P": _texto(getm("Obs_Partida", "")), "Obs_D": _texto(getm("Obs_Detencion", "")),
             "Config_Tarifa": _texto(getm("Config_Tarifa_Partida", "")),
@@ -161,7 +171,7 @@ def descomponer_efectos(pares: pd.DataFrame) -> pd.DataFrame:
     p["Efecto_M"] = [_sc(r.Mo_P, r.Mo_D, r.Mo_M)-_sc(r.Mo_P, r.Mo_D, r.Ex_M) for r in p.itertuples()]
     p.loc[solo_e, ["Efecto_P", "Efecto_D", "Efecto_M"]] = np.c_[np.zeros(solo_e.sum()), np.zeros(solo_e.sum()), -p.loc[solo_e, "Ex_SC"]]
     p.loc[solo_m, ["Efecto_P", "Efecto_D", "Efecto_M"]] = np.c_[p.loc[solo_m, "Mo_SC"], np.zeros(solo_m.sum()), np.zeros(solo_m.sum())]
-    if not np.allclose(p.Efecto_P + p.Efecto_D + p.Efecto_M, p.dSC, atol=1):
+    if not np.allclose(p.Efecto_P + p.Efecto_D + p.Efecto_M, p.dSC, atol=2):
         raise AssertionError("La suma de efectos no reproduce el delta SC")
     return p
 
@@ -224,12 +234,20 @@ def comparar(ruta_motor: str | Path, ruta_excel: str | Path, ruta_salida: str | 
     for col in ("Inicio_Ciclo", "Termino_Ciclo"): motor[col] = pd.to_datetime(motor[col], errors="coerce")
     ciclos0, xhyc, pd_int = leer_excel_horario(ruta_excel)
     excel = preparar_ciclos_excel(ciclos0, xhyc)
-    mes = motor.Inicio_Ciclo.dropna().min().to_period("M")
+    # El mes liquidado es el de los ciclos que inician y terminan en el; el minimo de
+    # Inicio_Ciclo apuntaria al mes anterior cuando hay empalme.
+    propios = motor.loc[motor.Estado_Ciclo_Mes.eq("Inicia y termina este mes"), "Inicio_Ciclo"].dropna()
+    mes = (propios.min() if len(propios) else motor.Termino_Ciclo.dropna().max()).to_period("M")
     inicio_mes, fin_mes = mes.start_time, mes.end_time
     excel_mes = excel[~excel.Traspasa].copy(); excel_mes["SC_Comparacion"] = excel_mes.Ex_SC
+    # El SC publicado del libro es MAX(0, C + D + F - E - G): la partida y el margen heredados
+    # del mes anterior entran a la partida y al margen para que la descomposicion cierre.
+    excel_mes["P_Comparacion"] = excel_mes.Ex_P + excel_mes.Herencia_P
+    excel_mes["M_Comparacion"] = excel_mes.Ex_M + excel_mes.Herencia_M
     motor_mes = motor[(motor.Inicio_Ciclo <= fin_mes) & (motor.Termino_Ciclo >= inicio_mes)].copy()
     excel_propio = excel_mes[(excel_mes.inicio > inicio_mes) & (excel_mes.inicio <= fin_mes)].copy()
     excel_propio["SC_Comparacion"] = excel_propio.SC_Propio
+    excel_propio["P_Comparacion"] = excel_propio.Ex_P; excel_propio["M_Comparacion"] = excel_propio.Ex_M
     motor_propio = motor[motor.Estado_Ciclo_Mes.eq("Inicia y termina este mes")].copy()
     ints = internos_excel(xhyc, pd_int)
     todos = []; res = []

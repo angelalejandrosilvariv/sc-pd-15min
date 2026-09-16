@@ -88,6 +88,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2608 con empalme 2607 (interfaz, umbral 0,5 MWh) | — | **971.292.712** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **1.063.758.505** | 1.028.628.659 |
 | 2607 con empalme 2606, `main` f820455 | — | **1.343.830.997** | (Excel de julio no comparado) |
+| 2608 con empalme 2607, `RESOLUCION_MARGEN = 'hora'` (spec 30, solo para contraste) | — | 999.211.996 | 966.791.746 |
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
 | 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
@@ -121,6 +122,34 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-16 — Claude — Verificación de las specs 29 y 30 (PR #51 y #52) con datos reales
+
+- **Tipo:** revisión + corrección + prueba.
+- **Spec 30 (`RESOLUCION_MARGEN`)**: correcta sin cambios. Agosto con julio, `'hora'`:
+  SANISIDRO-2 margen 644,2 → 587,9 MM (a mano había estimado 583,5; Excel 565,2),
+  SANISIDRO-1 656,2 → 614,8, NEHUENCO-2 54,5 → 41,1; total 941,3 → 999,2 MM. En
+  ciclos del mes la causa R9 pasa de −54,3 MM (bruto 54,3) a **−1,1 MM (bruto 2,9)**:
+  el margen por bloque vs por hora queda demostrado como resolución pura. Con
+  `'bloque'` reproduce 941.327.164 al peso.
+- **Spec 29 (comparador)**: la lógica es la de los scripts de referencia y con
+  fixtures pasaba, pero con el libro real fallaba tres veces: (1) `Sobrecosto_Ciclo`
+  trae columnas auxiliares `Ciclo` y `Copia Ciclo` y encabezados vacíos repetidos →
+  `AttributeError` al renombrar; (2) `read_only` entrega ~81.000 filas vacías bajo la
+  tabla, que se contaban como ciclos; (3) el mes se tomaba del mínimo de
+  `Inicio_Ciclo`, que con empalme es julio → alcance del mes vacío. Además la
+  descomposición del mes completo no cerraba porque el SC publicado incluye la
+  partida y el margen heredados (F y G) y las componentes no. Corregido en
+  `scripts/comparar_con_excel_horario.py` (deduplicación de columnas, filtro de filas
+  vacías, mes de los ciclos propios, componentes con herencia) y cubierto con dos
+  pruebas sobre un libro con la forma real (116 pruebas).
+- **Validación:** `comparar(Motor_2608_julio, Excel corregido v2)` reproduce la
+  quinta ronda al peso: mes completo 941.327.164 vs 966.791.746 (−25,46 MM); ciclos
+  del mes 914.820.834 vs 914.259.268 (+561.566); causas R3 48,7 / R6 ±47,3 / R5
+  −25,3 / R1 +25,0 / R9 −54,2 / R2, R4, R7 iguales al diagnóstico manual. Tiempo:
+  ~110 s. `Carpeta_de_Trabajo/correr_comparacion.py` queda operativo.
+- **Pendientes:** actualizar `Defensa_Modelo_15min.html` con specs 25–30 y el
+  diagnóstico de agosto; rehacer junio con `main` actual.
 
 ### 2026-09-16 — Codex (OpenAI) — Spec 30: resolución configurable del margen
 
