@@ -150,14 +150,14 @@ El flujo exporta hojas de auditoría y conciliación, incluyendo:
 - `Auditoria_Pasos`
 - `Cobertura_Instruccion_RIO` cuando está habilitada
 
-La spec 31 agrega un paquete autocontenido para el Coordinador. Use **Generar
+La spec 32 agrega un paquete autocontenido para el Coordinador. Use **Generar
 entrega CEN** en la interfaz o `Carpeta_de_Trabajo/correr_entrega.py`; se crean
 CSV reproducibles y un libro de auditoría con fórmulas y checks en
 `Entrega_SCPD_<AAMM>/`. La spec 32 (en implementación) rehace ese libro con las
 hojas, encabezados y cadena de fórmulas del Excel horario del CEN
 (`Sobrecosto_PD xHyC → PARTIDAS_DETENCIONES → Sobrecosto_Ciclo → RESUMEN`) a
-resolución de 15 minutos. Véanse `docs/specs/31-entrega-auditoria-cen.md` y
-`docs/specs/32-entrega-formato-excel-horario.md`.
+resolución de 15 minutos, además de un CSV de valores por hoja. La spec 32 reemplaza
+el libro de la spec 31. Véase `docs/specs/32-entrega-formato-excel-horario.md`.
 
 ## Pruebas
 

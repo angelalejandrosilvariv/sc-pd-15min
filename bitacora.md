@@ -1936,3 +1936,13 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 - **Validación:** suite `pytest -q`, compilación Python y `git diff --check`.
 - **Pendientes:** Claude debe ejecutar y contrastar la herramienta con los libros
   reales; esos datos no se versionan.
+
+### 2026-09-16 — Codex (OpenAI) — Entrega con formato Excel horario (spec 32)
+
+- **Tipo:** implementación, exportación, documentación y pruebas sintéticas.
+- **Cambios:** la entrega de la spec 31 fue reemplazada por las trece hojas del
+  Excel horario, fórmulas por letra y rangos acotados, y CSV de valores. El motor
+  expone sin alterar el cálculo `RIO_Usado`, `Costos_PD_Usados` y
+  `Central_Empresa`. Se agregó la versión Preliminar/Definitivo y se retiró la
+  opción de tablas dinámicas.
+- **Pendiente:** Claude verificará agosto de 2026 con los archivos reales.

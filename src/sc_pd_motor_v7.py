@@ -2601,6 +2601,14 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     print("=" * 78)
 
     print(f"\nExportando a: {RUTA_SALIDA} ...")
+    # Insumos exactos usados por el cálculo.  Estas hojas son deliberadamente de
+    # sólo exportación: permiten reconstruir la entrega CEN sin recalcular nada.
+    rio_usado = rio.copy()
+    rio_usado['Mes'] = np.where(
+        pd.to_datetime(rio_usado['FECHA_HORA_RIO'], errors='coerce') < f_min_actual,
+        'anterior', 'actual')
+    central_empresa_export = pd.DataFrame(
+        list(empresa_por_relacionada.items()), columns=['Central', 'Empresa'])
     with pd.ExcelWriter(RUTA_SALIDA, engine='xlsxwriter') as writer:
         hojas = {'Guia_Lectura': crear_guia_lectura(),
                  'Parametros_Motor': pd.DataFrame(
@@ -2612,6 +2620,9 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                  'Resumen_Ciclos_PD': df_compacto,
                  'Detalle_15Min': detalle_mes,
                  'Detalle_Frontera': detalle_frontera,
+                 'RIO_Usado': rio_usado,
+                 'Costos_PD_Usados': df_externo,
+                 'Central_Empresa': central_empresa_export,
                  'Auditoria_Pasos': pd.DataFrame(_audit_log)}
         if AUDITAR_INSTRUCCION_RIO == 1:
             hojas['Cobertura_Instruccion_RIO'] = cobertura_export
