@@ -1,5 +1,8 @@
 # 31 — Paquete de entrega para auditoría del Coordinador
 
+> **Reemplazada:** el formato de libro y los CSV definidos aquí fueron reemplazados
+> por la spec 32. Se conserva este documento únicamente como registro histórico.
+
 **Toca código:** sí (`scripts/generar_entrega_cen.py`, runner, interfaz y exposición
 de candidatas del motor). **Cambia el monto liquidado:** no.
 

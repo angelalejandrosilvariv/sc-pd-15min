@@ -1,89 +1,47 @@
-"""Prueba integrada pequeña del paquete de auditoría de la spec 31."""
+"""Pruebas sintéticas de la entrega con formato horario (spec 32)."""
 import sys
 from pathlib import Path
-
 import pandas as pd
+from openpyxl import load_workbook
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from generar_entrega_cen import generar_entrega, interruptores_panel
-
-
-def test_genera_siete_archivos_y_diccionario_completo(tmp_path):
-    ciclos = pd.DataFrame({
-        "Etiqueta_Relacionada": [f"C{i}&1" for i in range(3)],
-        "Central_Relacionada": [f"C{i}" for i in range(3)], "Empresa": ["E1", "E1", "E2"],
-        "Ciclo_Mes": ["2608"] * 3, "Inicio_Ciclo": pd.date_range("2026-08-01", periods=3),
-        "Termino_Ciclo": pd.date_range("2026-08-01 00:45", periods=3),
-        "Margen_Suma_Ciclo": [4.] * 3, "Costo_Partida_Base": [10.] * 3,
-        "Costo_Detencion_Base": [2.] * 3, "Total SC_PD": [8.] * 3,
-    })
-    for tipo in ("Partida", "Detencion"):
-        for filtro in ("Conf", "Disp", "Op", "CostoCero"):
-            ciclos[f"Filtro_{filtro}_{tipo}"] = 1
-        ciclos[f"Costo_{tipo}_Efectivo"] = ciclos[f"Costo_{tipo}_Base"]
-    filas = []
-    for i in range(3):
-        for j in range(4):
-            filas.append({"Etiqueta_Relacionada": f"C{i}&1", "Central_Relacionada": f"C{i}",
-                "Ciclo_ID_Relacionada": 1, "Central": f"C{i}_GN", "FECHA_HORA": pd.Timestamp("2026-08-01") + pd.Timedelta(days=i, minutes=15*j),
-                "GENERACION": 1., "CMg": 3., "CV": 2., "Dolar": 1., "Margen": 1.,
-                "Fuente_Config_RIO": pd.Timestamp("2026-08-01") + pd.Timedelta(days=i),
-                "CONSIGNAS": "PP", "MOTIVO": "OM", "ESTADO OPERACIONAL": "PDO",
-                "COMENTARIO": "", "Configuracion RIO": f"C{i}_GN", "Filtro_Operacional": 1,
-                "Vigencia_RIO": 1, "Costo_Partida_ML": 10., "Costo_Detencion_ML": 2.,
-                "Filtro_CostoCero_Partida": 1, "Filtro_CostoCero_Detencion": 1})
-    detalle = pd.DataFrame(filas)
-    reporte = tmp_path / "Reporte_Sobrecostos_PD_Final.xlsx"
-    with pd.ExcelWriter(reporte) as writer:
-        ciclos.to_excel(writer, sheet_name="Resumen_Ciclos_PD", index=False)
-        detalle.to_excel(writer, sheet_name="Detalle_15Min", index=False)
-        pd.DataFrame({"Empresa": ["E1", "E2"], "Total_SC_PD_CLP": [16., 8.]}).to_excel(writer, sheet_name="SC_por_Empresa", index=False)
-        pd.DataFrame({"Columna": ["Margen"], "Que significa": ["Margen de venta"]}).to_excel(writer, sheet_name="Guia_Lectura", index=False)
-    destino = generar_entrega(reporte, tablas_dinamicas=True)
-    assert len(list(destino.iterdir())) == 7
-    params = pd.read_csv(destino / "SCPD_2608_parametros.csv")
-    assert set(interruptores_panel()).issubset(set(params["interruptor"]))
-    dic = pd.read_csv(destino / "SCPD_2608_diccionario.csv")
-    for nombre in ("parametros", "bloques", "ciclos", "candidatas_tarifa", "empresas"):
-        df = pd.read_csv(destino / f"SCPD_2608_{nombre}.csv")
-        assert set(df.columns).issubset(set(dic.loc[dic.archivo == nombre, "columna"]))
+sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
+from generar_entrega_cen import FORMULAS, SHEETS, generar_entrega
 
 
-# --- hallazgos de la verificacion con datos reales (16-09) -----------------------------------
-
-def test_referencias_estructuradas_completas():
-    """xlsxwriter expande [@Col] a [[#This Row],Col] y Excel no abre el libro: hay que
-    escribir Tabla[[#This Row],[Col]]."""
-    from generar_entrega_cen import _referencias_completas
-    assert (_referencias_completas("=[@SC_recalc]-[@[Total SC_PD]]", "Ciclos")
-            == "=Ciclos[[#This Row],[SC_recalc]]-Ciclos[[#This Row],[Total SC_PD]]")
-    assert (_referencias_completas("=SUMIFS(Bloques[Margen_recalc],Bloques[Etiqueta_Relacionada],[@Etiqueta_Relacionada])", "Ciclos")
-            == "=SUMIFS(Bloques[Margen_recalc],Bloques[Etiqueta_Relacionada],Ciclos[[#This Row],[Etiqueta_Relacionada]])")
-
-
-def test_libro_no_contiene_referencias_cortas(tmp_path):
-    import zipfile, re
-    test_genera_siete_archivos_y_diccionario_completo(tmp_path)
-    libro = next(tmp_path.rglob("SCPD_2608_Auditoria.xlsx"))
-    with zipfile.ZipFile(libro) as z:
-        xml = "".join(z.read(n).decode("utf-8", "ignore") for n in z.namelist() if n.startswith("xl/"))
-    assert "[[#This Row]," in xml
-    assert not re.search(r"(?<![A-Za-z\]])\[\[#This Row\],", xml), "referencia sin nombre de tabla"
+def _reporte(tmp_path):
+    ciclos=pd.DataFrame({"Etiqueta_Relacionada":["C&1","D&1","A&1"],"Central_Relacionada":["C","D","A"],"Empresa":["E1","E2","E1"],"Ciclo_Mes":["2608"]*3,"Inicio_Ciclo":pd.to_datetime(["2026-08-01","2026-08-02","2026-07-31 23:45"],format="mixed"),"Termino_Ciclo":pd.to_datetime(["2026-08-01 00:15",None,"2026-08-01"],format="mixed"),"Estado_Ciclo_Mes":["Inicia y termina este mes","Continua proximo mes","Viene del mes anterior"],"Costo_Partida_Efectivo":[20.,10.,5.],"Costo_Detencion_Efectivo":[2.,0.,1.],"Margen_Suma_Ciclo":[2.,1.,1.],"Total SC_PD":[20.,0.,5.]})
+    rows=[]
+    for lab,rel,day in [("C&1","C",1),("D&1","D",2),("A&1","A",1)]:
+      for j in range(2):
+       for config,tarifa in ((rel+"_1",10.),(rel+"_2",20.)) if rel=="C" else ((rel+"_1",10.),):
+        rows.append({"Etiqueta_Relacionada":lab,"Central_Relacionada":rel,"Central":config,"FECHA_HORA":pd.Timestamp(2026,8,day)+pd.Timedelta(minutes=15*j),"GENERACION":1.,"CMg":2.,"CV":1.,"Dolar":1.,"Margen":1.,"Costo_Partida":tarifa,"Costo_Detencion":1.,"MOTIVO":"OM","ESTADO OPERACIONAL":"PDO","Disponible (1) / Pruebas (0)":1})
+    d=pd.DataFrame(rows); front=d.iloc[:1].copy();front["Etiqueta_Relacionada"]="A&1";front["Central_Relacionada"]="A";front["FECHA_HORA"]=pd.Timestamp("2026-07-31 23:45")
+    p=tmp_path/"Reporte.xlsx"
+    with pd.ExcelWriter(p) as w:
+      ciclos.to_excel(w,sheet_name="Resumen_Ciclos_PD",index=False);d.to_excel(w,sheet_name="Detalle_15Min",index=False);front.to_excel(w,sheet_name="Detalle_Frontera",index=False)
+      pd.DataFrame({"Empresa":["E1","E2"],"Total_SC_PD_CLP":[25,0]}).to_excel(w,sheet_name="SC_por_Empresa",index=False)
+    return p
 
 
-def test_bloques_del_mes_anterior_entran_desde_detalle_frontera(tmp_path):
-    """Los ciclos que vienen del mes anterior traen su margen completo: sin los bloques de
-    ese mes (hoja Detalle_Frontera) el recalculo por bloque no cierra."""
-    test_genera_siete_archivos_y_diccionario_completo(tmp_path)
-    reporte = tmp_path / "Reporte_Sobrecostos_PD_Final.xlsx"
-    hojas = pd.read_excel(reporte, sheet_name=None)
-    frontera = hojas["Detalle_15Min"].head(2).copy()
-    frontera["FECHA_HORA"] = pd.Timestamp("2026-07-31 23:30"); frontera["Etiqueta_Relacionada"] = "C0&1"
-    with pd.ExcelWriter(reporte) as w:
-        for nombre, df in hojas.items():
-            df.to_excel(w, sheet_name=nombre, index=False)
-        frontera.to_excel(w, sheet_name="Detalle_Frontera", index=False)
-    destino = generar_entrega(reporte, tmp_path / "salida2")
-    bloques = pd.read_csv(destino / "SCPD_2608_bloques.csv")
-    assert (pd.to_datetime(bloques.FECHA_HORA) < "2026-08-01").sum() == 2
-    assert bloques.groupby("Etiqueta_Relacionada").size()["C0&1"] == 6
+def test_paquete_hojas_formulas_y_frontera(tmp_path):
+    out=generar_entrega(_reporte(tmp_path),version="Definitivo")
+    assert len(list(out.glob("*.csv")))==12
+    book=next(out.glob("*.xlsx")); wb=load_workbook(book,data_only=False)
+    assert wb.sheetnames==SHEETS
+    assert wb["Menu"]["A2"].value==260801 and wb["Menu"]["D2"].value=="Definitivo"
+    assert wb["Sobrecosto_PD xHyC"]["A2"].value.startswith("2608011.1")
+    assert wb["Sobrecosto_PD xHyC"]["U2"].value.startswith("=IFERROR")
+    assert wb["Sobrecosto_Ciclo"]["C2"].value.startswith("=SUMIF")
+    assert wb["Ciclos inconclusos"]["S3"].value=="=T3"
+    assert "'xHyC mes anterior'" in wb["Ciclos inconclusos"]["X3"].value
+
+
+def test_formulas_sin_referencias_estructuradas_y_rangos_acotados():
+    text=" ".join(FORMULAS["PARTIDAS_DETENCIONES"].values())
+    assert "$U$2:$U${N}" in text
+    assert "[@" not in text and "[[#This Row]" not in text
+
+
+def test_sin_rio_se_degrada_a_encabezados(tmp_path):
+    out=generar_entrega(_reporte(tmp_path)); wb=load_workbook(next(out.glob("*.xlsx")))
+    assert wb["Instrucciones RIO"].max_row==1
