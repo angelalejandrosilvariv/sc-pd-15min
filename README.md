@@ -95,6 +95,12 @@ python src/sc_pd_motor_v7.py
 
 El resultado se escribe en la ruta definida en `RUTA_SALIDA`.
 
+Para conciliar esa salida con el Excel horario del CEN, copia el `.xlsm` a
+`Carpeta_de_Trabajo`, edita los nombres al inicio de `correr_comparacion.py` y
+ejecútalo. La herramienta genera `Comparacion_Excel_Horario.xlsx` con totales para el
+mes completo y para ciclos íntegramente contenidos en el mes, apareo por traslape y
+diagnóstico de causa raíz. Véase `docs/specs/29-comparador-excel-horario.md`.
+
 La forma recomendada para operación manual es abrir
 `Carpeta_de_Trabajo/Abrir_Interfaz.bat`, que permite elegir el motor y las rutas
 sin editar código.

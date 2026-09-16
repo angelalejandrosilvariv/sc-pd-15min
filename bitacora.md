@@ -1794,3 +1794,16 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
   de entrada en **2,71 segundos**, con límite explícito de 20 segundos.
 - **Pendientes:** validar el pipeline completo con los archivos operacionales
   reales cuando estén disponibles.
+### 2026-09-16 — Codex (OpenAI) — Comparador oficial con Excel horario (spec 29)
+
+- **Tipo:** implementación, documentación y pruebas.
+- **Origen:** scripts manuales de `docs/informes/scripts_brechas_2608` y diagnóstico
+  de las rondas tercera a quinta de `Brechas_2608_por_empresa.md`.
+- **Cambios:** herramienta importable/CLI que lee el `.xlsm` horario en modo
+  `read_only`/`data_only`, deriva fechas desde xHyC, calcula los alcances mes completo
+  y ciclos propios sin herencia, aparea por central/traslape, descompone exactamente
+  el delta SC y asigna causas R1–R9. Exporta las siete hojas de auditoría y ofrece un
+  runner con archivos locales en `Carpeta_de_Trabajo`.
+- **Validación:** suite `pytest -q`, compilación Python y `git diff --check`.
+- **Pendientes:** Claude debe ejecutar y contrastar la herramienta con los libros
+  reales; esos datos no se versionan.

@@ -55,6 +55,11 @@ etc.) y corre los scripts con F5 en Spyder, en este orden:
    en un solo consolidado. Esa subcarpeta debe existir dentro de esta
    misma carpeta antes de correrlo.
 
+5. correr_comparacion.py (opcional, conciliacion con el Excel horario)
+   Deja la salida del motor y el .xlsm horario en esta carpeta, edita las
+   tres variables NOMBRE_... y ejecuta el script. Genera un libro con ambos
+   alcances, apareo ciclo a ciclo, efectos y causas raiz. No modifica el motor.
+
 Si algo falla, revisa primero que los nombres de archivo escritos en
 las variables NOMBRE_... coincidan exactamente con los archivos que
 dejaste en esta carpeta (mismo nombre, misma extension).
