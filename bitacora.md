@@ -56,14 +56,28 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 4. **Vigencia de la instrucción RIO = 30 minutos** (15-09-2026): una partida o
    detención solo se justifica con una instrucción dada hasta 30 min antes (o 30
    min después, búsqueda relajada). `VIGENCIA_INSTRUCCION_RIO_MIN`, spec 27.
+5. **Paradas cortas** (16-09-2026): toda interrupción de la generación es una
+   detención y lo que sigue es una partida (`TOLERANCIA_CORTES_BLOQUES = 0`). Son
+   paradas reales que el horario no detecta; no se tolera ninguna.
+6. **Lista Pruebas** (16-09-2026): la fuente es el RIO (`CONSIGNAS = EP`). La hoja
+   `Pruebas` del Excel es una copia del RIO con llave horaria; no se agrega insumo.
+7. **Detención OM tras partida EP** (16-09-2026): se paga. Cada extremo del ciclo se
+   evalúa por separado (GUACOLDA-1 23-ago, LOSVIENTOS &4, SANJAVIER).
+8. **SSCC para aceptar OT** (16-09-2026): no hay decisión de fuente. El Excel usa el
+   mismo comentario del RIO (`FIND("SSCC"|"CTF"|"CSF"|"CPF", COMENTARIO)`), pero su
+   `Presta SSCC = IF(ISNUMBER(VLOOKUP(...)),1,0)` es siempre 1 → OT paga siempre.
+   Es un defecto del Excel (30,0 MM en agosto), no una regla distinta.
 
 **Decisiones abiertas** (el código las deja parametrizadas o documentadas):
 
-- Primer ciclo del mes sin historia cuando falta el reporte del mes anterior: hoy
-  la partida queda en 0 (`Tipo_Partida = No_Aplica`); el Excel asume detenida desde
-  el día 1. Recomendación pendiente de aprobar: exigir el archivo del mes anterior.
-- Reportar o no al CEN los defectos detectados en el Excel horario (ATACAMA: 62% de
-  la energía fuera del margen; COGEN excluido a mano sin fórmula).
+- Primer ciclo sin historia: resuelto en parte por la spec 28 (cota inferior). Sigue
+  la recomendación de exigir siempre el archivo del mes anterior.
+- Valor exacto de la vigencia (30 min vigente). El concepto está decidido; la spec 27
+  deja la sensibilidad 60/120 y la alternativa por consigna si se quiere afinar.
+- Reportar al CEN los defectos del Excel horario, con celda y monto: instrucción
+  asociada a la hora equivocada (R3, 48,7 MM), `Presta SSCC` con `ISNUMBER` (30,0
+  MM), detenciones no marcadas por la macro (R2), PO de mitad de mes (R7), energía
+  fuera de `xHyC` (ATACAMA en junio), COGEN excluido a mano.
 
 **Cifras de referencia** (para detectar regresiones al correr con datos reales):
 
@@ -73,6 +87,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2608 sin julio | 536.027.769 | **875.313.107** | 957.823.663 (preliminar) |
 | 2608 con empalme 2607 (interfaz, umbral 0,5 MWh) | — | **971.292.712** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **1.063.758.505** | 1.028.628.659 |
+| 2607 con empalme 2606, `main` f820455 | — | **1.343.830.997** | (Excel de julio no comparado) |
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
 | 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
@@ -106,6 +121,30 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-16 — Claude — Decisiones 5 a 8 cerradas; TOCOPILLA-U16 &1 aclarado
+
+- **Tipo:** decisión + análisis con datos reales.
+- **Origen:** respuestas del dueño del proyecto a las decisiones pendientes.
+- **Decisiones:** paradas cortas se cobran (son paradas reales que el horario no ve);
+  la vigencia de la instrucción se mantiene (no tiene sentido lejos del inicio de la
+  generación); la lista Pruebas es el mismo RIO con llave horaria (no se agrega
+  insumo); la detención OM tras partida EP se paga. SSCC: el Excel usa el mismo
+  comentario del RIO; su `Presta SSCC` con `ISNUMBER` hace que OT pague siempre —
+  defecto del Excel, no decisión (7 casos, −18,0 MM de los −25,3 de R5 en ciclos
+  del mes; 30,0 MM en todo agosto).
+- **TOCOPILLA-U16 &1 (50,4 MM en el Excel v2):** corrida de julio con junio
+  empalmado. El motor sí cobra la partida instruida de TOCOPILLA del 29-jul
+  (PMT/OM 03:53, ciclo 03:45 → 11:00, **51,07 MM en julio**). A las 11:02 la unidad
+  sale por falla (FS/OT/DF, IF 2026004027), resincroniza en pruebas a las 13:42 y
+  14:42 (EP, "sincronizada en pruebas según IF 2026004027") y recién a las 16:40
+  pasa a operación (MT/OM). El ciclo que cruza a agosto arranca a las 14:30 en EP:
+  no hay instrucción OM de partida, y el Excel lo paga porque en su hora clave
+  encuentra el FS/OT de las 13:44 y OT siempre pasa por el bug de `Presta SSCC`.
+  Bajo la regla que ambos modelos declaran, esa partida no se cobra; la legítima
+  ya está pagada en julio. Cifra de referencia julio con junio: 1.343.830.997.
+- **Pendientes:** Codex — herramienta de comparación contra el Excel y margen a
+  resolución configurable; Claude — junio con `main` actual.
 
 ### 2026-09-15 — Claude — Excel corregido v2 (sin margen heredado): comparación actualizada
 
