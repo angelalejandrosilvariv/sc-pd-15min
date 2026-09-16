@@ -171,6 +171,11 @@ El propio código deja explícitos asuntos que todavía requieren validación de
   del ciclo antes de truncar; viene **apagado** porque cambia el monto liquidado
   (+33,5% sobre 2606) y se aparta del modelo vigente — ver
   `docs/specs/23-margen-neteado-por-ciclo.md`;
+- la resolución temporal del margen se controla con `RESOLUCION_MARGEN`: `'bloque'`
+  (default, cuartos de hora sin cambio de comportamiento) o `'hora'` (CMg/CV
+  horarios ponderados por generación y margen repartido nuevamente a los bloques).
+  La segunda permite reproducir y medir la regla del Excel horario con el motor v7;
+  ver `docs/specs/30-resolucion-margen.md`;
 - la tarifa de un ciclo que pasó por varias configuraciones es la de la **más cara**
   entre las que generaron en él, restringida al combustible que instruyó el RIO
   (`TARIFA_CONFIGURACION = 'maxima'`, regla del modelo horario, decisión del

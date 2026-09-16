@@ -125,17 +125,30 @@ class Interfaz(tk.Tk):
         ttk.Radiobutton(fm, text="Usar la columna CMg-CV del reporte tal como viene",
                         variable=self.var_margen, value=0).pack(anchor="w")
 
+        self.lbl_resolucion_margen = ttk.Label(f_met, text="Resolucion del margen (solo motor v7)")
+        self.lbl_resolucion_margen.grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+        self.var_resolucion_margen = tk.StringVar(value="bloque")
+        fr = ttk.Frame(f_met); fr.grid(row=1, column=1, sticky="w", pady=(6, 0))
+        self.rb_resolucion_margen = [
+            ttk.Radiobutton(fr, text="bloque — calcular cada 15 minutos (default)",
+                            variable=self.var_resolucion_margen, value="bloque"),
+            ttk.Radiobutton(fr, text="hora — agregar por hora-reloj [igual que el horario]",
+                            variable=self.var_resolucion_margen, value="hora"),
+        ]
+        for rb in self.rb_resolucion_margen:
+            rb.pack(anchor="w")
+
         self.var_neteado = tk.IntVar(value=0)
         self.cb_neteado = ttk.Checkbutton(f_met, text="Netear el margen dentro del ciclo antes de truncar  "
                                                       "(CAMBIA EL MONTO: +33,5% en 2606; el horario NO lo hace)",
                                           variable=self.var_neteado)
-        self.cb_neteado.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.cb_neteado.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         # solo v7: que tarifa cobra un ciclo que paso por varias configuraciones
         self.lbl_tarifa = ttk.Label(f_met, text="Tarifa del ciclo (solo motor v7)")
-        self.lbl_tarifa.grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+        self.lbl_tarifa.grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
         self.var_tarifa = tk.StringVar(value="maxima")
-        ft = ttk.Frame(f_met); ft.grid(row=2, column=1, sticky="w", pady=(6, 0))
+        ft = ttk.Frame(f_met); ft.grid(row=3, column=1, sticky="w", pady=(6, 0))
         self.rb_tarifa = [
             ttk.Radiobutton(ft, text="maxima — la configuracion mas cara que paso por el ciclo  [igual que el horario]",
                             variable=self.var_tarifa, value="maxima"),
@@ -148,10 +161,10 @@ class Interfaz(tk.Tk):
         self.var_diferir = tk.IntVar(value=1)
         self.cb_diferir = ttk.Checkbutton(f_met, text="Diferir ciclos que no terminan en el mes (se cobran el mes que terminan)",
                                           variable=self.var_diferir)
-        self.cb_diferir.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.cb_diferir.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         self.var_baja_gen = tk.IntVar(value=1)
-        fb = ttk.Frame(f_met); fb.grid(row=4, column=0, columnspan=2, sticky="w")
+        fb = ttk.Frame(f_met); fb.grid(row=5, column=0, columnspan=2, sticky="w")
         self.cb_baja_gen = ttk.Checkbutton(fb, text="Rechazar ciclos con generacion menor o igual a",
                                            variable=self.var_baja_gen)
         self.cb_baja_gen.pack(side="left")
@@ -161,7 +174,7 @@ class Interfaz(tk.Tk):
         ttk.Label(fb, text="MWh").pack(side="left")
 
         self.var_relajada = tk.IntVar(value=1)
-        fr = ttk.Frame(f_met); fr.grid(row=5, column=0, columnspan=2, sticky="w")
+        fr = ttk.Frame(f_met); fr.grid(row=6, column=0, columnspan=2, sticky="w")
         self.cb_relajada = ttk.Checkbutton(fr, text="Buscar el registro RIO mas conveniente en una ventana de ±",
                                            variable=self.var_relajada)
         self.cb_relajada.pack(side="left")
@@ -169,7 +182,7 @@ class Interfaz(tk.Tk):
         self.ent_ventana = ttk.Entry(fr, textvariable=self.var_ventana, width=4)
         self.ent_ventana.pack(side="left", padx=4)
         ttk.Label(fr, text="cuartos de hora").pack(side="left")
-        fv = ttk.Frame(f_met); fv.grid(row=6, column=0, columnspan=2, sticky="w")
+        fv = ttk.Frame(f_met); fv.grid(row=7, column=0, columnspan=2, sticky="w")
         ttk.Label(fv, text="Aceptar como justificacion una instruccion RIO dada hasta").pack(side="left")
         self.var_vigencia = tk.StringVar(value="30")
         self.ent_vigencia = ttk.Entry(fv, textvariable=self.var_vigencia, width=5)
@@ -177,24 +190,24 @@ class Interfaz(tk.Tk):
         ttk.Label(fv, text="min antes del inicio/termino del ciclo (0 = sin limite, hasta 24 h)").pack(side="left")
 
         self.lbl_horas_sin_historia = ttk.Label(f_met, text="Primer ciclo sin historia (solo motor v7)")
-        self.lbl_horas_sin_historia.grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+        self.lbl_horas_sin_historia.grid(row=8, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
         self.var_horas_sin_historia = tk.StringVar(value="cota_inferior")
         self.cb_horas_sin_historia = ttk.Combobox(
             f_met, textvariable=self.var_horas_sin_historia, state="readonly", width=44,
             values=["cota_inferior", "nulo"])
-        self.cb_horas_sin_historia.grid(row=7, column=1, sticky="w", pady=(6, 0))
+        self.cb_horas_sin_historia.grid(row=8, column=1, sticky="w", pady=(6, 0))
 
         # solo turbina
-        ttk.Separator(f_met).grid(row=8, column=0, columnspan=2, sticky="ew", pady=6)
+        ttk.Separator(f_met).grid(row=9, column=0, columnspan=2, sticky="ew", pady=6)
         self.lbl_atrib = ttk.Label(f_met, text="Tarifa entre turbinas del mismo evento (solo motor Turbina)")
-        self.lbl_atrib.grid(row=9, column=0, sticky="w", padx=(0, 8))
+        self.lbl_atrib.grid(row=10, column=0, sticky="w", padx=(0, 8))
         self.var_atrib = tk.StringVar(value="prorrata")
         self.cb_atrib = ttk.Combobox(f_met, textvariable=self.var_atrib, state="readonly", width=44,
                                      values=["prorrata  — una vez, repartida por generacion",
                                              "primera  — una vez, a la turbina que arranco primero",
                                              "cada_turbina  — cada turbina paga completa"])
         self.cb_atrib.current(0)
-        self.cb_atrib.grid(row=9, column=1, sticky="w")
+        self.cb_atrib.grid(row=10, column=1, sticky="w")
 
         # -- 5. Ejecutar + log
         f_run = ttk.Frame(cuerpo)
@@ -226,6 +239,10 @@ class Interfaz(tk.Tk):
         for rb in self.rb_tarifa:
             rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
         self.lbl_tarifa.configure(foreground="#000" if self.var_motor.get() == "v7" else "#999")
+        for rb in self.rb_resolucion_margen:
+            rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
+        self.lbl_resolucion_margen.configure(
+            foreground="#000" if self.var_motor.get() == "v7" else "#999")
         self.cb_horas_sin_historia.configure(
             state="readonly" if self.var_motor.get() == "v7" else "disabled")
         self.lbl_horas_sin_historia.configure(
@@ -293,6 +310,7 @@ class Interfaz(tk.Tk):
         if self.var_motor.get() == "turbina":
             panel["ATRIBUCION_TARIFA_TURBINA"] = self.var_atrib.get().split()[0]
         else:
+            panel["RESOLUCION_MARGEN"] = self.var_resolucion_margen.get()
             panel["TARIFA_CONFIGURACION"] = self.var_tarifa.get()
             panel["HORAS_SIN_HISTORIA"] = self.var_horas_sin_historia.get()
         return panel
@@ -403,6 +421,7 @@ class Interfaz(tk.Tk):
         self.var_motor.set(datos.get("motor", "v7"))
         p = datos.get("panel", {})
         self.var_margen.set(p.get("CALCULAR_MARGEN_EN_EL_MOTOR", 1))
+        self.var_resolucion_margen.set(p.get("RESOLUCION_MARGEN", "bloque"))
         self.var_neteado.set(p.get("MARGEN_NETEADO_POR_CICLO", 0))
         self.var_tarifa.set(p.get("TARIFA_CONFIGURACION", "maxima"))
         self.var_diferir.set(p.get("DIFERIR_CICLOS_SIN_TERMINAR", 1))
