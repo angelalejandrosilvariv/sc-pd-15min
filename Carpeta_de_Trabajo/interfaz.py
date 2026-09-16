@@ -24,6 +24,8 @@ CARPETA = Path(__file__).resolve().parent
 RAIZ = CARPETA.parent
 if str(RAIZ / "src") not in sys.path:
     sys.path.insert(0, str(RAIZ / "src"))
+if str(RAIZ / "scripts") not in sys.path:
+    sys.path.insert(0, str(RAIZ / "scripts"))
 
 CONFIG = CARPETA / "interfaz_config.json"
 
@@ -201,6 +203,8 @@ class Interfaz(tk.Tk):
         f_run.grid(row=4, column=0, sticky="ew", pady=(0, 6))
         self.btn_run = ttk.Button(f_run, text="▶  Ejecutar", command=self._ejecutar)
         self.btn_run.pack(side="left")
+        self.btn_entrega = ttk.Button(f_run, text="Generar entrega CEN", command=self._generar_entrega)
+        self.btn_entrega.pack(side="left", padx=(8, 0))
         self.lbl_estado = ttk.Label(f_run, text="Listo.", foreground="#666")
         self.lbl_estado.pack(side="left", padx=12)
         ttk.Button(f_run, text="Abrir carpeta de salida", command=self._abrir_carpeta).pack(side="right")
@@ -315,6 +319,19 @@ class Interfaz(tk.Tk):
         self.lbl_estado.configure(text="Corriendo… (3 a 5 minutos)", foreground="#b8720a")
         self._limpiar_log()
         threading.Thread(target=self._correr_motor, daemon=True).start()
+
+    def _generar_entrega(self):
+        """Empaqueta la ultima salida con las rutas y el panel visibles."""
+        salida = Path(self.var_salida.get().strip())
+        if not salida.is_file():
+            messagebox.showerror("Sin salida", "Primero ejecuta el motor o selecciona una salida existente.")
+            return
+        try:
+            from generar_entrega_cen import generar_entrega
+            destino = generar_entrega(salida, self._rutas(), panel=self._panel())
+            messagebox.showinfo("Entrega CEN", f"Entrega creada en:\n{destino}")
+        except Exception:
+            messagebox.showerror("Error al generar entrega", traceback.format_exc())
 
     def _correr_motor(self):
         """Corre en un hilo aparte para que la ventana no se congele."""

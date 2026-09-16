@@ -572,6 +572,54 @@ def tarifa_configuracion_maxima(resumen_relacionada, compacto):
     return salida
 
 
+def candidatas_tarifa_configuracion(resumen_relacionada):
+    """Devuelve la auditoria de configuraciones candidatas, sin alterar el calculo.
+
+    Replica los filtros que usa :func:`tarifa_configuracion_maxima` y marca las
+    filas ganadoras. Se expone para construir el paquete de auditoria del CEN.
+    """
+    llave = ['Central_Relacionada', 'Ciclo_ID_Relacionada']
+    b = resumen_relacionada.copy()
+    propio = combustible_configuracion(b['Central'])
+    rio = b.groupby(llave)['Configuracion RIO'] if 'Configuracion RIO' in b else None
+    partida = rio.transform('first') if rio is not None else pd.Series('', index=b.index)
+    detencion = rio.transform('last') if rio is not None else pd.Series('', index=b.index)
+    salida = b[llave + ['Central']].copy()
+    salida['Etiqueta_Relacionada'] = b.get('Etiqueta_Relacionada', '')
+    salida['Costo_Partida_ML'] = pd.to_numeric(b['Costo_Partida_ML'], errors='coerce').fillna(0)
+    salida['Costo_Detencion_ML'] = pd.to_numeric(b['Costo_Detencion_ML'], errors='coerce').fillna(0)
+    salida['combustible_propio'] = propio
+    # Una sola columna instruida es suficiente cuando ambos extremos coinciden;
+    # las columnas por evento preservan los casos en que difieren.
+    salida['combustible_instruido'] = combustible_configuracion(partida)
+    salida['combustible_instruido_detencion'] = combustible_configuracion(detencion)
+    fp = pd.to_numeric(b['Filtro_CostoCero_Partida'], errors='coerce').fillna(1).astype(int)
+    fd = pd.to_numeric(b['Filtro_CostoCero_Detencion'], errors='coerce').fillna(1).astype(int)
+    pasa_p = (salida.combustible_instruido == '') | (propio == salida.combustible_instruido)
+    pasa_d = (salida.combustible_instruido_detencion == '') | (propio == salida.combustible_instruido_detencion)
+    salida['pasa_combustible'] = pasa_p.astype(int)
+    salida['pasa_combustible_detencion'] = pasa_d.astype(int)
+    salida['pasa_costo_cero'] = (fp.astype(bool) & fd.astype(bool)).astype(int)
+    cp = salida.Costo_Partida_ML * fp * pasa_p.astype(int)
+    cd = salida.Costo_Detencion_ML * fd * pasa_d.astype(int)
+    salida['elegida_partida'] = 0; salida['elegida_detencion'] = 0
+    salida.loc[cp.groupby([b[c] for c in llave]).idxmax(), 'elegida_partida'] = 1
+    salida.loc[cd.groupby([b[c] for c in llave]).idxmax(), 'elegida_detencion'] = 1
+    # Una configuración puede ocupar muchos bloques. La entrega exige una fila
+    # por configuración y ciclo, preservando la marca si cualquiera de esos
+    # bloques fue el ganador cronológico de idxmax().
+    grupos = llave + ['Etiqueta_Relacionada', 'Central', 'combustible_propio',
+                      'combustible_instruido', 'combustible_instruido_detencion']
+    return salida.groupby(grupos, as_index=False, dropna=False).agg(
+        Costo_Partida_ML=('Costo_Partida_ML', 'max'),
+        Costo_Detencion_ML=('Costo_Detencion_ML', 'max'),
+        pasa_combustible=('pasa_combustible', 'max'),
+        pasa_combustible_detencion=('pasa_combustible_detencion', 'max'),
+        pasa_costo_cero=('pasa_costo_cero', 'max'),
+        elegida_partida=('elegida_partida', 'max'),
+        elegida_detencion=('elegida_detencion', 'max'))
+
+
 def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
                              netear_por_ciclo=0, tarifa_configuracion='instruida'):
     """Resume los bloques por ciclo sin perder los insumos de su liquidacion."""
@@ -2416,6 +2464,11 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     # 15. RECONCILIACION Y EXPORTACION
     # ==========================================
     detalle_mes = resumen_relacionada[resumen_relacionada['FECHA_HORA'] >= f_min_actual].copy()
+    # Insumos visibles para el paquete de auditoria (spec 31). Son copias de
+    # columnas ya usadas por el calculo; no intervienen en ninguna formula.
+    if 'Dolar' not in detalle_mes.columns and 'Valor_Dolar' in detalle_mes.columns:
+        detalle_mes['Dolar'] = detalle_mes['Valor_Dolar']
+    candidatas_tarifa = candidatas_tarifa_configuracion(resumen_relacionada)
     print_audit_summary()
 
     gen_csv_mes = reporte_actual['GENERACION'].sum()
@@ -2437,6 +2490,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                  'SC_por_Empresa': df_empresa,
                  'Resumen_Ciclos_PD': df_compacto,
                  'Detalle_15Min': detalle_mes,
+                 'Candidatas_Tarifa': candidatas_tarifa,
                  'Auditoria_Pasos': pd.DataFrame(_audit_log)}
         if AUDITAR_INSTRUCCION_RIO == 1:
             hojas['Cobertura_Instruccion_RIO'] = cobertura_export
