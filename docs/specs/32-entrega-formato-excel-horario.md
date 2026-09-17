@@ -8,8 +8,8 @@ exportación, `tests/test_generar_entrega_cen.py`, `Carpeta_de_Trabajo/correr_en
 de este libro. Decisión del 16-09-2026: *"el entregable debe tener un formato lo más
 parecido al Excel horario que ya existe"*.
 
-**Estado:** especificada; implementación por Codex; verificación con datos reales por
-Claude (Codex no tiene los archivos).
+**Estado:** implementada (PR #55 + correcciones de Claude) y verificada con agosto 2026:
+checks en 0 en 390/390 ciclos, `RESUMEN!G1` = 939.959.962 (§10).
 
 ---
 
@@ -494,19 +494,86 @@ sigue devolviendo lo mismo, y que el export contiene las tres hojas nuevas (pued
 hacerse sobre un reporte mínimo si ya existe un fixture; si no, verificar la lista
 `hojas` por inspección del código con una prueba de humo del módulo).
 
-## 10. Verificación con datos reales (Claude)
+## 10. Verificación con datos reales (Claude, 16/17-09-2026)
 
-Con agosto 2026 empalmado con julio (`main` actual, 939.959.962 CLP):
+Agosto 2026 empalmado con julio, `main` (939.959.962 CLP), libro abierto por COM en
+Excel y recalculado por completo (`CalculateFullRebuild`):
 
-1. El libro abre en Excel sin reparación; recálculo completo < 3 min.
-2. `Sobrecosto_Ciclo!T:W` (checks) = 0 en los 390 ciclos.
-3. `RESUMEN!F` = 0 en todas las empresas y `RESUMEN!G1` = 939.959.962.
-4. `xHyC!BE` = 0 en todos los bloques.
-5. Muestreo manual de tres ciclos conocidos contra el Excel horario v2: `COLMITO&1`
-   (una configuración), `NEHUENCO-2` multi-configuración, `TOCOPILLA-U16&1` (rechazo
-   EP): la lectura de las hojas debe ser reconocible para quien usa el horario.
+| Comprobación | Resultado |
+|---|---|
+| Abre sin reparación | sí; apertura 19 s, recálculo completo **8 s** |
+| `Sobrecosto_Ciclo!T:W` (Check SC / partida / detención / margen) | **0 en 390/390** ciclos |
+| `RESUMEN!F` (CHECK) | 0 en 27/27 empresas; `G1 = SUM(D:D)` = **939.959.962** |
+| `xHyC!BE` (margen bloque a bloque) | 0 en 41.300/41.300 bloques |
+| `PARTIDAS_DETENCIONES` | Σ S = 973.224.571, Σ T = 351.181.500 (= Σ `Costo_*_Efectivo`) |
+| Generación del paquete | 1 min 40 s (21 s de lectura con `calamine`); libro 35 MB |
 
-Resultados, hallazgos y correcciones se documentan en esta spec y en la bitácora.
+Muestra: `COLMITO&1` C = 207.054, D = 168.434, H = 375.488 — **idéntico al peso** al
+`Sobrecosto_Ciclo` del Excel horario v2 (207.053,96 / 168.433,71). `NEHUENCO-2&1` C =
+26.558.790 (gana `NEHUENCO-2_TG1+TV1_GN_A` sobre `_GN_B` por combustible instruido `GN_A`,
+visible en xHyC!AF/AG), D = 8.275.800, E = 1.042.014, H = 33.792.576. `TOCOPILLA-U16&1`
+H = 0 (EP en la partida; Excel v2 pagaba 50,4 MM por el `ISNUMBER`).
+
+### Lo que hubo que corregir del PR #55
+
+El PR trajo la estructura (hojas, constantes, `FORMULAS`) pero no la cadena de fórmulas
+ni varios valores; se reescribió el generador conservando su esqueleto:
+
+1. **Fórmulas ausentes**: `Sobrecosto_Ciclo!F/G/H/I/J/K/Q/R/S` y los cuatro checks,
+   `RESUMEN!D/E/F/G1/I`, `PARTIDAS_DETENCIONES!V:Y` y `AB:AD`, tabla izquierda de
+   `Ciclos inconclusos`. Sin `H` la cadena del Excel no existía.
+2. **`PARTIDAS_DETENCIONES!I` traía la etiqueta completa** (`COLMITO&1`) en vez del
+   número, por lo que `N = M&"&"&I` daba `COLMITO&COLMITO&1` y `Sobrecosto_Ciclo!C/D`
+   sumaban 0.
+3. **Dólar del extremo y combustible instruido**: `USD apertura/cierre ciclo` era el
+   dólar del bloque y `Conf despachada RIO` valía siempre 1 (`combustible_configuracion`
+   recibía escalares). Ahora se calculan sobre el detalle completo (mes + frontera) con
+   el primer/último bloque del ciclo, igual que `tarifa_valorizada_al_extremo`.
+4. **`Presta SSCC`** se buscaba en `Instrucción + Consigna` (nunca contiene SSCC) en vez
+   del comentario; `Exención` llegaba como booleano (`AE=1` es falso en Excel).
+5. **Ciclos de un solo bloque**: la fila es partida y detención a la vez; `T` usaba los
+   filtros de la partida. Se agregaron las columnas de la detención (`AQ:AY`) y `T` las
+   usa siempre.
+6. **`Sobrecosto_Ciclo` perdía `Empresa`**: las columnas del motor se copiaban con su
+   nombre y `Empresa` (motor) pisaba `I`; los diferidos entraban al `RESUMEN`
+   (GMETROPOLITANA +17,2 MM). Las columnas del motor que chocan se renombran
+   `... (motor)`.
+7. **Libro ilegible**: cachés `<v></v>` vacíos en `O` (Detencion = ""), strings que
+   empiezan con `=` escritos como fórmula (`Diccionario`) y `MAXIFS` sin `_xlfn.`
+   (`#NAME?` → S/T = 0). Opciones `strings_to_formulas=False`, `use_future_functions=True`
+   y caché 0 para vacíos.
+8. **`Central_Empresa`**: `YUNGAY-1/2` no están en el diccionario por relacionada (el
+   motor los rescata por configuración) y `Sobrecosto_Ciclo!I` daba `#N/A` (ORAZUL
+   −987.671). La hoja agrega esas parejas con `Origen = rescate por configuracion (motor)`.
+9. **Rendimiento**: 4 min 49 s → 1 min 40 s. Lectura con `engine="calamine"`, escritura
+   fila a fila con `constant_memory` (sin `DataFrame.to_excel`), fórmulas pesadas solo en
+   las filas de partida/detención, `Costos_de_P-D` solo con las configuraciones que
+   tienen ciclos, `Instrucciones RIO` con el mes actual completo y del anterior solo las
+   instrucciones usadas.
+
+### Cambios en el motor (solo export) que faltaban en la spec
+
+- `Resumen_Ciclos_PD` exporta `Flag_Exencion`, `Comentario_Partida/Detencion`,
+  `Fuente_Config_RIO_*` y `Fuente_Filtros_RIO_*`; el comentario viaja con los filtros de
+  la búsqueda relajada (es lo que decide el SSCC de un OT).
+- **`Vigencia_RIO_Partida/Detencion` = 1 cuando la búsqueda relajada reemplazó los
+  filtros**: esa instrucción está dentro de ±VENTANA y es vigente por construcción; antes
+  quedaba la vigencia del cruce maestro (0) mientras `Filtro_Op` valía 1, y la fórmula `S`
+  (que multiplica por AF) daba 0 en ATACAMA, NEHUENCO-2, SANISIDRO-2. Solo auditoría:
+  `Vigencia_RIO_*` no entra en `Costo_*_Efectivo`; 2608 sigue en 939.959.962.
+
+### Desvíos respecto de las secciones 4–5
+
+- xHyC agrupa las **unidades generadoras** de una misma configuración en una fila por
+  bloque (el motor trae una por unidad): generación y margen se suman, `CV` se pondera
+  por generación (1 bloque de 41.690 con CV distinto entre unidades) y la columna nueva
+  `Unidades` las lista. Sin esto `SUMIFS`/`COUNTIFS` de `V:Y` contaban doble.
+- `PARTIDAS_DETENCIONES!W/Y` se titulan `Monto Partidas ciclo` / `Monto Detenciones
+  ciclo` para no repetir el encabezado de `S/T` (el Excel los repite).
+- `Costos_de_P-D` deduplicada por llave (gana la última, como `df_costos_pd`) y solo con
+  configuraciones que generaron en ciclos.
+- Suite: **125 pruebas** (`tests/test_generar_entrega_cen.py` reescrito con los casos
+  de §9: multi-configuración, diferido, herencia con frontera, exención, SSCC).
 
 ## 11. Fuera de alcance
 

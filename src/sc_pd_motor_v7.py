@@ -675,6 +675,8 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
         resumen_relacionada = resumen_relacionada.assign(Horas_Cota_Inferior=np.nan)
     if 'Horas_Detenida_Estimada' not in resumen_relacionada.columns:
         resumen_relacionada = resumen_relacionada.assign(Horas_Detenida_Estimada=False)
+    if 'COMENTARIO' not in resumen_relacionada.columns:
+        resumen_relacionada = resumen_relacionada.assign(COMENTARIO='')
     agregaciones = {
         'Inicio_Ciclo': ('FECHA_HORA', 'min'),
         'Termino_Ciclo': ('FECHA_HORA', 'max'),
@@ -705,6 +707,7 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
         'Filtro_Op_Partida': ('Filtro_Operacional', 'first'),
         'Vigencia_RIO_Partida': ('Vigencia_RIO', 'first'),
         'Consigna_Partida': ('CONSIGNAS', 'first'),
+        'Comentario_Partida': ('COMENTARIO', 'first'),
         'Motivo_Partida': ('MOTIVO', 'first'),
         'Estado_Op_Partida': ('ESTADO OPERACIONAL', 'first'),
         'Fuente_Config_RIO_Partida': ('Fuente_Config_RIO', 'first'),
@@ -715,6 +718,7 @@ def compactar_resumen_ciclos(resumen_relacionada, usar_tarifa_rio_instruida,
         'Filtro_Op_Detencion': ('Filtro_Operacional', 'last'),
         'Vigencia_RIO_Detencion': ('Vigencia_RIO', 'last'),
         'Consigna_Detencion': ('CONSIGNAS', 'last'),
+        'Comentario_Detencion': ('COMENTARIO', 'last'),
         'Motivo_Detencion': ('MOTIVO', 'last'),
         'Estado_Op_Detencion': ('ESTADO OPERACIONAL', 'last'),
         'Fuente_Config_RIO_Detencion': ('Fuente_Config_RIO', 'last'),
@@ -944,6 +948,12 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
         'Costo_Detencion_Base', 'Detencion_Tarifa',
         'Costo_Detencion_Efectivo', 'Obs_Detencion',
         'Costos_Totales_PD', 'Total SC_PD', 'Obs_Liquidacion_Final', 'Etiqueta_Original',
+        # Insumos de los extremos que la entrega CEN (spec 32) necesita para que sus
+        # formulas reproduzcan Costo_*_Efectivo: exencion, comentario (SSCC) y de que
+        # registro RIO salieron la configuracion y los filtros. Solo export.
+        'Flag_Exencion', 'Comentario_Partida', 'Comentario_Detencion',
+        'Fuente_Config_RIO_Partida', 'Fuente_Filtros_RIO_Partida',
+        'Fuente_Config_RIO_Detencion', 'Fuente_Filtros_RIO_Detencion',
     ]
     if netear_por_ciclo == 1:
         # Margen_Suma_Ciclo sale truncado en 0; sin este neto firmado no hay como
@@ -2221,13 +2231,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             objetivo = row['Inicio_Ciclo'] if tipo == 'Partida' else row['Termino_Ciclo']
             sub = por_central.get(row['Central_Relacionada'])
             if pd.isna(objetivo) or sub is None or sub.empty:
-                return pd.Series([None] * 8)
+                return pd.Series([None] * 9)
 
             sub = sub.copy()
             sub['Diff'] = (sub['FECHA_HORA_RIO'] - objetivo).dt.total_seconds().abs()
             sub = sub[sub['Diff'] <= tol_seg]
             if sub.empty:
-                return pd.Series([None] * 8)
+                return pd.Series([None] * 9)
 
             sub['Central'] = row['Central_Partida'] if tipo == 'Partida' else row['Central_Detencion']
             sub['Flag_Exencion'] = bool(row['Flag_Exencion'])
@@ -2238,7 +2248,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             best = sub.sort_values(by=['Suma', 'Diff'], ascending=[False, True]).iloc[0]
             return pd.Series([best['CONSIGNAS'], best['MOTIVO'], best['ESTADO OPERACIONAL'],
                               best['Filtro_Conf'], best['Filtro_Disp'], best['Filtro_Op'], True,
-                              best['FECHA_HORA_RIO']])
+                              best['FECHA_HORA_RIO'], best['COMENTARIO']])
 
         for prefijo in ['Partida', 'Detencion']:
             columna_confiable = f'_Confiable_{prefijo}'
@@ -2248,6 +2258,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
             if validos.any():
                 destino = [f'Consigna_{prefijo}', f'Motivo_{prefijo}', f'Estado_Op_{prefijo}',
                            f'Filtro_Conf_{prefijo}', f'Filtro_Disp_{prefijo}', f'Filtro_Op_{prefijo}']
+                if f'Comentario_{prefijo}' in df_compacto.columns:
+                    # El comentario viaja con los filtros: es lo que decide el SSCC de un OT.
+                    df_compacto.loc[validos, f'Comentario_{prefijo}'] = res.loc[validos, 8]
+                # La instruccion encontrada esta dentro de +/- VENTANA, asi que es vigente
+                # por construccion; la vigencia del cruce maestro ya no describe lo usado.
+                # Solo auditoria: Vigencia_RIO_* no entra en Costo_*_Efectivo.
+                df_compacto.loc[validos, f'Vigencia_RIO_{prefijo}'] = 1
                 for i, col in enumerate(destino):
                     df_compacto.loc[validos, col] = res.loc[validos, i]
                 df_compacto.loc[validos, f'Fuente_Filtros_RIO_{prefijo}'] = res.loc[validos, 7]

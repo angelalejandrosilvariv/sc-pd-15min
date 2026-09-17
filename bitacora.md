@@ -41,7 +41,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | Runners para Spyder | `Carpeta_de_Trabajo/correr_motor*.py` | Vigentes. Editar solo las variables `NOMBRE_*`. |
 | Consolidación de costos desde políticas PO | `scripts/consolidar_politicas.py` | Vigente (produce `Costos_de_P-D_Consolidado_AAMM.xlsx`). |
 
-**Cómo correr y verificar**: `pytest -q` → 87 pruebas deben pasar. Los datos
+**Cómo correr y verificar**: `pytest -q` → 125 pruebas deben pasar. Los datos
 (CSV/XLSX/XLSM/parquet) **no se versionan** (`.gitignore`); se dejan en
 `Carpeta_de_Trabajo/`. Nunca escribir en la unidad `T:`; se copia a local.
 
@@ -98,8 +98,8 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 
 **Trabajo siguiente, en orden sugerido**
 
-0. **Spec 32** (entrega con el formato del Excel horario): Codex implementa, Claude
-   verifica con agosto. Reemplaza el libro de la spec 31.
+0. ~~Spec 32~~ — hecha y verificada (17-09): el libro con formato horario cierra al
+   peso con el motor. Falta la lectura del dueño del proyecto.
 1. ~~Spec + tests para el motor Reglas del Horario~~ — hecho (spec 26, Codex).
 2. ~~Conseguir julio 2026~~ — hecho; agosto corre con empalme (971,3 MM, +1,4% vs
    Excel). Queda revisar `CMg` nulo en el reporte `2608_v2` si se vuelve a usar.
@@ -126,6 +126,37 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-17 — Claude — Verificación de la spec 32 (PR #55) con agosto real: el libro con formato horario cierra al peso
+
+- **Tipo:** corrección + prueba + verificación.
+- **Origen:** PR #55 de Codex (`codex/implementar-formato-excel-para-entrega`). El PR
+  trajo la estructura pero no la cadena de fórmulas: faltaban `Sobrecosto_Ciclo!F:K`,
+  `Q:S` y los checks, `RESUMEN!D:G`, `PARTIDAS_DETENCIONES!V:Y`; `I` traía la etiqueta
+  completa y `N` quedaba `COLMITO&COLMITO&1`; el dólar del extremo y el combustible
+  instruido no se calculaban; `Presta SSCC` miraba el motivo y no el comentario; la
+  columna `Empresa` del motor pisaba la del Excel y los diferidos entraban al RESUMEN.
+  El libro además no abría (`<v></v>` vacíos, strings `=` como fórmulas, `MAXIFS` sin
+  `_xlfn.`). Detalle en spec 32 §10.
+- **Cambios:** `scripts/generar_entrega_cen.py` reescrito sobre el esqueleto del PR
+  (una función por hoja, escritura fila a fila con `constant_memory`, lectura con
+  `calamine`, fórmulas pesadas solo en los extremos, columnas de la detención `AQ:AY`,
+  agrupación de unidades generadoras por configuración, `Central_Empresa` con el rescate
+  del motor). Motor, solo export: `Resumen_Ciclos_PD` suma `Flag_Exencion`,
+  `Comentario_*`, `Fuente_Config_RIO_*`, `Fuente_Filtros_RIO_*`; `Vigencia_RIO_*` pasa a
+  1 cuando la búsqueda relajada aportó los filtros (antes describía la instrucción
+  descartada). `tests/test_generar_entrega_cen.py` reescrito: 9 pruebas con los casos
+  de la spec §9.
+- **Validación:** `pytest -q` → **125 passed**. Agosto con julio (`main`): libro abre por
+  COM sin reparar, recálculo 8 s; `Sobrecosto_Ciclo!T:W` = 0 en 390/390; `RESUMEN!F` = 0
+  en 27/27 y `G1` = **939.959.962**; `xHyC!BE` = 0 en 41.300 bloques. `COLMITO&1`
+  idéntico al peso al Excel horario v2 (207.054 / 168.434). Motor sin cambio de monto
+  (939.959.962). Paquete entregado en `C:\Kpi SC_PD\5 a 6\Claude\Entrega_SCPD_2608`.
+- **Pendientes:** que el dueño del proyecto lea el libro y diga si la disposición le
+  sirve; cerrar PR #53 (duplicado); refrescar la Defensa v2 con el erratum (941,3 →
+  940,0 MM). Para Codex: en specs con muchas fórmulas conviene exigir en §9 la prueba
+  "valores en pandas = motor" desde el principio; esta vez el PR pasó su propia suite
+  sin reproducir un solo monto.
 
 ### 2026-09-16 — Claude — Spec 32: el entregable al Coordinador debe tener el formato del Excel horario
 
