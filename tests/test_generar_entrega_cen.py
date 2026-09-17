@@ -138,14 +138,15 @@ def test_llaves_y_marcas_de_partida_detencion(reporte):
     carpeta = generar_entrega(reporte)
     x = _csv(carpeta, "Sobrecosto_PD_xHyC")
     c1 = x[x["Ciclo de operación"] == "C&1"].sort_values(["central", "FECHA_HORA"])
-    assert c1.iloc[0]["Id"] == "2608011.1C_1" and c1.iloc[1]["Id"] == "2608011.2C_1"
+    assert c1.iloc[0]["Id"] == "26080100:00C_1" and c1.iloc[1]["Id"] == "26080100:15C_1"
     # SI exactamente en el primer y último bloque de cada configuración
     assert list(c1["Proceso_Partida"].fillna("")) == ["SI", "", "SI", ""]
     assert list(c1["proceso_detencion"].fillna("")) == ["", "SI", "", "SI"]
     p = _csv(carpeta, "PARTIDAS_DETENCIONES")
     pc = p[p["Clave Ciclo"] == "C&1"].sort_values("FECHA_HORA")
     assert list(pc["Proceso_Partida"].fillna("")) == ["SI", ""] and list(pc["proceso_detencion"].fillna("")) == ["", "SI"]
-    assert pc.iloc[0]["Ciclo + fecha + hora"] == "2608011.1C" and int(pc.iloc[0]["Ciclo"]) == 1
+    assert pc.iloc[0]["Ciclo + fecha + hora"] == "26080100:00C" and int(pc.iloc[0]["Ciclo"]) == 1
+    assert list(pc["hora"]) == ["00:00", "00:15"] and list(pc["cuarto"]) == [1, 2]
     # el diferido no tiene detención; el que viene de julio no tiene partida en agosto
     assert (p.loc[p["Clave Ciclo"] == "D&1", "proceso_detencion"].fillna("") == "").all()
     assert (p.loc[p["Clave Ciclo"] == "A&1", "Proceso_Partida"].fillna("") == "").all()

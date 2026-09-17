@@ -37,16 +37,17 @@ Las columnas que el Excel no tiene (cuarto de hora, filtros del motor, checks) v
 | Concepto | Excel horario | Este libro (15 min) |
 |---|---|---|
 | `fecha` | `AAMMDD` entero (260811) | igual |
-| `hora` | 1..24 (hora 1 = 00:00–00:59) | igual: `FECHA_HORA.hour + 1` |
+| `hora` | 1..24 (hora 1 = 00:00–00:59) | **inicio del bloque, `HH:MM`** (`09:45`). Con 1..24 la hoja se leía horaria (17-09) |
 | `cuarto` | no existe | 1..4 (`FECHA_HORA.minute // 15 + 1`), columna nueva al final |
-| `Id` (xHyC!A) | `fecha & hora & central` | `fecha & hora & "." & cuarto & central` → `2608119.1COLMITO_GN_A` |
-| `Ciclo + fecha + hora` (P_D!O) | `fecha & hora & relacionada` | `fecha & hora & "." & cuarto & relacionada` |
+| `Id` (xHyC!A) | `fecha & hora & central` | igual: `fecha & hora & central` → `26081108:45COLMITO_GN_A` |
+| `Ciclo + fecha + hora` (P_D!O) | `fecha & hora & relacionada` | igual: `=A&B&M` |
 | `Clave Ciclo` / `Ciclo de operación` | `RELACIONADA&n` | `Etiqueta_Relacionada` del motor, sin cambios |
 | `Politica vigente` | `260801-1` | prefijo de `Llave_FHC` del bloque (`260818-1`) |
 
-`FECHA_HORA` es el inicio del bloque. El punto en el `Id` se lee como fracción de la
-hora (9.1 = primer cuarto de la hora 9) y evita la ambigüedad de concatenar sin
-separador.
+`FECHA_HORA` es el inicio del bloque. La versión inicial de la spec usaba `hora` 1..24 y un
+`Id` con `hora.cuarto`; al abrir el libro, con el `cuarto` en la columna AJ/AK, las hojas
+parecían horarias. Con `HH:MM` la resolución se ve en la segunda columna y las llaves
+quedan exactamente como en el Excel (`fecha & hora & central`).
 
 ## 3. Alcance de filas
 
@@ -159,8 +160,8 @@ registro.
 
 | Col | Encabezado | Contenido |
 |---|---|---|
-| A | `Clave` | `fecha & hora & "." & cuarto & Configuración` |
-| B | `Clave relacionada` | `fecha & hora & "." & cuarto & Relacionada` |
+| A | `Clave` | `fecha & hora(HH:MM del bloque de 15 min que contiene la instrucción) & Configuración` |
+| B | `Clave relacionada` | ídem con `Relacionada` (misma llave que `PARTIDAS_DETENCIONES!O`) |
 | C | `Dia` | día del mes |
 | D | `Hora` | `HH:MM` |
 | E | `E/S` | vacío (no existe en el RIO de 15 min) |
@@ -202,7 +203,7 @@ Una fila por bloque × configuración de `Detalle_15Min`, ordenada por `central`
 |---|---|---|
 | A | `Id` | valor, §2 |
 | B | `fecha` | entero `AAMMDD` |
-| C | `hora` | 1..24 |
+| C | `hora` | `HH:MM` inicio del bloque |
 | D | `central` | `Central` (configuración) |
 | E | `generacion` | `GENERACION` |
 | F | `Remunerar` | vacío |
@@ -245,7 +246,7 @@ Una fila por bloque × configuración de `Detalle_15Min`, ordenada por `central`
 | AQ | `Tarifa partida USD` | `Costo_Partida` |
 | AR | `Tarifa detención USD` | `Costo_Detencion` |
 | AS | `Central relacionada` | `Central_Relacionada` |
-| AT | `Clave relacionada` | `fecha & hora & "." & cuarto & Central_Relacionada` (es `PD x HyConf!N` del Excel; la usa `PARTIDAS_DETENCIONES!D`) |
+| AT | `Clave relacionada` | `fecha & hora & Central_Relacionada` (es `PD x HyConf!N` del Excel; la usa `PARTIDAS_DETENCIONES!D`) |
 | AU | `FECHA_HORA` | timestamp |
 | AV | `Instrucción` | `MOTIVO` |
 | AW | `Operación` | `ESTADO OPERACIONAL` |
@@ -271,7 +272,7 @@ Una fila por bloque × central relacionada (agrupando las configuraciones de
 | Col | Encabezado | Contenido |
 |---|---|---|
 | A | `fecha` | `AAMMDD` (el Excel tiene `|` por accidente; aquí `fecha`) |
-| B | `hora` | 1..24 |
+| B | `hora` | `HH:MM` inicio del bloque |
 | C | `central` | `Central_Relacionada` |
 | D | `generacion` | fórmula `=SUMIF('Sobrecosto_PD xHyC'!$AT$2:$AT$N,O2,'Sobrecosto_PD xHyC'!$E$2:$E$N)` |
 | E | `Remunerar` | vacío |
@@ -284,7 +285,7 @@ Una fila por bloque × central relacionada (agrupando las configuraciones de
 | L | `Costo PD` | 1 |
 | M | `Central relacionada` | fórmula `=C2` |
 | N | `Clave Ciclo` | fórmula `=M2&"&"&I2` |
-| O | `Ciclo + fecha + hora` | fórmula `=A2&B2&"."&AK2&M2` |
+| O | `Ciclo + fecha + hora` | fórmula `=A2&B2&M2` (idéntica al Excel) |
 | P | `Instrucción` | en `F = SI`: `Motivo_Partida` del ciclo; en `H = SI`: `Motivo_Detencion`; resto: `MOTIVO` del bloque |
 | Q | `Operación` | ídem con `Estado_Op_Partida` / `Estado_Op_Detencion` / `ESTADO OPERACIONAL` |
 | R | `Programación` | vacío |

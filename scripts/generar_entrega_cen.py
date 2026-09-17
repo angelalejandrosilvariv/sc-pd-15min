@@ -119,7 +119,7 @@ FORMULAS = {
         "D": f"=SUMIF({XH}!$AT$2:$AT${{N}},O{{r}},{XH}!$E$2:$E${{N}})",
         "M": "=C{r}",
         "N": "=M{r}&\"&\"&I{r}",
-        "O": "=A{r}&B{r}&\".\"&AK{r}&M{r}",
+        "O": "=A{r}&B{r}&M{r}",
         # solo en filas Proceso_Partida = SI
         "S": (f"=IFERROR(MAXIFS({XH}!$U$2:$U${{N}},{XH}!$J$2:$J${{N}},N{{r}},{XH}!$G$2:$G${{N}},\"SI\")"
               "*" + _FILTRO_OP.format(P="P", Q="Q", Z="Z", r="{r}") + "*AF{r}*AG{r}*AH{r},0)"),
@@ -324,10 +324,10 @@ def hoja_xhyc(detalle: pd.DataFrame, ciclos: pd.DataFrame, atributos: pd.DataFra
 
     out = pd.DataFrame(index=d.index)
     out["fecha"] = t.dt.strftime("%y%m%d").astype(int)
-    out["hora"] = t.dt.hour + 1
+    out["hora"] = t.dt.strftime("%H:%M")  # inicio del bloque; el Excel usa 1..24
     out["cuarto"] = t.dt.minute // 15 + 1
     out["central"] = central
-    out["Id"] = out["fecha"].astype(str) + out["hora"].astype(str) + "." + out["cuarto"].astype(str) + central
+    out["Id"] = out["fecha"].astype(str) + out["hora"] + central
     out["generacion"] = _num(_col(d, "GENERACION"))
     out["Remunerar"] = ""
     grupo_cfg = d.groupby([etiqueta, central])["FECHA_HORA"]
@@ -387,8 +387,7 @@ def hoja_xhyc(detalle: pd.DataFrame, ciclos: pd.DataFrame, atributos: pd.DataFra
     out["Tarifa partida USD"] = tarifa_p
     out["Tarifa detención USD"] = tarifa_d
     out["Central relacionada"] = _col(d, "Central_Relacionada", "").astype(str)
-    out["Clave relacionada"] = (out["fecha"].astype(str) + out["hora"].astype(str) + "."
-                                + out["cuarto"].astype(str) + out["Central relacionada"])
+    out["Clave relacionada"] = out["fecha"].astype(str) + out["hora"] + out["Central relacionada"]
     out["FECHA_HORA"] = t
     out["Instrucción"] = _col(d, "MOTIVO", "")
     out["Operación"] = _col(d, "ESTADO OPERACIONAL", "")
@@ -461,8 +460,7 @@ def hoja_partidas_detenciones(x: pd.DataFrame, ciclos: pd.DataFrame) -> pd.DataF
     out["Central relacionada"] = out["central"]
     out["Clave Ciclo"] = etiqueta
     out["cuarto"] = agg["cuarto"]
-    out["Ciclo + fecha + hora"] = (out["fecha"].astype(str) + out["hora"].astype(str) + "."
-                                   + out["cuarto"].astype(str) + out["central"])
+    out["Ciclo + fecha + hora"] = out["fecha"].astype(str) + out["hora"].astype(str) + out["central"]
 
     def extremo(col_ciclo, col_bloque, mask, default=None):
         """Valor del ciclo en el extremo indicado, el del bloque en el resto."""
@@ -529,7 +527,7 @@ def hoja_partidas_detenciones(x: pd.DataFrame, ciclos: pd.DataFrame) -> pd.DataF
     out["Monto Partidas ciclo"] = etiqueta.map(n_p["s"]).where(extremos, np.nan)
     out["N° Detenciones"] = etiqueta.map(n_d["n"]).where(extremos, np.nan)
     out["Monto Detenciones ciclo"] = etiqueta.map(n_d["s"]).where(extremos, np.nan)
-    out["Bloque mes"] = (t.dt.day - 1) * 96 + (out["hora"] - 1) * 4 + out["cuarto"]
+    out["Bloque mes"] = (t.dt.day - 1) * 96 + t.dt.hour * 4 + t.dt.minute // 15 + 1
     out["RIO PP"] = 0
     out["RIO PS"] = 0
     out["Revisar"] = 0
@@ -571,13 +569,13 @@ def hoja_rio(rio_usado: pd.DataFrame, ciclos: pd.DataFrame) -> pd.DataFrame:
     r = rio_usado.reset_index(drop=True)
     t = pd.to_datetime(_col(r, "FECHA_HORA_RIO", pd.NaT), errors="coerce")
     fecha = t.dt.strftime("%y%m%d").fillna("")
-    hora = (t.dt.hour + 1).astype("Int64").astype(str).replace("<NA>", "")
-    cuarto = (t.dt.minute // 15 + 1).astype("Int64").astype(str).replace("<NA>", "")
+    # la llave usa el bloque de 15 min que contiene la instruccion, como xHyC!Id
+    hora = t.dt.floor("15min").dt.strftime("%H:%M").fillna("")
     config = _col(r, "NOMBRE CONFIGURACIÓN", "").fillna("").astype(str)
     relacionada = _col(r, "Central_Relacionada_RIO", "").fillna("").astype(str)
     out = pd.DataFrame(index=r.index)
-    out["Clave"] = fecha + hora + "." + cuarto + config
-    out["Clave relacionada"] = fecha + hora + "." + cuarto + relacionada
+    out["Clave"] = fecha + hora + config
+    out["Clave relacionada"] = fecha + hora + relacionada
     out["Dia"] = t.dt.day
     out["Hora"] = t.dt.strftime("%H:%M")
     out["E/S"] = ""
@@ -759,8 +757,8 @@ def hoja_resumen(ciclo: pd.DataFrame, empresas: pd.DataFrame) -> pd.DataFrame:
 
 # --------------------------------------------------------------------------- diccionario y leeme
 _SIGNIFICADOS = {
-    "Id": "fecha & hora & '.' & cuarto & central; llave del bloque",
-    "fecha": "AAMMDD", "hora": "1..24 (hora 1 = 00:00-00:59)", "cuarto": "1..4 dentro de la hora",
+    "Id": "fecha & hora & central; llave del bloque (igual que el Excel, con hora HH:MM)",
+    "fecha": "AAMMDD", "hora": "inicio del bloque de 15 min, HH:MM (el Excel trae 1..24)", "cuarto": "1..4 dentro de la hora",
     "central": "configuracion que genero", "generacion": "MWh del bloque",
     "Proceso_Partida": "SI en el primer bloque de la configuracion dentro del ciclo",
     "proceso_detencion": "SI en el ultimo bloque de la configuracion dentro del ciclo",
@@ -794,6 +792,7 @@ LEEME = [
     "Cada hoja replica la homonima del Sobrecostos_PD_AAMM.xlsm: mismos encabezados y letras de columna;",
     "las columnas a la derecha de la ultima del Excel son del motor y no existen en el horario.",
     "Solo hay filas para los bloques de 15 min que pertenecen a un ciclo del mes; no se rellenan horas sin generacion.",
+    "La columna hora trae el inicio del bloque de 15 min (HH:MM) en vez del 1..24 del horario; Id y las llaves siguen siendo fecha & hora & central.",
     "",
     "CADENA DE FORMULAS (igual que el horario):",
     "  RESUMEN!C = SUMIF(Sobrecosto_Ciclo!I, empresa, Sobrecosto_Ciclo!H)",
