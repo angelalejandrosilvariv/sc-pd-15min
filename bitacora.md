@@ -98,8 +98,11 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 
 **Trabajo siguiente, en orden sugerido**
 
-0. ~~Spec 32~~ — hecha y verificada (17-09): el libro con formato horario cierra al
-   peso con el motor. Falta la lectura del dueño del proyecto.
+0. **Spec 33** (partida en pruebas tras orden fallida, interruptor activable en la
+   interfaz): Codex implementa, Claude verifica con agosto (+69,0 MM con
+   `'validar_orden_om_fallida'`) y junio.
+0b. ~~Spec 32~~ — hecha y verificada (17-09): el libro con formato horario cierra al
+   peso con el motor.
 1. ~~Spec + tests para el motor Reglas del Horario~~ — hecho (spec 26, Codex).
 2. ~~Conseguir julio 2026~~ — hecho; agosto corre con empalme (971,3 MM, +1,4% vs
    Excel). Queda revisar `CMg` nulo en el reporte `2608_v2` si se vuelve a usar.
@@ -126,6 +129,34 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-21 — Claude — Observaciones al Excel de agosto revisadas contra el motor; spec 33 (partida en pruebas tras orden fallida)
+
+- **Tipo:** análisis + especificación + decisión.
+- **Origen:** cuatro observaciones de empresas al `Sobrecostos_PD_2608_pre` (TOCOPILLA-TG3,
+  GUACOLDA-1, TRAPEN_DIESEL, PENON_DIESEL).
+- **Análisis:** TRAPEN 10/08 y PENON 10/08 están cubiertos: el motor separa las activaciones
+  CTF (+) en ciclos propios (TRAPEN &4–&7, PENON &6–&7) y paga partida y detención en cada
+  uno; el Excel las fundió en un ciclo (R1). TOCOPILLA-TG3 **no** está cubierto por dato:
+  el reporte de 15 min de agosto y la hoja `Gen` del Excel traen 0 MWh en los 2.976
+  bloques de TG3 mientras el RIO registra 8 PP / 8 PS OM a mínimo técnico y julio sí trae
+  1.619 MWh; hay que reponer la generación en el origen. Además `TOCOPILLA-TG3_GN_B` (y
+  `_GN_C/_GN_D`) faltan en `Diccionario_central_config`, el CV de `_GN_B` en el reporte
+  es 0,99 USD/MWh (placeholder) y el consolidado de costos 2608 trae 693 filas con
+  `DIA = 260909`. GUACOLDA-1: el RIO trae PP OM 21/08 23:16 → FS OT DF "Falla en la
+  pártida" → EP "según IF 2026004644" 23/08 00:50 → MT OM "Disponible y cancela IF" 05:00;
+  el motor rechaza la partida por EP. El dueño del proyecto concuerda con la empresa: el
+  EP cerró la partida ordenada por mérito, la partida es válida.
+- **Decisión (21-09-2026):** la validación de la partida EP queda como característica
+  **activable desde la interfaz**, apagada por defecto, con dos lecturas: solo orden OM
+  fallida (grupo Guacolda: GUACOLDA-1&1 y CHUYACA&3, +69,0 MM en agosto) o toda partida
+  EP que queda disponible OM en el mismo ciclo (13 ciclos, +244,9 MM; incluye salidas
+  intempestivas y retornos de mantención, cronologías distintas a la de Guacolda).
+  `docs/specs/33-partida-en-pruebas-tras-orden-fallida.md`.
+- **Validación:** ninguna todavía (spec). Los 21 ciclos EP de agosto y sus cronologías RIO
+  están en la §2 de la spec.
+- **Pendientes:** Codex implementa la spec 33; Claude verifica con agosto y junio.
+  Responder las observaciones de TG3 con la evidencia del dato faltante.
 
 ### 2026-09-17 — Claude — Verificación de la spec 32 (PR #55) con agosto real: el libro con formato horario cierra al peso
 
