@@ -49,6 +49,10 @@ MARGEN_NETEADO_POR_CICLO = 0
 # CAMBIA EL MONTO A PAGAR. Ver docs/specs/25-tarifa-configuracion-maxima.md
 TARIFA_CONFIGURACION = "maxima"
 
+# Partidas sincronizadas con instruccion EP. "rechazar" conserva la regla
+# vigente; las otras opciones cambian el monto (ver spec 33).
+PARTIDA_EN_PRUEBAS = "rechazar"
+
 # Minutos de vigencia de la instruccion RIO que justifica una partida/detencion.
 # 30 = solo se acepta una instruccion dada hasta 30 min antes (o 30 min despues,
 # via busqueda relajada) del inicio/termino del ciclo. 0 = sin limite (hasta
@@ -82,6 +86,7 @@ def main() -> None:
         "RESOLUCION_MARGEN": RESOLUCION_MARGEN,
         "MARGEN_NETEADO_POR_CICLO": MARGEN_NETEADO_POR_CICLO,
         "TARIFA_CONFIGURACION": TARIFA_CONFIGURACION,
+        "PARTIDA_EN_PRUEBAS": PARTIDA_EN_PRUEBAS,
         "VIGENCIA_INSTRUCCION_RIO_MIN": VIGENCIA_INSTRUCCION_RIO_MIN,
         "HORAS_SIN_HISTORIA": HORAS_SIN_HISTORIA,
     })

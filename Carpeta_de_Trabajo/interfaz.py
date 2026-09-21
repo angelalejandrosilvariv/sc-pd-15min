@@ -159,6 +159,22 @@ class Interfaz(tk.Tk):
         for rb in self.rb_tarifa:
             rb.pack(anchor="w")
 
+        self.lbl_partida_pruebas = ttk.Label(
+            f_met, text="Partida sincronizada en pruebas (EP) — solo motor v7")
+        self.lbl_partida_pruebas.grid(row=9, column=0, sticky="w", padx=(0, 8), pady=(6, 0))
+        self.var_partida_pruebas = tk.StringVar(value="rechazar")
+        fep = ttk.Frame(f_met); fep.grid(row=9, column=1, sticky="w", pady=(6, 0))
+        self.rb_partida_pruebas = [
+            ttk.Radiobutton(fep, text="Rechazar (vigente)",
+                            variable=self.var_partida_pruebas, value="rechazar"),
+            ttk.Radiobutton(fep, text="Validar si el CEN la ordenó y la orden falló antes de sincronizar",
+                            variable=self.var_partida_pruebas, value="validar_orden_om_fallida"),
+            ttk.Radiobutton(fep, text="Validar si queda disponible con motivo válido en el mismo ciclo",
+                            variable=self.var_partida_pruebas, value="validar_si_queda_disponible_om"),
+        ]
+        for rb in self.rb_partida_pruebas:
+            rb.pack(anchor="w")
+
         self.var_diferir = tk.IntVar(value=1)
         self.cb_diferir = ttk.Checkbutton(f_met, text="Diferir ciclos que no terminan en el mes (se cobran el mes que terminan)",
                                           variable=self.var_diferir)
@@ -199,16 +215,16 @@ class Interfaz(tk.Tk):
         self.cb_horas_sin_historia.grid(row=8, column=1, sticky="w", pady=(6, 0))
 
         # solo turbina
-        ttk.Separator(f_met).grid(row=9, column=0, columnspan=2, sticky="ew", pady=6)
+        ttk.Separator(f_met).grid(row=10, column=0, columnspan=2, sticky="ew", pady=6)
         self.lbl_atrib = ttk.Label(f_met, text="Tarifa entre turbinas del mismo evento (solo motor Turbina)")
-        self.lbl_atrib.grid(row=10, column=0, sticky="w", padx=(0, 8))
+        self.lbl_atrib.grid(row=11, column=0, sticky="w", padx=(0, 8))
         self.var_atrib = tk.StringVar(value="prorrata")
         self.cb_atrib = ttk.Combobox(f_met, textvariable=self.var_atrib, state="readonly", width=44,
                                      values=["prorrata  — una vez, repartida por generacion",
                                              "primera  — una vez, a la turbina que arranco primero",
                                              "cada_turbina  — cada turbina paga completa"])
         self.cb_atrib.current(0)
-        self.cb_atrib.grid(row=10, column=1, sticky="w")
+        self.cb_atrib.grid(row=11, column=1, sticky="w")
 
         # -- 5. Ejecutar + log
         f_run = ttk.Frame(cuerpo)
@@ -242,6 +258,10 @@ class Interfaz(tk.Tk):
         for rb in self.rb_tarifa:
             rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
         self.lbl_tarifa.configure(foreground="#000" if self.var_motor.get() == "v7" else "#999")
+        for rb in self.rb_partida_pruebas:
+            rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
+        self.lbl_partida_pruebas.configure(
+            foreground="#000" if self.var_motor.get() == "v7" else "#999")
         for rb in self.rb_resolucion_margen:
             rb.configure(state="normal" if self.var_motor.get() == "v7" else "disabled")
         self.lbl_resolucion_margen.configure(
@@ -315,6 +335,7 @@ class Interfaz(tk.Tk):
         else:
             panel["RESOLUCION_MARGEN"] = self.var_resolucion_margen.get()
             panel["TARIFA_CONFIGURACION"] = self.var_tarifa.get()
+            panel["PARTIDA_EN_PRUEBAS"] = self.var_partida_pruebas.get()
             panel["HORAS_SIN_HISTORIA"] = self.var_horas_sin_historia.get()
         return panel
 
@@ -450,6 +471,7 @@ class Interfaz(tk.Tk):
         self.var_resolucion_margen.set(p.get("RESOLUCION_MARGEN", "bloque"))
         self.var_neteado.set(p.get("MARGEN_NETEADO_POR_CICLO", 0))
         self.var_tarifa.set(p.get("TARIFA_CONFIGURACION", "maxima"))
+        self.var_partida_pruebas.set(p.get("PARTIDA_EN_PRUEBAS", "rechazar"))
         self.var_diferir.set(p.get("DIFERIR_CICLOS_SIN_TERMINAR", 1))
         self.var_baja_gen.set(p.get("FILTRAR_CICLOS_BAJA_GEN", 1))
         self.var_umbral.set(str(p.get("UMBRAL_RUIDO_MWH", 1.0)))
