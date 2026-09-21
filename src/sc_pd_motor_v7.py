@@ -239,6 +239,14 @@ USAR_TARIFA_RIO_INSTRUIDA = 1
 # 'instruida'). Ver docs/specs/25-tarifa-configuracion-maxima.md.
 TARIFA_CONFIGURACION = 'maxima'
 
+# Partida cuya instruccion vigente es EP (maquina en pruebas). Nace apagado:
+# las dos alternativas son sensibilidades que CAMBIAN EL MONTO A PAGAR.
+# Ver docs/specs/33-partida-en-pruebas-tras-orden-fallida.md.
+PARTIDA_EN_PRUEBAS = 'rechazar'
+PARTIDAS_EN_PRUEBAS_VALIDAS = (
+    'rechazar', 'validar_orden_om_fallida', 'validar_si_queda_disponible_om')
+VENTANA_ORDEN_FALLIDA_H = 48
+
 # Regla de exencion cuando el RIO no tiene registro de motivo.
 #   'sin_historia' : exime a los ciclos sin ciclo anterior conocido
 #                    (Horas_Detenida_Ciclo nula). Es el equivalente correcto de
@@ -462,6 +470,111 @@ def listar_secuencia_rio_ventana(momentos, rio_subset, ventana_cuartos_hora):
 
 
 TARIFAS_CONFIGURACION_VALIDAS = ('instruida', 'maxima')
+
+
+def validar_partida_en_pruebas(valor):
+    """Valida el interruptor EP con el mismo contrato (SystemExit) del panel."""
+    if valor not in PARTIDAS_EN_PRUEBAS_VALIDAS:
+        sys.exit(f"ERROR: PARTIDA_EN_PRUEBAS='{valor}' no es valido. "
+                 f"Opciones: {PARTIDAS_EN_PRUEBAS_VALIDAS}")
+
+
+def _motivo_rio_valido(rio):
+    """Criterio operacional de ``calcular_filtros``, pero sin exencion."""
+    motivo = rio.get('MOTIVO', pd.Series('', index=rio.index)).fillna('').astype(str).str.strip()
+    eo = rio.get('ESTADO OPERACIONAL', pd.Series('', index=rio.index)).fillna('').astype(str).str.strip()
+    comentario = rio.get('COMENTARIO', pd.Series('', index=rio.index)).fillna('').astype(str)
+    return (motivo.eq('OM') | eo.isin(CODIGOS_EO_VALIDOS)
+            | (motivo.eq('OT') & comentario.str.contains(r'SSCC|CTF|CSF|CPF', case=False, regex=True)))
+
+
+def aplicar_partida_en_pruebas(compacto, rio, reporte, modo='rechazar',
+                               ventana_h=VENTANA_ORDEN_FALLIDA_H):
+    """Evalua D/O y, si corresponde, valida partidas EP tras una orden fallida.
+
+    Devuelve una copia del compacto y una tabla de diagnostico (tambien cuando
+    ``modo='rechazar'``), de modo que la consola pueda mostrar la sensibilidad.
+    """
+    validar_partida_en_pruebas(modo)
+    df = compacto.copy()
+    nuevas = {
+        'Partida_En_Pruebas_Validada': '',
+        'Orden_Partida_Fallida': pd.NaT,
+        'Disponible_OM_Desde': pd.NaT,
+        'Consigna_Reingreso_Pruebas': '',
+        'Fuente_Reingreso_Pruebas': pd.NaT,
+        'Comentario_Reingreso_Pruebas': '',
+    }
+    for columna, valor in nuevas.items():
+        df[columna] = valor
+
+    registros = rio.copy()
+    if registros.empty:
+        return df, pd.DataFrame(columns=['Indice', 'Cumple_D', 'Cumple_O', 't_orden', 't_disp'])
+    registros['FECHA_HORA_RIO'] = pd.to_datetime(registros['FECHA_HORA_RIO'], errors='coerce')
+    registros['_motivo_valido'] = _motivo_rio_valido(registros)
+    grupos = {k: v.sort_values('FECHA_HORA_RIO') for k, v in
+              registros.groupby('Central_Relacionada_RIO', sort=False)}
+    diagnostico = []
+    candidatos = df.index[(pd.to_numeric(df['Filtro_Disp_Partida'], errors='coerce').fillna(0) == 0)
+                           & df['Consigna_Partida'].fillna('').astype(str).str.strip().eq('EP')]
+    for indice in candidatos:
+        fila = df.loc[indice]
+        t0, t1 = pd.Timestamp(fila['Inicio_Ciclo']), pd.Timestamp(fila['Termino_Ciclo'])
+        sub = grupos.get(fila['Central_Relacionada'])
+        disponibles = registros.iloc[0:0]
+        ordenes = registros.iloc[0:0]
+        if sub is not None:
+            con = sub['CONSIGNAS'].fillna('').astype(str).str.strip()
+            disponibles = sub[(sub['FECHA_HORA_RIO'].between(t0, t1))
+                               & ~con.isin(['EP', 'FS', 'PS']) & sub['_motivo_valido']]
+            ordenes = sub[(sub['FECHA_HORA_RIO'] >= t0 - pd.Timedelta(hours=ventana_h))
+                           & (sub['FECHA_HORA_RIO'] < t0) & con.isin(['PP', 'PMT'])
+                           & sub['_motivo_valido']]
+        disp = disponibles.iloc[0] if not disponibles.empty else None
+        orden = ordenes.iloc[-1] if not ordenes.empty else None
+        cumple_o = orden is not None
+        if cumple_o:
+            rep = reporte
+            if 'Central_Relacionada' in rep:
+                rep = rep[rep['Central_Relacionada'] == fila['Central_Relacionada']]
+            entre = rep[(pd.to_datetime(rep['FECHA_HORA'], errors='coerce') >= orden['FECHA_HORA_RIO'])
+                        & (pd.to_datetime(rep['FECHA_HORA'], errors='coerce') < t0)]
+            cumple_o = not pd.to_numeric(entre.get('GENERACION', 0), errors='coerce').fillna(0).ne(0).any()
+        cumple_d = disp is not None
+        diagnostico.append({'Indice': indice, 'Cumple_D': cumple_d, 'Cumple_O': cumple_o,
+                            't_orden': orden['FECHA_HORA_RIO'] if orden is not None else pd.NaT,
+                            't_disp': disp['FECHA_HORA_RIO'] if disp is not None else pd.NaT})
+        validar = (modo == 'validar_si_queda_disponible_om' and cumple_d) or (
+            modo == 'validar_orden_om_fallida' and cumple_d and cumple_o)
+        if not validar:
+            continue
+        original_fuente = fila.get('Fuente_Filtros_RIO_Partida', pd.NaT)
+        if pd.isna(original_fuente):
+            original_fuente = fila.get('Fuente_Config_RIO_Partida', pd.NaT)
+        df.at[indice, 'Consigna_Reingreso_Pruebas'] = fila['Consigna_Partida']
+        df.at[indice, 'Fuente_Reingreso_Pruebas'] = original_fuente
+        df.at[indice, 'Comentario_Reingreso_Pruebas'] = fila.get('Comentario_Partida', '')
+        justifica = orden if cumple_o and modo == 'validar_orden_om_fallida' else disp
+        etiqueta = 'orden OM fallida' if justifica is orden else 'queda disponible OM'
+        df.at[indice, 'Partida_En_Pruebas_Validada'] = etiqueta
+        df.at[indice, 'Orden_Partida_Fallida'] = (orden['FECHA_HORA_RIO'] if cumple_o else pd.NaT)
+        df.at[indice, 'Disponible_OM_Desde'] = disp['FECHA_HORA_RIO']
+        for origen, destino in [('CONSIGNAS', 'Consigna_Partida'), ('MOTIVO', 'Motivo_Partida'),
+                                ('ESTADO OPERACIONAL', 'Estado_Op_Partida'),
+                                ('COMENTARIO', 'Comentario_Partida')]:
+            df.at[indice, destino] = justifica.get(origen, '')
+        df.at[indice, 'Fuente_Filtros_RIO_Partida'] = justifica['FECHA_HORA_RIO']
+        df.loc[indice, ['Filtro_Disp_Partida', 'Filtro_Op_Partida', 'Vigencia_RIO_Partida']] = 1
+        if etiqueta == 'orden OM fallida':
+            obs = (f"Aprobado: partida en pruebas validada — orden {orden['CONSIGNAS']} {orden['MOTIVO']} del "
+                   f"{orden['FECHA_HORA_RIO']:%d/%m %H:%M} sin sincronizar; disponible "
+                   f"{disp['MOTIVO']} el {disp['FECHA_HORA_RIO']:%d/%m %H:%M}")
+        else:
+            obs = (f"Aprobado: partida en pruebas validada — disponible {disp['MOTIVO']} el "
+                   f"{disp['FECHA_HORA_RIO']:%d/%m %H:%M}")
+        df.at[indice, '_Obs_Partida_En_Pruebas'] = obs
+    return df, pd.DataFrame(diagnostico)
 
 # Campos de partida/detencion que deben viajar juntos con la tarifa elegida:
 # si la tarifa sale de otra configuracion, sus umbrales, tramo y filtro de
@@ -882,6 +995,11 @@ def crear_guia_lectura():
         ('Horas_Cota_Inferior / Horas_Detenida_Estimada',
          'Para el ciclo sin anterior conocido: horas desde el primer FECHA_HORA cargado y marca de que la cota se uso para demostrar el tramo Fria. Horas_Detenida_Ciclo queda nula y conserva la exencion RIO sin_historia.'),
         ('Filtros de Partida', 'Filtro_Conf_Partida, Filtro_Disp_Partida, Filtro_Op_Partida y Filtro_CostoCero_Partida: 1 acepta y 0 rechaza el costo.'),
+        ('PARTIDA_EN_PRUEBAS', "'rechazar' conserva la regla vigente; las alternativas validan una partida EP por una orden OM fallida o porque queda disponible con motivo valido dentro del ciclo."),
+        ('Partida_En_Pruebas_Validada / Orden_Partida_Fallida / Disponible_OM_Desde',
+         'Auditoria de la excepcion EP: variante que valido el ciclo y timestamps de la orden fallida y de la disponibilidad.'),
+        ('Consigna_Reingreso_Pruebas / Fuente_Reingreso_Pruebas / Comentario_Reingreso_Pruebas',
+         'Instruccion EP original, su timestamp RIO y comentario, conservados antes de sustituirla por la instruccion que justifica la partida.'),
         ('Vigencia_RIO_Partida / Vigencia_RIO_Detencion', 'Con VIGENCIA_INSTRUCCION_RIO_MIN > 0: 1 si la instruccion RIO usada tiene a lo mas esos minutos de antiguedad respecto del bloque; 0 la deja sin efecto (Filtro_Op = 0) salvo que la busqueda relajada encuentre una instruccion valida en +/- VENTANA_CUARTOS_HORA.'),
         ('Costo_Partida_Base', 'Costo de partida en moneda local antes de aplicar los filtros.'),
         ('Umbrales base', 'Fria_Num1_M, Tibia_Num1_O, Tibia_Num2_N y Caliente_Num1_P delimitan los tramos por horas detenidas.'),
@@ -941,6 +1059,8 @@ def columnas_resumen_ciclos(usar_config_dominante, usar_tarifa_rio_instruida,
         'Costo_Partida_Base',
         'Fria_Num1_M', 'Tibia_Num1_O', 'Tibia_Num2_N', 'Caliente_Num1_P',
         'Partida_Fria', 'Partida_Tibia', 'Partida_Tibia_2', 'Partida_Caliente',
+        'Partida_En_Pruebas_Validada', 'Orden_Partida_Fallida', 'Disponible_OM_Desde',
+        'Consigna_Reingreso_Pruebas', 'Fuente_Reingreso_Pruebas', 'Comentario_Reingreso_Pruebas',
         'Costo_Partida_Efectivo', 'Obs_Partida',
         'Estado_Op_Detencion', 'Consigna_Detencion', 'Motivo_Detencion',
         'Filtro_Conf_Detencion', 'Filtro_Disp_Detencion', 'Filtro_Op_Detencion', 'Vigencia_RIO_Detencion',
@@ -1037,6 +1157,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     """Ejecuta el motor con rutas/interruptores opcionales sobre el panel actual."""
     globals().update(rutas or {})
     globals().update(panel or {})
+    validar_partida_en_pruebas(PARTIDA_EN_PRUEBAS)
     if RESOLUCION_MARGEN not in RESOLUCIONES_MARGEN_VALIDAS:
         sys.exit(f"ERROR: RESOLUCION_MARGEN='{RESOLUCION_MARGEN}' no es valido. "
                  f"Opciones: {RESOLUCIONES_MARGEN_VALIDAS}")
@@ -2302,6 +2423,41 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         df_compacto['Filtro_Conf_Partida'] = 1
         df_compacto['Filtro_Conf_Detencion'] = 1
 
+    # La excepcion EP se evalua tras la busqueda relajada, cuando ya se conoce
+    # la instruccion definitiva del extremo, y antes de calcular costos.
+    df_compacto, diagnostico_ep = aplicar_partida_en_pruebas(
+        df_compacto, rio, reporte, PARTIDA_EN_PRUEBAS, VENTANA_ORDEN_FALLIDA_H)
+    print("\n" + "=" * 78)
+    print("  PARTIDA EN PRUEBAS (EP)")
+    print("=" * 78)
+    print(f"  Interruptor: {PARTIDA_EN_PRUEBAS}")
+    print(f"  Ciclos EP rechazados evaluados: {len(diagnostico_ep):,}")
+    if not diagnostico_ep.empty:
+        print(f"  Cumplen D: {int(diagnostico_ep['Cumple_D'].sum()):,}")
+        print(f"  Cumplen D y O: {int((diagnostico_ep['Cumple_D'] & diagnostico_ep['Cumple_O']).sum()):,}")
+        validados_ep = df_compacto['Partida_En_Pruebas_Validada'].ne('')
+        impactos_ep = []
+        for idx in df_compacto.index[validados_ep]:
+            partida = (df_compacto.at[idx, 'Costo_Partida_Base']
+                       * df_compacto.at[idx, 'Filtro_Conf_Partida']
+                       * df_compacto.at[idx, 'Filtro_Disp_Partida']
+                       * df_compacto.at[idx, 'Filtro_Op_Partida']
+                       * df_compacto.at[idx, 'Filtro_CostoCero_Partida'])
+            detencion = (df_compacto.at[idx, 'Costo_Detencion_Base']
+                         * df_compacto.at[idx, 'Filtro_Conf_Detencion']
+                         * df_compacto.at[idx, 'Filtro_Disp_Detencion']
+                         * df_compacto.at[idx, 'Filtro_Op_Detencion']
+                         * df_compacto.at[idx, 'Filtro_CostoCero_Detencion'])
+            margen = df_compacto.at[idx, 'Margen_Suma_Ciclo']
+            impacto = max(0, partida + detencion - margen) - max(0, detencion - margen)
+            impactos_ep.append(impacto)
+            print(f"    {df_compacto.at[idx, 'Etiqueta_Relacionada']}: "
+                  f"orden={df_compacto.at[idx, 'Orden_Partida_Fallida']}, "
+                  f"disponible={df_compacto.at[idx, 'Disponible_OM_Desde']}, "
+                  f"tarifa={df_compacto.at[idx, 'Costo_Partida_Base']:,.0f}, "
+                  f"delta Total SC_PD={impacto:,.0f} CLP")
+        print(f"  Impacto total: {sum(impactos_ep):,.0f} CLP")
+
     df_compacto = costos_clasicos(df_compacto)
     df_compacto, ciclos_sin_terminar = diferir_costos_ciclos_sin_terminar(
         df_compacto, DIFERIR_CICLOS_SIN_TERMINAR)
@@ -2554,6 +2710,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                 'Rechazo: ninguna configuracion del ciclo tiene el combustible instruido')
     df_compacto = asignar_observaciones_liquidacion(
         df_compacto, ciclos_sin_terminar, DIFERIR_CICLOS_SIN_TERMINAR)
+    if '_Obs_Partida_En_Pruebas' in df_compacto:
+        aprobada_ep = df_compacto['_Obs_Partida_En_Pruebas'].notna()
+        if DIFERIR_CICLOS_SIN_TERMINAR == 1:
+            aprobada_ep &= ~df_compacto['Estado_Ciclo_Mes'].isin(
+                ['Continua todo el mes', 'Continua proximo mes'])
+        df_compacto.loc[aprobada_ep, 'Obs_Partida'] = df_compacto.loc[
+            aprobada_ep, '_Obs_Partida_En_Pruebas']
 
     columnas_finales = columnas_resumen_ciclos(
         USAR_CONFIG_DOMINANTE, USAR_TARIFA_RIO_INSTRUIDA, MARGEN_NETEADO_POR_CICLO,

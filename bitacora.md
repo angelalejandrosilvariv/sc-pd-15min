@@ -2008,3 +2008,16 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
   `Central_Empresa`. Se agregó la versión Preliminar/Definitivo y se retiró la
   opción de tablas dinámicas.
 - **Pendiente:** Claude verificará agosto de 2026 con los archivos reales.
+
+### 2026-09-21 — Codex (OpenAI) — Partida en pruebas tras orden fallida (spec 33)
+
+- **Tipo:** regla de negocio opcional, auditoría, interfaz y pruebas sintéticas.
+- **Cambios:** se agregó `PARTIDA_EN_PRUEBAS`, apagado por defecto, con las
+  variantes que exigen orden OM fallida más disponibilidad o solamente
+  disponibilidad con motivo válido. El motor conserva la instrucción EP original,
+  expone seis columnas de auditoría, muestra en consola la sensibilidad D/O aun al
+  rechazar y ofrece el selector únicamente para v7 en runner e interfaz.
+- **Validación:** nueve escenarios sintéticos de la spec 33 y suite completa de
+  regresión. Con `rechazar` no se alteran filtros ni montos existentes.
+- **Pendiente:** Claude verificará agosto de 2026 con los archivos reales, según la
+  sección 9 de la especificación.
