@@ -123,3 +123,19 @@ def test_9_export_ubica_y_documenta_las_seis_columnas():
                     columnas.index('Costo_Partida_Efectivo')] == nuevas
     guia = ' '.join(crear_guia_lectura()['Columna'].astype(str))
     assert all(columna in guia for columna in nuevas)
+
+
+def test_10_la_generacion_de_otras_centrales_no_bloquea_la_orden_fallida():
+    # En el motor el reporte completo trae todas las centrales: solo la generacion de
+    # la relacionada del ciclo puede desmentir que la orden no sincronizo.
+    reporte = pd.DataFrame({'FECHA_HORA': [T0 - pd.Timedelta(hours=12)] * 2,
+                            'Central_Relacionada': ['GUACOLDA-1', 'OTRA'],
+                            'GENERACION': [0.0, 250.0]})
+    df, diag = aplicar_partida_en_pruebas(_compacto(), _rio(), reporte, 'validar_orden_om_fallida')
+    assert bool(diag['Cumple_O'].iloc[0]) and df['Partida_En_Pruebas_Validada'].iloc[0] == 'orden OM fallida'
+
+
+def test_11_sin_central_relacionada_en_el_reporte_aborta_en_vez_de_callar():
+    reporte = pd.DataFrame({'FECHA_HORA': [T0 - pd.Timedelta(hours=12)], 'GENERACION': [0.0]})
+    with pytest.raises(SystemExit):
+        aplicar_partida_en_pruebas(_compacto(), _rio(), reporte, 'validar_orden_om_fallida')

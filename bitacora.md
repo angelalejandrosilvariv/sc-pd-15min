@@ -41,7 +41,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | Runners para Spyder | `Carpeta_de_Trabajo/correr_motor*.py` | Vigentes. Editar solo las variables `NOMBRE_*`. |
 | Consolidación de costos desde políticas PO | `scripts/consolidar_politicas.py` | Vigente (produce `Costos_de_P-D_Consolidado_AAMM.xlsx`). |
 
-**Cómo correr y verificar**: `pytest -q` → 125 pruebas deben pasar. Los datos
+**Cómo correr y verificar**: `pytest -q` → 136 pruebas deben pasar. Los datos
 (CSV/XLSX/XLSM/parquet) **no se versionan** (`.gitignore`); se dejan en
 `Carpeta_de_Trabajo/`. Nunca escribir en la unidad `T:`; se copia a local.
 
@@ -91,6 +91,8 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | 2608 con empalme 2607, `RESOLUCION_MARGEN = 'hora'` (spec 30, solo para contraste) | — | 999.211.996 | 966.791.746 |
 | **2608 con empalme 2607, `main` con erratum spec 25 (16-09)** | — | **939.959.962** | 966.791.746 |
 | **2606 con empalme 2605, `main` con erratum spec 25 (16-09)** | — | **1.065.608.599** | 1.028.628.659 |
+| 2608 con empalme 2607, `PARTIDA_EN_PRUEBAS = 'validar_orden_om_fallida'` (spec 33, apagado por defecto) | — | 1.008.974.072 | 966.791.746 |
+| 2608 con empalme 2607, `PARTIDA_EN_PRUEBAS = 'validar_si_queda_disponible_om'` (spec 33, sensibilidad) | — | 1.184.861.113 | 966.791.746 |
 | 2608 sin julio, `VIGENCIA_INSTRUCCION_RIO_MIN = 30` | — | **857.661.488** | 957.823.663 (preliminar) |
 | 2606 con empalme 2605, vigencia 30 + cota inferior (spec 28) | — | **1.065.936.984** | 1.028.628.659 |
 | 2608 sin julio, vigencia 30 + cota inferior (spec 28) | — | **910.213.848** | 957.823.663 (preliminar) |
@@ -98,9 +100,9 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 
 **Trabajo siguiente, en orden sugerido**
 
-0. **Spec 33** (partida en pruebas tras orden fallida, interruptor activable en la
-   interfaz): Codex implementa, Claude verifica con agosto (+69,0 MM con
-   `'validar_orden_om_fallida'`) y junio.
+0. ~~Spec 33~~ — hecha y verificada (21-09). `PARTIDA_EN_PRUEBAS` sigue en `'rechazar'`;
+   con `'validar_orden_om_fallida'` agosto sube a 1.008.974.072 (+69,0 MM, GUACOLDA-1).
+   Falta la decisión del CEN sobre la observación de Guacolda.
 0b. ~~Spec 32~~ — hecha y verificada (17-09): el libro con formato horario cierra al
    peso con el motor.
 1. ~~Spec + tests para el motor Reglas del Horario~~ — hecho (spec 26, Codex).
@@ -129,6 +131,29 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-21 — Claude — Verificación de la spec 33 (PR #56) con agosto y junio: una corrección y cifras de sensibilidad
+
+- **Tipo:** corrección + prueba + verificación.
+- **Origen:** PR #56 de Codex (`codex/implementar-partida-en-pruebas-en-el-motor`).
+- **Cambios:** la condición O (la orden no sincronizó) miraba la generación del reporte
+  completo sin `Central_Relacionada` —el reporte crudo no trae esa columna, solo
+  `reporte_sin_ceros`— y cualquier MWh del sistema entre la orden y el inicio la
+  anulaba: `'validar_orden_om_fallida'` nunca validaba nada, y la prueba sintética no lo
+  veía porque su reporte sí traía la columna. `main()` ahora mapea `Central_Relacionada`
+  con el diccionario antes de llamar a `aplicar_partida_en_pruebas`, que aborta si falta
+  la columna. Dos pruebas nuevas (`test_10`, `test_11`). Interfaz, runner, export y
+  consola del PR quedan como vinieron.
+- **Validación:** `pytest -q` → **136 passed**. Agosto con julio: `'rechazar'`
+  939.959.962 (sin cambio); `'validar_orden_om_fallida'` **1.008.974.072** (+69.014.110:
+  GUACOLDA-1&1 +68,58 MM, CHUYACA&3 +0,43 MM); `'validar_si_queda_disponible_om'`
+  **1.184.861.113** (+244.901.151, 13 ciclos liquidados + 7 diferidos marcados). Junio con
+  mayo: 1.065.608.599 / 1.065.608.599 (CMPCCORDILLERA&4 validado, Δ 0 por margen) /
+  1.074.540.295 (+8,93 MM). Ningún ciclo no validado cambió. Detalle en spec 33 §9.
+- **Pendientes:** decisión del CEN sobre la observación de Guacolda (el interruptor sigue
+  en `'rechazar'`); la interfaz ya permite activarlo. Codex: en reglas que cruzan con el
+  reporte, la spec debe decir qué DataFrame se pasa y qué columnas trae; la prueba
+  sintética debe replicar las columnas reales del motor.
 
 ### 2026-09-21 — Claude — Observaciones al Excel de agosto revisadas contra el motor; spec 33 (partida en pruebas tras orden fallida)
 

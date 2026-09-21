@@ -8,7 +8,8 @@
 runner o la interfaz. Decisión del 21-09-2026: la característica queda disponible como
 opción mientras el CEN resuelve la observación de Guacolda.
 
-**Estado:** especificada; implementación por Codex; verificación con agosto por Claude.
+**Estado:** implementada (PR #56 + corrección de Claude) y verificada con agosto y junio (§9).
+Sigue **apagada** por defecto: la decisión de negocio está pendiente (§10).
 
 ---
 
@@ -179,13 +180,47 @@ Construir compacto + RIO + reporte mínimos y verificar:
 9. `columnas_resumen_ciclos` contiene las seis columnas en su lugar y `Guia_Lectura` las
    describe.
 
-## 9. Verificación con datos reales (Claude)
+## 9. Verificación con datos reales (Claude, 21-09-2026)
 
-Agosto con julio: `'rechazar'` = 939.959.962 (sin cambio). `'validar_orden_om_fallida'`
-debe validar GUACOLDA-1&1 (+68,58 MM) y evaluar CHUYACA_DIESEL&3 (depende de si el RIO la
-deja disponible OM dentro del ciclo); ningún otro. `'validar_si_queda_disponible_om'`
-debe validar los 13 ciclos de la §2 (+244,9 MM). Junio con mayo para regresión.
-Resultados a esta spec y a la bitácora.
+PR #56 de Codex, agosto 2026 con julio empalmado, las tres variantes corridas sobre el
+mismo `main`:
+
+| `PARTIDA_EN_PRUEBAS` | Total SC_PD 2608 | Δ vs `'rechazar'` | Ciclos validados |
+|---|---:|---:|---|
+| `'rechazar'` | **939.959.962** | — | 0 (idéntico al `main` anterior) |
+| `'validar_orden_om_fallida'` | **1.008.974.072** | +69.014.110 | GUACOLDA-1_CAR&1 (+68.579.355), CHUYACA_DIESEL&3 (+434.755) |
+| `'validar_si_queda_disponible_om'` | **1.184.861.113** | +244.901.151 | 20 marcados: los 13 de la §2 (GUACOLDA-3&1/&2, GUACOLDA-4&1, GUACOLDA-5&1 y SANISIDRO-1&6 con Δ 0 por margen) más 7 diferidos que se evaluarán el mes que terminen |
+
+Exactamente lo previsto en la §2. Ningún ciclo no validado cambió de monto en ninguna
+variante. GUACOLDA-1 queda con `Consigna_Partida = PP`, `Motivo_Partida = OM`,
+`Orden_Partida_Fallida = 21/08 23:16`, `Disponible_OM_Desde = 23/08 05:00`,
+`Consigna_Reingreso_Pruebas = EP`, y `Obs_Partida` "Aprobado: partida en pruebas validada
+— orden PP OM del 21/08 23:16 sin sincronizar; disponible OM el 23/08 05:00". CHUYACA&3
+cumple O y D (PC OM a las 12:19 dentro del ciclo).
+
+Consola con `'rechazar'`: 28 ciclos EP evaluados (incluye diferidos), 20 cumplen D, 2
+cumplen D y O, impacto 0 — la sensibilidad queda visible sin activar nada. Las etiquetas
+del bloque de consola son las previas a la renumeración (`GUACOLDA-1_CAR&2`,
+`CHUYACA_DIESEL&14`); el export trae las definitivas.
+
+**Corrección al PR**: la condición O comparaba la generación contra el reporte completo
+sin `Central_Relacionada` (el reporte crudo no la trae; solo `reporte_sin_ceros`), así
+que cualquier generación del sistema entre la orden y el inicio la anulaba y
+`'validar_orden_om_fallida'` nunca validaba nada. La prueba sintética pasaba porque su
+reporte sí traía la columna. Ahora `main()` mapea `Central_Relacionada` con el mismo
+diccionario antes de llamar, y la función aborta si falta la columna en vez de callar.
+Dos pruebas nuevas (`test_10`, `test_11`) fijan ambas cosas. Suite: **136 pruebas**.
+
+Junio 2026 con mayo (regresión y sensibilidad):
+
+| `PARTIDA_EN_PRUEBAS` | Total SC_PD 2606 | Δ | Ciclos validados |
+|---|---:|---:|---|
+| `'rechazar'` | **1.065.608.599** | — | 0 (idéntico al `main` anterior) |
+| `'validar_orden_om_fallida'` | 1.065.608.599 | 0 | CMPCCORDILLERA&4 (orden PMT OM 04/06 19:11; el margen absorbe la tarifa de 1,05 MM) |
+| `'validar_si_queda_disponible_om'` | 1.074.540.295 | +8.931.695 | 24 marcados; solo ATACAMA-1TG1AB&3 (+3,30 MM) y &13 (+5,63 MM) cambian de monto, el resto queda en 0 por margen o está diferido |
+
+En junio el caso "orden OM fallida" es raro y sin efecto; en agosto lo concentra
+GUACOLDA-1. La variante amplia mueve 8,9 MM en junio y 244,9 MM en agosto.
 
 ## 10. Pendiente de negocio
 

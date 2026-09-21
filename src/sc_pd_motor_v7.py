@@ -535,9 +535,13 @@ def aplicar_partida_en_pruebas(compacto, rio, reporte, modo='rechazar',
         orden = ordenes.iloc[-1] if not ordenes.empty else None
         cumple_o = orden is not None
         if cumple_o:
-            rep = reporte
-            if 'Central_Relacionada' in rep:
-                rep = rep[rep['Central_Relacionada'] == fila['Central_Relacionada']]
+            # La condicion O exige que la orden no haya sincronizado: se mira la
+            # generacion de ESTA relacionada (todas sus configuraciones). Sin la
+            # columna, la comparacion seria contra todo el sistema y O nunca se
+            # cumpliria en silencio.
+            if 'Central_Relacionada' not in reporte.columns:
+                sys.exit("ERROR: aplicar_partida_en_pruebas necesita 'Central_Relacionada' en el reporte.")
+            rep = reporte[reporte['Central_Relacionada'] == fila['Central_Relacionada']]
             entre = rep[(pd.to_datetime(rep['FECHA_HORA'], errors='coerce') >= orden['FECHA_HORA_RIO'])
                         & (pd.to_datetime(rep['FECHA_HORA'], errors='coerce') < t0)]
             cumple_o = not pd.to_numeric(entre.get('GENERACION', 0), errors='coerce').fillna(0).ne(0).any()
@@ -2425,8 +2429,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
 
     # La excepcion EP se evalua tras la busqueda relajada, cuando ya se conoce
     # la instruccion definitiva del extremo, y antes de calcular costos.
+    # El reporte completo (con ceros) no trae Central_Relacionada; se mapea con el
+    # mismo diccionario que reporte_sin_ceros para mirar la generacion de la relacionada.
+    reporte_relacionada = reporte.assign(
+        Central_Relacionada=reporte['Central'].astype(str).str.strip().map(diccionario_central)
+        .fillna(reporte['Central'].astype(str).str.strip()))
     df_compacto, diagnostico_ep = aplicar_partida_en_pruebas(
-        df_compacto, rio, reporte, PARTIDA_EN_PRUEBAS, VENTANA_ORDEN_FALLIDA_H)
+        df_compacto, rio, reporte_relacionada, PARTIDA_EN_PRUEBAS, VENTANA_ORDEN_FALLIDA_H)
     print("\n" + "=" * 78)
     print("  PARTIDA EN PRUEBAS (EP)")
     print("=" * 78)
