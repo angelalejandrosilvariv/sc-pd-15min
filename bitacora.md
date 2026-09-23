@@ -132,6 +132,23 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-23 — Claude — Verificación del PR #58 de Codex (correcciones a la spec 34)
+
+- **Tipo:** verificación.
+- **Origen:** PR #58 (`codex/corrige-tres-puntos-en-la-spec-34`), que corrige las tres
+  observaciones de la revisión automática del PR #57.
+- **Revisión del código:** los tres puntos están resueltos como se pidió, sin tocar los
+  motores, la lógica del prorrateo ni pruebas existentes (salvo el fixture de `Ciclo_Mes`,
+  como se indicó). (1) Sin retiros, la entrega borra los dos CSV de pagos de una corrida
+  anterior. (2) `normalizar_etiqueta_ciclo` lleva `Etiqueta_Turbina` y la `Etiqueta` de Reglas
+  del Horario a `Etiqueta_Relacionada`, y en el detalle de Reglas la reconstruye con la
+  fórmula del motor. El conteo por empresa ya no depende de la etiqueta. (3) El mes sale de
+  `max(Inicio_Ciclo)`.
+- **Validación:** `pytest -q` → **147 passed** sobre `main` (3711438); `git diff --check`
+  limpio.
+- **Pendientes:** los de la spec 34 §5 (verificación con agosto y los retiros reales). Sigue
+  sin haber CI: los PR con automerge entran sin correr pruebas.
+
 ### 2026-09-23 — Codex (OpenAI) — Correcciones posteriores a la revisión de la spec 34
 
 - **Tipo:** corrección + pruebas.
