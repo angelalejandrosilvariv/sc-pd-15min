@@ -132,6 +132,34 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-23 — Claude — Verificación del PR #59 (spec 35): NO verificado, el caché cambia la entrega CEN
+
+- **Tipo:** verificación.
+- **Origen:** PR #59 (`codex/optimizar-tiempo-de-ejecucion-sin-cambios-en-resultados`).
+- **Método:** datos sintéticos de `tests/generar_datos_volumen.py --rapido`. Se corrió el motor
+  con el código anterior (3711438, más el arreglo `astype('string')` de pandas 3 que trae el PR)
+  y con el nuevo, y la entrega y el prorrateo leyendo del caché Parquet y del XLSX.
+- **Resultados:**
+  - Excel del motor: idéntico hoja por hoja (`assert_frame_equal`, exacto). Prorrateo: idéntico.
+  - **Entrega CEN: distinta según lea del caché o del XLSX.** (1) `Presta SSCC` y
+    `Presta SSCC detención` cambian de 1 a 0 en tres ciclos: el XLSX devuelve NaN para un
+    comentario vacío y `extremo()` cae al comentario del bloque; el Parquet devuelve `""` y lo
+    usa tal cual. Esa columna entra en la fórmula del filtro operacional (OT + SSCC) de
+    `PARTIDAS_DETENCIONES!S/T`. (2) Floats con más dígitos (el XLSX guarda 15 cifras) y enteros
+    escritos como `36800920.0`: no cambia montos, pero la entrega deja de ser idéntica.
+  - Con pyarrow instalado (Anaconda lo trae) el caché queda activo por defecto: el riesgo aplica
+    en la máquina del dueño.
+  - Tiempos (mismo conjunto): motor 3,2 s → 4,0 s (escribe el caché); entrega 7,1 s → 6,3 s;
+    prorrateo 0,8 s → 0,3 s. Sin ganancia relevante; los puntos caros (búsqueda RIO,
+    exportación del Excel) no se tocaron.
+  - `tests/test_regresion_golden.py` no cubre el caché ni el motor: genera la entrega desde el
+    XLSX armado a mano del fixture. Los datos de volumen dan `Total SC_PD = 0` en todos los
+    ciclos, así que el prorrateo reparte 0 y no se puede juzgar ningún monto con ellos.
+  - `pytest -q` → 157 passed.
+- **Pendientes:** Codex debe quitar la lectura desde el caché (o hacerla equivalente al XLSX y
+  demostrarlo de punta a punta). Mientras tanto, borrar la carpeta
+  `Reporte_Sobrecostos_PD_Final_cache` antes de generar una entrega.
+
 ### 2026-09-23 — Claude — Verificación del PR #58 de Codex (correcciones a la spec 34)
 
 - **Tipo:** verificación.
