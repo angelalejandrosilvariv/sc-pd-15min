@@ -104,3 +104,19 @@ propias.
 3. Revisar si los nombres de `Suministrador` del archivo de retiros coinciden con los de
    `Empresa` del diccionario. Si no, hace falta una tabla de equivalencias; esta spec no la
    crea.
+
+## §6 Correcciones posteriores a la revisión
+
+1. **Archivos de pagos de corridas anteriores.** Cuando la entrega CEN se vuelve a generar
+   sin retiros en una carpeta que antes se generó con ellos, se eliminan
+   `SCPD_<AAMM>_Cuadro_de_pagos.csv` y
+   `SCPD_<AAMM>_Prorrateo_Detalle_15min.csv`. Así, la entrega sin prorrateo vuelve a contener
+   exactamente sus 12 CSV y no conserva pagos obsoletos.
+2. **Compatibilidad con los tres motores.** La lectura para la interfaz normaliza como
+   `Etiqueta_Relacionada` la `Etiqueta_Turbina` del motor Turbina y la `Etiqueta` del resumen
+   de Reglas del Horario. Como el detalle de este último no exporta una etiqueta, se
+   reconstruye como `Central_Relacionada + "&" + Ciclo_ID`. La normalización se aplica tanto
+   al resumen visible como al prorrateo; la entrega CEN continúa siendo exclusiva del v7.
+3. **Mes derivado de las fechas.** `Ciclo_Mes` es un ordinal por central, no un AAMM. El mes
+   mostrado ahora se obtiene de la fecha máxima válida de `Inicio_Ciclo`, con formato `%y%m`;
+   si no existe una fecha válida, queda vacío.

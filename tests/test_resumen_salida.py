@@ -14,7 +14,7 @@ Q = pd.Timedelta(minutes=15)
 
 
 def _ciclo(etiqueta, empresa, estado, costos, total, obs="Aprobado"):
-    return {"Etiqueta_Relacionada": etiqueta, "Empresa": empresa, "Ciclo_Mes": "2608",
+    return {"Etiqueta_Relacionada": etiqueta, "Empresa": empresa,
             "Estado_Ciclo_Mes": estado, "Tipo_Partida": "Fria", "Inicio_Ciclo": T0,
             "Costo_Partida_Efectivo": costos, "Costo_Detencion_Efectivo": 0.0,
             "Margen_Suma_Ciclo": costos - total, "Costos_Totales_PD": costos, "Total SC_PD": total,
@@ -30,6 +30,7 @@ def salida(tmp_path):
         _ciclo("B&2", "E2", "Continua proximo mes", 0.0, 0.0),                  # diferido
         _ciclo("C&1", "E3", "Viene del mes anterior", 30.0, 20.0),
     ])
+    ciclos["Ciclo_Mes"] = [1, 2, 1, 2, 1]
     detalle = pd.DataFrame({
         "Etiqueta_Relacionada": ["A&1", "A&1", "A&2", "B&2", "C&1"],
         "FECHA_HORA": [T0, T0 + Q, T0 + 2 * Q, T0 + 3 * Q, T0],
@@ -95,3 +96,34 @@ def test_prorratear_salida_reparte_solo_ciclos_con_monto(salida, tmp_path):
     # A&2 (cubierto) y B&2 (diferido) no se reparten ni generan avisos de "sin retiros"
     assert r["ciclos"] == 2 and r["ciclos_sin_retiros"] == [] and not r["mensajes"]
     assert r["excel"].exists() and r["csv"].exists()
+
+
+@pytest.mark.parametrize("motor", ["turbina", "reglas"])
+def test_salidas_alternativas_normalizan_etiqueta_y_prorratean(tmp_path, motor):
+    ciclos = pd.DataFrame({
+        "Empresa": ["E1"], "Inicio_Ciclo": [T0], "Total SC_PD": [100.0],
+        "Costos_Totales_PD": [120.0], "Estado_Ciclo_Mes": ["Inicia y termina este mes"],
+    })
+    detalle = pd.DataFrame({"FECHA_HORA": [T0, T0 + Q]})
+    if motor == "turbina":
+        ciclos["Etiqueta_Turbina"] = "TG1&1"
+        detalle["Etiqueta_Turbina"] = "TG1&1"
+    else:
+        ciclos["Etiqueta"] = "CEN&1"
+        detalle["Central_Relacionada"] = "CEN"
+        detalle["Ciclo_ID"] = 1
+
+    salida_motor = tmp_path / f"salida_{motor}.xlsx"
+    with pd.ExcelWriter(salida_motor) as w:
+        ciclos.to_excel(w, sheet_name="Resumen_Ciclos_PD", index=False)
+        detalle.to_excel(w, sheet_name="Detalle_15Min", index=False)
+    retiros = tmp_path / f"retiros_{motor}.csv"
+    pd.DataFrame({"Cuarto de Hora": [1, 2], "Suministrador": ["S1", "S1"],
+                  "Medida_kWh": [-10, -20]}).to_csv(retiros, index=False, sep=";")
+
+    reparto = prorratear_salida(salida_motor, retiros, tmp_path / f"out_{motor}")
+    resumen = resumir_salida(salida_motor)
+    etiqueta = "TG1&1" if motor == "turbina" else "CEN&1"
+    assert reparto["delta_total"] == pytest.approx(0)
+    assert reparto["total_repartido"] == pytest.approx(100)
+    assert resumen["top_ciclos"]["Etiqueta_Relacionada"].tolist() == [etiqueta]

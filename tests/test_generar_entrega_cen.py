@@ -295,3 +295,14 @@ def test_sin_retiros_paga_queda_en_cero(reporte):
     carpeta = generar_entrega(reporte)
     r = _csv(carpeta, "RESUMEN")
     assert (r["PAGA"] == 0).all() and not list(carpeta.glob("*Cuadro_de_pagos*"))
+
+
+def test_sin_retiros_elimina_archivos_de_pagos_de_corrida_anterior(reporte, retiros):
+    carpeta = generar_entrega(reporte, retiros=retiros)
+    assert (carpeta / "SCPD_2608_Cuadro_de_pagos.csv").exists()
+    assert (carpeta / "SCPD_2608_Prorrateo_Detalle_15min.csv").exists()
+
+    assert generar_entrega(reporte) == carpeta
+    assert not (carpeta / "SCPD_2608_Cuadro_de_pagos.csv").exists()
+    assert not (carpeta / "SCPD_2608_Prorrateo_Detalle_15min.csv").exists()
+    assert len(list(carpeta.glob("*.csv"))) == 12

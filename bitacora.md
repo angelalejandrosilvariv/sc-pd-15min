@@ -41,7 +41,7 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | Runners para Spyder | `Carpeta_de_Trabajo/correr_motor*.py` | Vigentes. Editar solo las variables `NOMBRE_*`. |
 | Consolidación de costos desde políticas PO | `scripts/consolidar_politicas.py` | Vigente (produce `Costos_de_P-D_Consolidado_AAMM.xlsx`). |
 
-**Cómo correr y verificar**: `pytest -q` → 144 pruebas deben pasar. Los datos
+**Cómo correr y verificar**: `pytest -q` → 147 pruebas deben pasar. Los datos
 (CSV/XLSX/XLSM/parquet) **no se versionan** (`.gitignore`); se dejan en
 `Carpeta_de_Trabajo/`. Nunca escribir en la unidad `T:`; se copia a local.
 
@@ -131,6 +131,18 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-23 — Codex (OpenAI) — Correcciones posteriores a la revisión de la spec 34
+
+- **Tipo:** corrección + pruebas.
+- **Origen:** revisión de la spec 34 después del PR #57.
+- **Cambios:** la entrega sin retiros elimina los dos CSV de pagos que pudiera haber dejado
+  una corrida anterior; la interfaz normaliza las etiquetas de ciclo de las salidas v7,
+  Turbina y Reglas del Horario antes de resumir o prorratear; y el mes mostrado se deriva de
+  la fecha máxima de inicio de ciclo, en vez del ordinal `Ciclo_Mes`. No se modificó ningún
+  motor ni la lógica del prorrateo.
+- **Validación:** `pytest -q` → **147 passed**; `git diff --check` limpio.
+- **Pendientes:** Ninguno.
 
 ### 2026-09-23 — Claude — Interfaz con resultados visibles y botón Prorratear: PAGA en la entrega CEN (spec 34)
 

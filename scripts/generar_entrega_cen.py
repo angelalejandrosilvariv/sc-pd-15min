@@ -999,6 +999,11 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     if carpeta_salida and destino.name != f"Entrega_SCPD_{aamm}":
         destino = destino / f"Entrega_SCPD_{aamm}"
     destino.mkdir(parents=True, exist_ok=True)
+    if not retiros:
+        # Una segunda corrida en la misma carpeta no debe conservar pagos de
+        # una corrida anterior que si recibio el archivo de retiros.
+        for nombre in ("Cuadro_de_pagos.csv", "Prorrateo_Detalle_15min.csv"):
+            (destino / f"SCPD_{aamm}_{nombre}").unlink(missing_ok=True)
     entradas = [Path(x) for x in (archivos_entrada or [reporte]) if x and Path(x).exists()]
     if retiros and Path(retiros).resolve() not in {e.resolve() for e in entradas}:
         entradas.append(Path(retiros))
