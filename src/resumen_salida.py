@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from cache_reporte import leer_hoja_cache
 from prorrateo_15min import leer_retiros, prorratear_ciclos_motor, resumir_por_suministrador
 
 DIFERIDOS = ("Continua proximo mes", "Continua todo el mes")
@@ -180,9 +181,12 @@ def prorratear_salida(ruta_salida: str | Path, ruta_retiros: str | Path,
     igual que la entrega CEN.
     """
     ruta_salida = Path(ruta_salida)
-    xl = _libro(ruta_salida)
-    ciclos = _hoja(xl, "Resumen_Ciclos_PD")
-    detalle = _hoja(xl, "Detalle_15Min")
+    ciclos = leer_hoja_cache(ruta_salida, "Resumen_Ciclos_PD")
+    detalle = leer_hoja_cache(ruta_salida, "Detalle_15Min")
+    if ciclos is None or detalle is None:
+        xl = _libro(ruta_salida)
+        ciclos = _hoja(xl, "Resumen_Ciclos_PD")
+        detalle = _hoja(xl, "Detalle_15Min")
     if ciclos is None or detalle is None:
         raise ValueError(f"{ruta_salida.name} no trae Resumen_Ciclos_PD y Detalle_15Min.")
     ciclos = normalizar_etiqueta_ciclo(ciclos, "Resumen_Ciclos_PD")
