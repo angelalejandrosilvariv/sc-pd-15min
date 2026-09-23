@@ -10,6 +10,7 @@ que el Excel no tiene van a la derecha de la ultima suya.
 
 Uso:  python scripts/generar_entrega_cen.py Reporte_Sobrecostos_PD_Final.xlsx
              [--salida CARPETA] [--entrada ARCHIVO ...] [--version Preliminar|Definitivo]
+             [--retiros Retiros_15min.parquet]   # prorratea: llena RESUMEN!PAGA
 """
 from __future__ import annotations
 
@@ -29,6 +30,8 @@ RAIZ = Path(__file__).resolve().parents[1]
 if str(RAIZ / "src") not in sys.path:
     sys.path.insert(0, str(RAIZ / "src"))
 import sc_pd_motor_v7 as motor  # noqa: E402
+from prorrateo_15min import (  # noqa: E402
+    leer_retiros, prorratear_ciclos_motor, resumir_por_ciclo_suministrador)
 
 SHEETS = ["Menu", "Leeme", "Costos_de_P-D", "Pruebas", "Instrucciones RIO",
           "Central_Empresa", "Sobrecosto_PD xHyC", "PARTIDAS_DETENCIONES",
@@ -85,6 +88,10 @@ INCONCLUSO_DER = ["Ciclo de operación", "Ciclo de operación", "Ciclo completo"
                   "Margen ciclo inconcluso", "Total Sobrecosto_P-D", "Empresa", "Copia Ciclo",
                   "Cuadro de pagos?", "", " ", "Verificadores", "PO", "SIF"]
 RESUMEN = ["Empresa", "PAGA", "RECIBE", "SALDO", "rep", "CHECK", "", "Motor Total_SC_PD_CLP", "Ciclos"]
+# Hoja opcional (solo con archivo de retiros): quien paga cada ciclo y cuanto.
+HOJA_PAGOS = "Cuadro de pagos"
+PAGOS = ["Ciclo de operación", "Suministrador", "Retiro kWh ciclo", "Total kWh ciclo", "Prorrata",
+         "Total Sobrecosto_P-D", "PAGA"]
 PRUEBAS = ["Id", "fecha", "hora", "central", "Configuracion", "cuarto", "FECHA_HORA",
            "Central relacionada", "Fuente RIO"]
 
@@ -156,11 +163,18 @@ FORMULAS = {
         "W": "=ROUND((E{r}+G{r}-{col_margen}{r})*B{r},0)",
     },
     "RESUMEN": {
+        # "B" (PAGA) solo se escribe con prorrateo: ver FORMULA_PAGA
         "C": "=SUMIF(Sobrecosto_Ciclo!$I$2:$I${C},A{r},Sobrecosto_Ciclo!$H$2:$H${C})",
         "D": "=+C{r}-B{r}",
         "E": "=+COUNTIF($A$2:$A${Z},A{r})",
         "F": "=ROUND(C{r}-H{r},0)",
         "I": "=COUNTIFS(Sobrecosto_Ciclo!$I$2:$I${C},A{r})",
+    },
+    HOJA_PAGOS: {
+        "E": "=IF(D{r}=0,0,C{r}/D{r})",
+        # el precio del ciclo es el mismo H que liquida Sobrecosto_Ciclo (solo ciclos completos)
+        "F": "=SUMIFS(Sobrecosto_Ciclo!$H$2:$H${C},Sobrecosto_Ciclo!$A$2:$A${C},A{r},Sobrecosto_Ciclo!$B$2:$B${C},1)",
+        "G": "=E{r}*F{r}",
     },
     "Ciclos inconclusos": {
         # tabla izquierda (Proximo mes), filas desde la 3
@@ -173,6 +187,7 @@ FORMULAS = {
         "X": f"=SUMIF({XA}!$AC$2:$AC${{F}},T{{r}},{XA}!$AB$2:$AB${{F}})",
     },
 }
+FORMULA_PAGA = f"=SUMIF('{HOJA_PAGOS}'!$B$2:$B${{P}},A{{r}},'{HOJA_PAGOS}'!$G$2:$G${{P}})"
 
 
 # --------------------------------------------------------------------------- utilidades
@@ -737,15 +752,33 @@ def hoja_ciclo(ciclos: pd.DataFrame, pdv: pd.DataFrame, x: pd.DataFrame, der: pd
     return out, columnas_motor
 
 
-def hoja_resumen(ciclo: pd.DataFrame, empresas: pd.DataFrame) -> pd.DataFrame:
+def hoja_pagos(detalle_prorrateo: pd.DataFrame) -> pd.DataFrame:
+    """Cuadro de pagos: una fila por ciclo y suministrador que retiro en sus cuartos."""
+    por_ciclo = resumir_por_ciclo_suministrador(detalle_prorrateo)
+    out = pd.DataFrame({
+        "Ciclo de operación": por_ciclo["Ciclo"].astype(str), "Suministrador": por_ciclo["Suministrador"].astype(str),
+        "Retiro kWh ciclo": por_ciclo["Medida_kWh_Ciclo"], "Total kWh ciclo": por_ciclo["Total_kWh_Ciclo"],
+        "Prorrata": por_ciclo["Prorrata"], "Total Sobrecosto_P-D": por_ciclo["Precio_Ciclo"],
+        "PAGA": por_ciclo["Monetario"]})
+    return out[PAGOS].reset_index(drop=True)
+
+
+def hoja_resumen(ciclo: pd.DataFrame, empresas: pd.DataFrame, pagos: pd.DataFrame | None = None) -> pd.DataFrame:
+    """RESUMEN: RECIBE por empresa generadora y, con prorrateo, PAGA por suministrador.
+
+    Los suministradores que no reciben se agregan al final; el cruce es por nombre exacto.
+    """
+    paga = (pagos.groupby("Suministrador")["PAGA"].sum() if pagos is not None and len(pagos)
+            else pd.Series(dtype=float))
     orden = list(dict.fromkeys(list(_col(empresas, "Empresa", "").dropna().astype(str))
                                + [e for e in ciclo["Empresa"].astype(str).unique()
-                                  if e != "Se traspasa al proximo mes"]))
+                                  if e != "Se traspasa al proximo mes"]
+                               + list(paga.sort_values(ascending=False).index.astype(str))))
     out = pd.DataFrame({"Empresa": orden})
-    out["PAGA"] = 0
+    out["PAGA"] = out["Empresa"].map(paga).fillna(0).astype(float)
     recibe = ciclo.groupby("Empresa")["Total Sobrecosto_P-D"].sum()
     out["RECIBE"] = out["Empresa"].map(recibe).fillna(0).astype(float)
-    out["SALDO"] = out["RECIBE"]
+    out["SALDO"] = out["RECIBE"] - out["PAGA"]
     out["rep"] = 1
     motor_total = dict(zip(_col(empresas, "Empresa", "").astype(str), _num(_col(empresas, "Total_SC_PD_CLP"))))
     out["Motor Total_SC_PD_CLP"] = out["Empresa"].map(motor_total).fillna(0).astype(float)
@@ -822,6 +855,17 @@ LEEME = [
     "  Costos_de_P-D trae una fila por llave (gana la ultima), igual que la tabla que uso el motor, y solo las configuraciones con ciclos en el mes.",
     "  Los CSV de la carpeta son estas mismas hojas volcadas como valores (donde hay formula, el valor calculado en Python).",
     "  Los checks (Sobrecosto_Ciclo!T:W, RESUMEN!F, xHyC!BE) deben ser 0; 'Check SC' compara H x B con Total SC_PD del motor.",
+]
+LEEME_PAGOS = [
+    "",
+    "PRORRATEO DE PAGOS (spec 11, con archivo de retiros a 15 minutos):",
+    "  'Cuadro de pagos' reparte cada ciclo liquidado entre los suministradores que retiraron energia en sus cuartos de hora.",
+    "  Cuadro de pagos!E (Prorrata) = retiro del suministrador en el ciclo / retiro total en el ciclo.",
+    "  Cuadro de pagos!F = SUMIFS(Sobrecosto_Ciclo!H, ciclo, Ciclo completo = 1);  G (PAGA) = E x F.",
+    "  RESUMEN!B (PAGA) = SUMIF(Cuadro de pagos!B, empresa, Cuadro de pagos!G);  D (SALDO) = RECIBE - PAGA.",
+    "  RESUMEN!G1 = SUM(SALDO) debe ser 0: lo que se paga iguala lo que se recibe (salvo ciclos sin retiros, que avisa la consola).",
+    "  Los suministradores se cruzan con las empresas por nombre exacto; los que solo pagan aparecen al final del RESUMEN.",
+    "  El detalle cuarto a cuarto esta en SCPD_<AAMM>_Prorrateo_Detalle_15min.csv.",
 ]
 
 
@@ -913,8 +957,13 @@ def _escribir_lado_a_lado(wb, ws, izq: pd.DataFrame, der: pd.DataFrame, f_izq: d
 
 def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = None,
                     archivos_entrada=None, panel: dict | None = None,
-                    version: str = "Preliminar") -> Path:
-    """Crea la carpeta Entrega_SCPD_<AAMM> con el libro y los CSV; devuelve la carpeta."""
+                    version: str = "Preliminar", retiros: str | Path | None = None) -> Path:
+    """Crea la carpeta Entrega_SCPD_<AAMM> con el libro y los CSV; devuelve la carpeta.
+
+    Con ``retiros`` (CSV o Parquet de retiros a 15 minutos) prorratea el sobrecosto de cada
+    ciclo entre los suministradores (spec 11): agrega la hoja ``Cuadro de pagos`` y llena
+    ``RESUMEN!PAGA``. Sin retiros, PAGA queda en 0 como en la spec 32.
+    """
     reporte = Path(reporte).resolve()
     # calamine lee el reporte del motor (~350k filas) en segundos; openpyxl tarda minutos
     try:
@@ -951,6 +1000,8 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
         destino = destino / f"Entrega_SCPD_{aamm}"
     destino.mkdir(parents=True, exist_ok=True)
     entradas = [Path(x) for x in (archivos_entrada or [reporte]) if x and Path(x).exists()]
+    if retiros and Path(retiros).resolve() not in {e.resolve() for e in entradas}:
+        entradas.append(Path(retiros))
 
     # panel efectivo: motor + hoja Parametros_Motor del reporte + lo que pase el llamador
     panel_efectivo = interruptores_panel()
@@ -988,7 +1039,17 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     pdv = _conteo_rio(hoja_partidas_detenciones(x, ciclos), rio)
     izq, der = hoja_inconclusos(ciclos, pdv, x, xf)
     ciclo, columnas_motor = hoja_ciclo(ciclos, pdv, x, der, rio)
-    resumen = hoja_resumen(ciclo, empresas)
+    pagos = detalle_prorrateo = None
+    if retiros:
+        # solo ciclos con monto: un diferido o amortizado no tiene nada que repartir
+        con_monto = ciclos[_num(_col(ciclos, "Total SC_PD")) != 0]
+        detalle_prorrateo, auditoria_pagos = prorratear_ciclos_motor(detalle, con_monto, leer_retiros(retiros))
+        pagos = hoja_pagos(detalle_prorrateo)
+        print(f"Prorrateo: {auditoria_pagos['total_repartido']:,.0f} de {auditoria_pagos['total_original']:,.0f} CLP "
+              f"repartidos entre {pagos['Suministrador'].nunique()} suministradores.")
+        for mensaje in auditoria_pagos["mensajes"]:
+            print(mensaje)
+    resumen = hoja_resumen(ciclo, empresas, pagos)
     central_empresa = central_empresa[[c for c in ["Central", "Empresa"] if c in central_empresa]].copy()
     if len(central_empresa) and "Central_Relacionada" in ciclos and "Empresa" in ciclos:
         # El motor rescata la empresa por configuracion cuando la relacionada no esta en el
@@ -1028,6 +1089,7 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     ctx = {"N": max(2, len(x) + 1), "M": max(2, len(pdv_x) + 1), "C": max(2, len(ciclo) + 1),
            "K": max(3, len(der) + 2), "F": max(2, len(xf) + 1), "R": max(2, len(rio) + 1),
            "E": max(2, len(central_empresa) + 1), "Z": max(2, len(resumen) + 1),
+           "P": max(2, len(pagos) + 1) if pagos is not None else 2,
            "costos": max(2, len(costos) + 1),
            "col_sc": letra_motor.get("Total SC_PD", "H"), "col_partida": letra_motor.get("Costo_Partida_Efectivo", "C"),
            "col_detencion": letra_motor.get("Costo_Detencion_Efectivo", "D"),
@@ -1036,7 +1098,12 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     frames = {"Costos_de_P-D": costos, "Pruebas": pruebas, "Instrucciones RIO": rio,
               "Central_Empresa": central_empresa, "Sobrecosto_PD xHyC": x, "PARTIDAS_DETENCIONES": pdv_x,
               "Sobrecosto_Ciclo": ciclo, "RESUMEN": resumen, "xHyC mes anterior": xf}
+    f_resumen = dict(FORMULAS["RESUMEN"])
+    if pagos is not None:
+        frames[HOJA_PAGOS] = pagos
+        f_resumen["B"] = FORMULA_PAGA
     formulas_doc = dict(FORMULAS)
+    formulas_doc["RESUMEN"] = f_resumen
     formulas_doc["xHyC mes anterior"] = FORMULAS["Sobrecosto_PD xHyC"]
     diccionario = hoja_diccionario(frames, formulas_doc)
     frames["Diccionario"] = diccionario
@@ -1053,6 +1120,9 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
                                 ignore_index=True, sort=False)
     inconclusos_csv.to_csv(destino / f"SCPD_{aamm}_Ciclos_inconclusos.csv", index=False, encoding="utf-8-sig")
     parametros.to_csv(destino / f"SCPD_{aamm}_parametros.csv", index=False, encoding="utf-8-sig")
+    if detalle_prorrateo is not None:
+        detalle_prorrateo.to_csv(destino / f"SCPD_{aamm}_Prorrateo_Detalle_15min.csv", index=False,
+                                 encoding="utf-8-sig")
 
     # libro
     libro = destino / f"SCPD_{aamm}_Auditoria.xlsx"
@@ -1068,11 +1138,15 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
                                   "Total Costos Partida", "Total Costos Detención", "Total Margen",
                                   "Total Costos Partida ciclo inconcluso", "Margen ciclo inconcluso",
                                   "Total Sobrecosto_P-D", "RECIBE", "SALDO", "PAGA", "Motor Total_SC_PD_CLP",
-                                  "Check SC", "Check partida", "Check detención", "Check margen", "CHECK")}
+                                  "Check SC", "Check partida", "Check detención", "Check margen", "CHECK",
+                                  "Retiro kWh ciclo", "Total kWh ciclo")}
         f_dec = {c: dec for c in ("generacion", "Generación_neta", "CV", "CMg", "Diferencia Cmg-CV", "USD",
                                   "Tarifa partida USD", "Tarifa detención USD", "USD apertura ciclo", "USD cierre ciclo")}
-        formatos = {**f_clp, **f_dec}
-        hojas = {nombre: wb.add_worksheet(nombre) for nombre in SHEETS}
+        formatos = {**f_clp, **f_dec, "Prorrata": wb.add_format({"num_format": "0.0000%"})}
+        nombres = list(SHEETS)
+        if pagos is not None:
+            nombres.insert(nombres.index("RESUMEN") + 1, HOJA_PAGOS)
+        hojas = {nombre: wb.add_worksheet(nombre) for nombre in nombres}
 
         ws = hojas["Menu"]
         ws.write_row(0, 0, ["DIA", "Mes", "", "Version"])
@@ -1092,7 +1166,8 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
         ws.freeze_panes(1, 0)
 
         ws = hojas["Leeme"]
-        for i, linea in enumerate(LEEME):
+        leeme = LEEME + ([] if pagos is None else LEEME_PAGOS)
+        for i, linea in enumerate(leeme):
             ws.write(i, 0, linea)
         ws.set_column(0, 0, 150)
 
@@ -1103,8 +1178,10 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
         _escribir(wb, hojas["Sobrecosto_PD xHyC"], x, f_xhyc, ctx, formatos=formatos).freeze_panes(1, 0)
         _escribir(wb, hojas["PARTIDAS_DETENCIONES"], pdv_x, f_pd, ctx, solo_pd, formatos=formatos).freeze_panes(1, 0)
         _escribir(wb, hojas["Sobrecosto_Ciclo"], ciclo, f_ciclo, ctx, formatos=formatos).freeze_panes(1, 0)
-        _escribir(wb, hojas["RESUMEN"], resumen, FORMULAS["RESUMEN"], ctx, formatos=formatos,
+        _escribir(wb, hojas["RESUMEN"], resumen, f_resumen, ctx, formatos=formatos,
                   filas_extra={0: [(6, None)]}).freeze_panes(1, 0)
+        if pagos is not None:
+            _escribir(wb, hojas[HOJA_PAGOS], pagos, FORMULAS[HOJA_PAGOS], ctx, formatos=formatos).freeze_panes(1, 0)
         f_inc = FORMULAS["Ciclos inconclusos"]
         _escribir_lado_a_lado(wb, hojas["Ciclos inconclusos"], izq, der,
                               {k: v for k, v in f_inc.items() if k in ("C", "D", "E", "Q")},
@@ -1134,8 +1211,10 @@ def main(argv=None):
     p.add_argument("--salida", help="carpeta donde crear Entrega_SCPD_<AAMM>")
     p.add_argument("--entrada", action="append", default=[], help="archivo de entrada a registrar (repetible)")
     p.add_argument("--version", default="Preliminar", help="Preliminar | Definitivo")
+    p.add_argument("--retiros", help="retiros 15 min (.csv o .parquet): llena PAGA y agrega 'Cuadro de pagos'")
     a = p.parse_args(argv)
-    print(f"Entrega creada en: {generar_entrega(a.reporte, a.salida, a.entrada or None, version=a.version)}")
+    carpeta = generar_entrega(a.reporte, a.salida, a.entrada or None, version=a.version, retiros=a.retiros)
+    print(f"Entrega creada en: {carpeta}")
 
 
 if __name__ == "__main__":

@@ -6,8 +6,16 @@ LA FORMA SIMPLE: doble clic en Abrir_Interfaz.bat
 Abre una ventana donde eliges el motor (v7, Turbina o Reglas del Horario), cada archivo con
 un boton "Buscar...", el archivo de salida, y los metodos de calculo con
 casillas. Al abrirla ya viene con los archivos de esta carpeta detectados.
-Recuerda tu ultima configuracion (interfaz_config.json). El log del motor
-se ve en la misma ventana. Tambien se puede abrir con F5 sobre interfaz.py
+Recuerda tu ultima configuracion (interfaz_config.json). Tiene cuatro pestañas:
+  - Configurar: motor, archivos (marca verde si el archivo existe), salida y metodos.
+  - Resultados: al terminar el motor muestra el total a pagar, ciclos pagados /
+    cubiertos por el margen / rechazados / diferidos, del costo al pago, el
+    sobrecosto por empresa y los ciclos mas caros. "Cargar otra salida..." abre
+    cualquier Reporte_Sobrecostos_PD_*.xlsx ya generado.
+  - Pagos (prorrateo): elige el archivo de retiros de 15 min y pulsa "Prorratear".
+    Muestra cuanto paga cada suministrador y si cuadra. Luego "Generar entrega CEN"
+    llena la columna PAGA del RESUMEN y agrega la hoja "Cuadro de pagos".
+  - Registro: el log del motor, del prorrateo y de la entrega. Tambien se puede abrir con F5 sobre interfaz.py
 en Spyder; si la ventana no aparece, en Spyder usa Run > Configuration >
 "Execute in an external system terminal".
 
@@ -62,9 +70,10 @@ etc.) y corre los scripts con F5 en Spyder, en este orden:
    alcances, apareo ciclo a ciclo, efectos y causas raiz. No modifica el motor.
 
 6. correr_entrega.py (entrega de auditoria al CEN)
-   Edita NOMBRE_REPORTE_MOTOR y ejecuta. Genera Entrega_SCPD_AAMM con seis CSV y
+   Edita NOMBRE_REPORTE_MOTOR y ejecuta. Genera Entrega_SCPD_AAMM con los CSV y
    un Excel auditable. Tambien puedes pulsar "Generar entrega CEN" en la interfaz
-   despues de una corrida exitosa.
+   despues de una corrida exitosa; si antes pulsaste "Prorratear", la entrega trae
+   los pagos (PAGA) por suministrador. Por linea de comandos: --retiros ARCHIVO.
 
 Si algo falla, revisa primero que los nombres de archivo escritos en
 las variables NOMBRE_... coincidan exactamente con los archivos que

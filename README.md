@@ -28,7 +28,7 @@ El motor espera archivos como:
 sc-pd-15min/
 ├── docs/
 │   ├── informes/
-│   └── specs/                  # specs 00–26
+│   └── specs/                  # specs 00–34
 ├── src/
 │   ├── sc_pd_motor_v7.py       # producción
 │   ├── sc_pd_motor_turbina.py  # experimental
