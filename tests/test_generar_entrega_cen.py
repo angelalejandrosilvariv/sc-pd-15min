@@ -7,7 +7,8 @@ import pytest
 from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
-from generar_entrega_cen import CICLO, FORMULAS, PD, SHEETS, XHYC, generar_entrega  # noqa: E402
+from generar_entrega_cen import (  # noqa: E402
+    CICLO, FORMULAS, HOJA_PAGOS, PAGOS, PD, SHEETS, XHYC, generar_entrega)
 
 T0 = pd.Timestamp("2026-08-01 00:00")
 Q = pd.Timedelta(minutes=15)
@@ -250,3 +251,47 @@ def test_sin_rio_ni_costos_se_degrada_a_encabezados(reporte, tmp_path):
     assert wb["Instrucciones RIO"].max_row == 1 and wb["Costos_de_P-D"].max_row == 1
     c = _csv(carpeta, "Sobrecosto_Ciclo").set_index("Ciclo de operación")
     assert (c["Check SC"].abs() <= 1).all()   # los valores siguen cerrando sin insumos
+
+
+@pytest.fixture
+def retiros(tmp_path):
+    """Retiros a 15 min (negativos, como vienen): cuarto 1 = T0, 2 = T0+15, 193 = día 3 00:00."""
+    ruta = tmp_path / "Retiros_15min.csv"
+    pd.DataFrame({"Cuarto de Hora": [1, 1, 2, 2, 193],
+                  "Suministrador": ["S1", "S2", "S1", "E1", "S2"],
+                  "Medida_kWh": [-30, -10, -20, -20, -5]}).to_csv(ruta, index=False, sep=";")
+    return ruta
+
+
+def test_prorrateo_llena_paga_y_cuadra_con_recibe(reporte, retiros):
+    carpeta = generar_entrega(reporte, retiros=retiros)
+    wb = load_workbook(next(carpeta.glob("*.xlsx")))
+    assert wb.sheetnames == SHEETS[:SHEETS.index("RESUMEN") + 1] + [HOJA_PAGOS] + SHEETS[SHEETS.index("RESUMEN") + 1:]
+    # C&1 (18) cruza cuartos 1-2, A&1 (4) el 1, E&1 (2) el 193; D&1 es diferido y no se reparte
+    p = _csv(carpeta, "Cuadro_de_pagos").set_index(["Ciclo de operación", "Suministrador"])
+    assert list(p.columns) == PAGOS[2:]
+    assert p.loc[("C&1", "S1"), "PAGA"] == pytest.approx(18 * 50 / 80)
+    assert p.loc[("C&1", "E1"), "Prorrata"] == pytest.approx(20 / 80)
+    assert p.loc[("A&1", "S2"), "PAGA"] == pytest.approx(1)
+    assert p.loc[("E&1", "S2"), "PAGA"] == pytest.approx(2)
+    assert "D&1" not in p.index.get_level_values(0)
+    r = _csv(carpeta, "RESUMEN").set_index("Empresa")
+    assert r.loc["S1", "PAGA"] == pytest.approx(14.25) and r.loc["S2", "PAGA"] == pytest.approx(5.25)
+    # E1 recibe 24 y además paga como suministrador: el saldo neto es 19,5
+    assert r.loc["E1", "PAGA"] == pytest.approx(4.5) and r.loc["E1", "SALDO"] == pytest.approx(19.5)
+    assert r["SALDO"].sum() == pytest.approx(0)
+    assert (r["CHECK"].abs() <= 1).all()
+    res, cuadro = wb["RESUMEN"], wb[HOJA_PAGOS]
+    assert res["B2"].value.startswith(f"=SUMIF('{HOJA_PAGOS}'!$B$2:$B$")
+    assert cuadro["E2"].value == "=IF(D2=0,0,C2/D2)" and cuadro["G2"].value == "=E2*F2"
+    assert cuadro["F2"].value.startswith("=SUMIFS(Sobrecosto_Ciclo!$H$2:$H$")
+    assert any("PRORRATEO" in str(c.value) for c in wb["Leeme"]["A"])
+    assert (carpeta / "SCPD_2608_Prorrateo_Detalle_15min.csv").exists()
+    menu = [c.value for c in wb["Menu"]["A"]]
+    assert "Retiros_15min.csv" in menu
+
+
+def test_sin_retiros_paga_queda_en_cero(reporte):
+    carpeta = generar_entrega(reporte)
+    r = _csv(carpeta, "RESUMEN")
+    assert (r["PAGA"] == 0).all() and not list(carpeta.glob("*Cuadro_de_pagos*"))

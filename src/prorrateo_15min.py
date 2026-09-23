@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
 
@@ -148,3 +150,60 @@ def auditar_cuadratura(detalle: pd.DataFrame, tolerancia: float = 0.01) -> dict:
         "ciclos_con_diferencia": con_diferencia,
         "mensajes": mensajes,
     }
+
+
+def leer_retiros(ruta: str | Path) -> pd.DataFrame:
+    """Lee retiros CSV (detectando separador) o Parquet según extensión."""
+    ruta = Path(ruta)
+    if ruta.suffix.lower() == ".parquet":
+        return pd.read_parquet(ruta)
+    if ruta.suffix.lower() == ".csv":
+        return pd.read_csv(ruta, sep=None, engine="python", decimal=",")
+    raise ValueError("El archivo de retiros debe ser .csv o .parquet")
+
+
+def prorratear_ciclos_motor(
+    detalle_15min: pd.DataFrame, resumen_ciclos: pd.DataFrame, retiros: pd.DataFrame
+) -> tuple[pd.DataFrame, dict]:
+    """Prorratea el ``Total SC_PD`` de cada ciclo del motor entre los suministradores.
+
+    ``detalle_15min`` y ``resumen_ciclos`` son las hojas ``Detalle_15Min`` y
+    ``Resumen_Ciclos_PD`` del reporte; ``retiros`` son los retiros crudos (sin agrupar).
+    Devuelve el detalle por cuarto y la auditoría de cuadratura.
+    """
+    _requerir_columnas(resumen_ciclos, {"Etiqueta_Relacionada", "Total SC_PD"}, "Resumen_Ciclos_PD")
+    precios = resumen_ciclos[["Etiqueta_Relacionada", "Total SC_PD"]].rename(
+        columns={"Etiqueta_Relacionada": "Ciclo", "Total SC_PD": "Precio_Ciclo"}
+    )
+    detalle = prorratear_retiros(
+        construir_membresia_ciclos(detalle_15min), agrupar_retiros(retiros), precios
+    )
+    return detalle, auditar_cuadratura(detalle)
+
+
+def resumir_por_ciclo_suministrador(detalle: pd.DataFrame) -> pd.DataFrame:
+    """Colapsa el detalle por cuarto a una fila por ciclo y suministrador.
+
+    ``Prorrata`` es la fracción del ciclo que paga el suministrador; como el reparto es
+    lineal, ``Prorrata * Precio_Ciclo`` iguala la suma de ``Monetario_Cuarto``.
+    """
+    _requerir_columnas(detalle, set(COLUMNAS_DETALLE), "detalle prorrateado")
+    out = detalle.groupby(["Ciclo", "Suministrador"], as_index=False, sort=True).agg(
+        Medida_kWh_Ciclo=("Medida_kWh_Cuarto", "sum"),
+        Total_kWh_Ciclo=("Total_kWh_Ciclo", "first"),
+        Precio_Ciclo=("Precio_Ciclo", "first"),
+        Monetario=("Monetario_Cuarto", "sum"),
+    )
+    out["Prorrata"] = out["Medida_kWh_Ciclo"] / out["Total_kWh_Ciclo"]
+    return out[["Ciclo", "Suministrador", "Medida_kWh_Ciclo", "Total_kWh_Ciclo",
+                "Prorrata", "Precio_Ciclo", "Monetario"]]
+
+
+def resumir_por_suministrador(detalle: pd.DataFrame) -> pd.DataFrame:
+    """Monto a pagar por suministrador, de mayor a menor."""
+    _requerir_columnas(detalle, set(COLUMNAS_DETALLE), "detalle prorrateado")
+    return (
+        detalle.groupby("Suministrador", as_index=False)["Monetario_Cuarto"].sum()
+        .rename(columns={"Monetario_Cuarto": "Monetario"})
+        .sort_values("Monetario", ascending=False, ignore_index=True)
+    )

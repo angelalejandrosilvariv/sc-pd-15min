@@ -37,11 +37,11 @@ Estado al **2026-09-14**, después del push directo a `main` de esta fecha.
 | Motor "Reglas del Horario" (las 17 reglas del Excel sobre el dato de 15 min) | `src/sc_pd_motor_reglas_horario.py` | Funcional, **sin spec ni tests**. Solo para contrastar. |
 | Reglas del Excel horario deducidas de sus fórmulas y VBA | `docs/informes/Reglas_Modelo_Horario.md` + `docs/informes/vba_modelo_horario/` | Referencia. |
 | Informe de defensa del modelo 15 min | `docs/informes/Defensa_Modelo_15min.html` | Referencia. |
-| Interfaz visual (tkinter) | `Carpeta_de_Trabajo/interfaz.py`, `Abrir_Interfaz.bat` | Vigente. Elige motor v7/Turbina, archivos, salida e interruptores. |
+| Interfaz visual (tkinter) | `Carpeta_de_Trabajo/interfaz.py`, `Abrir_Interfaz.bat` | Vigente. Pestañas Configurar / Resultados / Pagos / Registro; botones Ejecutar, Prorratear y Generar entrega CEN (spec 34). |
 | Runners para Spyder | `Carpeta_de_Trabajo/correr_motor*.py` | Vigentes. Editar solo las variables `NOMBRE_*`. |
 | Consolidación de costos desde políticas PO | `scripts/consolidar_politicas.py` | Vigente (produce `Costos_de_P-D_Consolidado_AAMM.xlsx`). |
 
-**Cómo correr y verificar**: `pytest -q` → 136 pruebas deben pasar. Los datos
+**Cómo correr y verificar**: `pytest -q` → 144 pruebas deben pasar. Los datos
 (CSV/XLSX/XLSM/parquet) **no se versionan** (`.gitignore`); se dejan en
 `Carpeta_de_Trabajo/`. Nunca escribir en la unidad `T:`; se copia a local.
 
@@ -131,6 +131,29 @@ contraste con las cifras de referencia de arriba, registrando el resultado en es
 bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
+
+### 2026-09-23 — Claude — Interfaz con resultados visibles y botón Prorratear: PAGA en la entrega CEN (spec 34)
+
+- **Tipo:** implementación + pruebas.
+- **Origen:** pedido del dueño del proyecto: interfaz más amigable, la salida del motor más
+  visible y un botón "Prorratear" para que la entrega CEN muestre quién paga.
+- **Cambios:** `generar_entrega(..., retiros=)` / `--retiros` prorratea con la lógica de la
+  spec 11, solo los ciclos con monto. Agrega la hoja `Cuadro de pagos` (Prorrata = C/D,
+  F = SUMIFS de `Sobrecosto_Ciclo!H` con Ciclo completo = 1, PAGA = E×F) y llena
+  `RESUMEN!PAGA` con SUMIF. SALDO = RECIBE − PAGA y `G1 = SUM(SALDO)` cuadra en 0. Sin retiros
+  la entrega sale igual que antes. Interfaz nueva con pestañas: **Resultados** (total, ciclos
+  pagados / cubiertos / rechazados / diferidos, waterfall, empresas, top 15 ciclos, avisos),
+  **Pagos** (cuadratura y monto por suministrador) y **Registro**. Barra fija con Ejecutar,
+  Prorratear y Generar entrega CEN (versión Preliminar/Definitivo). La lectura de la salida
+  quedó en `src/resumen_salida.py`, sin tkinter. `leer_retiros` pasó a
+  `src/prorrateo_15min.py`; el script lo reexporta.
+- **Validación:** `pytest -q` → **144 passed**. Interfaz manejada bajo Xvfb con una salida
+  sintética de 62 ciclos y 12 suministradores: resultados, prorrateo (diferencia 0) y entrega
+  con pagos de punta a punta. En este entorno no hubo motor de hojas de cálculo para
+  recalcular las fórmulas nuevas. Los valores guardados salen de pandas y los prueban los tests.
+- **Pendientes:** verificación con agosto y los retiros reales (spec 34 §5): cuadratura,
+  `RESUMEN!G1` ≈ 0 recalculado en Excel y si los nombres de `Suministrador` calzan con los de
+  `Empresa`.
 
 ### 2026-09-21 — Claude — Verificación de la spec 33 (PR #56) con agosto y junio: una corrección y cifras de sensibilidad
 

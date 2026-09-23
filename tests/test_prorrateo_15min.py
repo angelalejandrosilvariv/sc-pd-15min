@@ -7,6 +7,8 @@ from src.prorrateo_15min import (
     calcular_cuarto_hora_mensual,
     construir_membresia_ciclos,
     prorratear_retiros,
+    resumir_por_ciclo_suministrador,
+    resumir_por_suministrador,
 )
 
 
@@ -66,3 +68,15 @@ def test_retiros_negativos_producen_prorratas_positivas_y_cuadran():
     detalle = prorratear_retiros(membresia, retiros, precios)
     assert detalle["Prorrata_Respecto_Ciclo"].tolist() == pytest.approx([0.25, 0.75])
     assert detalle["Monetario_Cuarto"].sum() == pytest.approx(200.0)
+
+
+def test_resumen_por_ciclo_y_suministrador_iguala_el_detalle():
+    membresia = pd.DataFrame({"Ciclo": ["C1", "C1"], "Cuarto_Hora_Mensual": [1, 2]})
+    retiros = pd.DataFrame({"Cuarto_Hora_Mensual": [1, 1, 2], "Suministrador": ["S1", "S2", "S1"],
+                            "Medida_kWh": [10.0, 30.0, 60.0]})
+    detalle = prorratear_retiros(membresia, retiros, pd.DataFrame({"Ciclo": ["C1"], "Precio_Ciclo": [100.0]}))
+    por_ciclo = resumir_por_ciclo_suministrador(detalle).set_index("Suministrador")
+    assert por_ciclo.loc["S1", "Prorrata"] == pytest.approx(0.7)
+    assert por_ciclo.loc["S1", "Monetario"] == pytest.approx(70.0)
+    assert por_ciclo["Monetario"].sum() == pytest.approx(100.0)
+    assert list(resumir_por_suministrador(detalle)["Suministrador"]) == ["S1", "S2"]
