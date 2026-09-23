@@ -2098,3 +2098,21 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
   regresión. Con `rechazar` no se alteran filtros ni montos existentes.
 - **Pendiente:** Claude verificará agosto de 2026 con los archivos reales, según la
   sección 9 de la especificación.
+### 2026-09-23 — Codex (OpenAI) — Rendimiento sin cambiar resultados (spec 35)
+
+- **Tipo:** instrumentación, optimización opcional y pruebas de regresión.
+- **Cambios:** generador reproducible de 892.800 bloques y 80 suministradores;
+  perfil por etapa con reloj, RSS y cProfile; caché Parquet opcional y con
+  invalidación por antigüedad para que prorrateo y entrega eviten releer las
+  hojas grandes del XLSX. El XLSX y todos los formatos contractuales permanecen
+  sin cambios; sin `pyarrow`, o ante cualquier hoja incompatible, se usa Excel.
+- **Medición rápida (misma máquina):** motor 13,01→12,21 s; prorrateo
+  3,56→3,02 s; entrega 26,25→26,93 s (ruido dominante en esta muestra pequeña).
+  La tabla, limitaciones y comando del volumen mensual están en la spec 35.
+- **Descartado:** vectorizar desempates RIO y cambiar el escritor contractual
+  sin evidencia golden suficiente; ambas opciones arriesgaban resultados.
+- **Validación:** suite completa de pytest, prueba dedicada de vigencia/fallback
+  del caché, compilación Python y `git diff --check`.
+- **Compatibilidad del PR:** la referencia golden se conserva como JSON de
+  texto sin compresión para que el revisor pueda mostrar el diff; se eliminó el
+  `.json.gz` que la plataforma rechazaba como archivo binario.
