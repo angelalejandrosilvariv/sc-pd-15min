@@ -39,6 +39,31 @@ def _num(df: pd.DataFrame, col: str) -> pd.Series:
     return pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
 
+def normalizar_etiqueta_ciclo(df: pd.DataFrame, hoja: str) -> pd.DataFrame:
+    """Uniforma la llave de ciclo exportada por los tres motores.
+
+    El v7 ya usa ``Etiqueta_Relacionada``; Turbina publica
+    ``Etiqueta_Turbina`` y Reglas del Horario publica ``Etiqueta`` solamente
+    en el resumen. En el detalle de este ultimo la llave se reconstruye con
+    las dos columnas con que el propio motor define sus ciclos.
+    """
+    normalizado = df.copy()
+    if "Etiqueta_Relacionada" in normalizado:
+        return normalizado
+    if "Etiqueta_Turbina" in normalizado:
+        return normalizado.rename(columns={"Etiqueta_Turbina": "Etiqueta_Relacionada"})
+    if hoja == "Resumen_Ciclos_PD" and "Etiqueta" in normalizado:
+        return normalizado.rename(columns={"Etiqueta": "Etiqueta_Relacionada"})
+    if hoja == "Detalle_15Min" and {"Central_Relacionada", "Ciclo_ID"} <= set(normalizado.columns):
+        ids = pd.to_numeric(normalizado["Ciclo_ID"], errors="raise").astype(int).astype(str)
+        normalizado["Etiqueta_Relacionada"] = normalizado["Central_Relacionada"].astype(str) + "&" + ids
+        return normalizado
+    raise ValueError(
+        f"{hoja} no tiene la etiqueta esperada de una salida del motor "
+        "v7, Turbina o Reglas del Horario."
+    )
+
+
 def formato_clp(valor: float) -> str:
     """1234567.8 -> '$ 1.234.568' (separador de miles chileno)."""
     entero = round(float(valor)) or 0  # sin "-0"
@@ -78,7 +103,7 @@ def resumir_salida(ruta: str | Path, top: int = 15) -> dict:
     waterfall = _hoja(xl, "Waterfall_Costos")
     parametros = _hoja(xl, "Parametros_Motor")
 
-    ciclos = ciclos.copy()
+    ciclos = normalizar_etiqueta_ciclo(ciclos, "Resumen_Ciclos_PD")
     ciclos["Resultado"] = clasificar_ciclos(ciclos)
     total = float(_num(ciclos, "Total SC_PD").sum())
     conteo = ciclos["Resultado"].value_counts()
@@ -86,7 +111,7 @@ def resumir_salida(ruta: str | Path, top: int = 15) -> dict:
     if empresas is None or "Total_SC_PD_CLP" not in empresas:
         empresas = (ciclos.assign(_t=_num(ciclos, "Total SC_PD"))
                     .groupby("Empresa", as_index=False)
-                    .agg(Ciclos=("Etiqueta_Relacionada", "count"), Total_SC_PD_CLP=("_t", "sum")))
+                    .agg(Ciclos=("_t", "size"), Total_SC_PD_CLP=("_t", "sum")))
     empresas = empresas.sort_values("Total_SC_PD_CLP", ascending=False, ignore_index=True)
     empresas["Participacion_%"] = (100 * empresas["Total_SC_PD_CLP"] / total).round(1) if total else 0.0
 
@@ -123,8 +148,10 @@ def resumir_salida(ruta: str | Path, top: int = 15) -> dict:
         avisos.append("Hay etiquetas de ciclo repetidas en Resumen_Ciclos_PD.")
 
     mes = ""
-    if "Ciclo_Mes" in ciclos and ciclos["Ciclo_Mes"].notna().any():
-        mes = str(ciclos["Ciclo_Mes"].dropna().astype(str).mode().iloc[0])
+    if "Inicio_Ciclo" in ciclos:
+        inicios = pd.to_datetime(ciclos["Inicio_Ciclo"], errors="coerce").dropna()
+        if not inicios.empty:
+            mes = inicios.max().strftime("%y%m")
 
     return {
         "archivo": ruta.name,
@@ -155,9 +182,11 @@ def prorratear_salida(ruta_salida: str | Path, ruta_retiros: str | Path,
     ruta_salida = Path(ruta_salida)
     xl = _libro(ruta_salida)
     ciclos = _hoja(xl, "Resumen_Ciclos_PD")
-    detalle = _hoja(xl, "Detalle_15Min", usecols=["Etiqueta_Relacionada", "FECHA_HORA"])
+    detalle = _hoja(xl, "Detalle_15Min")
     if ciclos is None or detalle is None:
         raise ValueError(f"{ruta_salida.name} no trae Resumen_Ciclos_PD y Detalle_15Min.")
+    ciclos = normalizar_etiqueta_ciclo(ciclos, "Resumen_Ciclos_PD")
+    detalle = normalizar_etiqueta_ciclo(detalle, "Detalle_15Min")[["Etiqueta_Relacionada", "FECHA_HORA"]]
     con_monto = ciclos[_num(ciclos, "Total SC_PD") != 0]
     detalle_p, auditoria = prorratear_ciclos_motor(detalle, con_monto, leer_retiros(ruta_retiros))
     por_suministrador = resumir_por_suministrador(detalle_p)
