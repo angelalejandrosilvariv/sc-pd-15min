@@ -106,6 +106,8 @@ import sys
 import pandas as pd
 import numpy as np
 
+from cache_reporte import escribir_cache
+
 from fase1_integridad import (calcular_ciclos, clasificar_partida, costos_clasicos,
                               deduplicar_rio_priorizando_motivo,
                               empalmar_reportes, filtro_costo_cero,
@@ -2704,7 +2706,7 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
     df_compacto.loc[sin_historia_insuficiente, 'Obs_Partida'] = (
         'Sin historia suficiente: cota '
         + df_compacto.loc[sin_historia_insuficiente, 'Horas_Cota_Inferior']
-        .round(2).map('{:g}'.format) + ' h < umbral Fria')
+        .round(2).map('{:g}'.format).astype('string') + ' h < umbral Fria')
     if VIGENCIA_INSTRUCCION_RIO_MIN:
         for tipo in ('Partida', 'Detencion'):
             vencida = ((df_compacto[f'Filtro_Op_{tipo}'] == 0) & (df_compacto[f'Vigencia_RIO_{tipo}'] == 0)
@@ -2822,6 +2824,10 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                 largo_datos = df_h[col].map(lambda v: len(str(v))).max() if len(df_h) else 0
                 ancho = max(int(largo_datos or 0), len(str(col))) + 2
                 ws.set_column(idx, idx, min(ancho, 50))
+
+    cache = escribir_cache(RUTA_SALIDA, hojas)
+    if cache is not None:
+        print(f"Cache Parquet para relecturas: {cache}")
 
     print("Listo. Proceso finalizado.")
 
