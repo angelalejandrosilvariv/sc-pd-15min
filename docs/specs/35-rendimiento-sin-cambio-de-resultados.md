@@ -53,6 +53,14 @@ que el caché funcione.
 * No se cambiaron sumas/groupby ni su orden, por lo que no hay diferencias de
   coma flotante que justificar.
 
+## Caché retirado
+
+El caché Parquet se retiró porque no preservaba exactamente los valores del
+XLSX: un comentario vacío se leía como `""` desde Parquet y como `NaN` desde
+Excel. Esa diferencia cambiaba la evaluación de `extremo()` en la entrega CEN
+y podía cambiar `Presta SSCC` de 1 a 0. La entrega y el prorrateo vuelven a leer
+siempre el XLSX.
+
 ## Regenerar referencias tras un cambio deliberado de negocio
 
 La referencia se versiona como JSON de texto (`tests/golden/entrega_sintetica.json`),
