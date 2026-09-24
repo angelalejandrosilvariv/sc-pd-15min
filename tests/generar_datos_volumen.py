@@ -23,7 +23,7 @@ def generar(destino: str | Path, configuraciones: int = 300, dias: int = 31) -> 
     cfg = np.array([f"CENTRAL_{i:03d}_CFG{i % 3 + 1}" for i in range(configuraciones)])
     centrales = np.array([f"CENTRAL_{i:03d}" for i in range(configuraciones)])
     n = len(fechas) * configuraciones
-    generacion = rng.gamma(2, 8, n)
+    generacion = rng.gamma(2, 6, n)
     # Paradas periódicas producen ciclos, ciclos sin instrucción y costo cero.
     bloque = np.tile(np.arange(len(fechas)), configuraciones)
     generacion[(bloque % 97) < 8] = 0
@@ -33,7 +33,9 @@ def generar(destino: str | Path, configuraciones: int = 300, dias: int = 31) -> 
         "Central": np.repeat(cfg, len(fechas)),
         "CONFIGURACION": np.repeat(cfg, len(fechas)),
         "GENERACION": generacion,
-        "CMg": rng.uniform(25, 180, n), "CV": rng.uniform(20, 100, n),
+        # Un margen acotado permite combinar ciclos pagados y amortizados sin
+        # depender de valores extremos aleatorios.
+        "CMg": rng.uniform(65, 105, n), "CV": rng.uniform(45, 75, n),
         "Dolar": np.full(n, 920.0), "CMg-CV": np.zeros(n), "Tipo": "C.Frec",
     })
     actual = destino / "Reporte_PD_15min_2608.csv"
@@ -54,24 +56,44 @@ def generar(destino: str | Path, configuraciones: int = 300, dias: int = 31) -> 
     costos = []
     for fecha in dias_costos:
         for i, unidad in enumerate(cfg):
+            # Cinco centrales tienen dos ciclos completos cuyo costo supera con
+            # holgura el margen (10 pagos); las restantes ejercitan margen y
+            # filtros. CENTRAL_000 conserva el caso explícito de costo cero.
+            tarifa_partida = 250000 if 1 <= i <= 5 else 30000
+            tarifa_detencion = 50000 if 1 <= i <= 5 else 5000
             costos.append({"Llave_Concatenada": f"{fecha:%y%m%d}-1{unidad}", "UNIDAD": unidad,
                            "Fria_Num1_M": 24, "Tibia_Num1_O": 8, "Tibia_Num2_N": 16,
-                           "Caliente_Num1_P": 4, "Partida_Fria": 100000 + i,
-                           "Partida_Tibia": 70000 + i, "Partida_Tibia_2": 85000 + i,
-                           "Partida_Caliente": 40000 + i, "Detencion": 10000 + i,
-                           "Costo_Cero": "SI" if i % 47 == 0 else "NO"})
+                           "Caliente_Num1_P": 4, "Partida_Fria": tarifa_partida + i,
+                           "Partida_Tibia": tarifa_partida + i,
+                           "Partida_Tibia_2": tarifa_partida + i,
+                           "Partida_Caliente": tarifa_partida + i,
+                           "Detencion": tarifa_detencion + i,
+                           "Costo_Cero": "SI" if i == 0 else "NO"})
     costos_df = pd.DataFrame(costos)
     costos_path = destino / "Costos_de_P-D_Consolidado.xlsx"
     costos_df.to_excel(costos_path, index=False)
 
     # Encabezado real del RIO comienza en fila 5 (skiprows=4).
     rio_rows = []
-    for i in range(max(4000, configuraciones * 15)):
-        c = i % configuraciones
-        motivo = "OT" if i % 11 == 0 else ("EP" if i % 17 == 0 else "OM")
-        rio_rows.append({"FECHA": fechas[i % len(fechas)].date(), "HORA": fechas[i % len(fechas)].strftime("%H:%M"),
-                         "NOMBRE CONFIGURACIÓN": cfg[c], "CON": "", "MOT": motivo,
-                         "EO": "PDO", "COMENTARIO": "Presta SSCC" if motivo == "OT" else ""})
+    # Sólo hacen falta instrucciones en los extremos de los ciclos. Mantener el
+    # RIO compacto acelera tanto el cruce como la entrega sin perder cobertura.
+    extremos = {8, 96, 105, 193, 202}
+    for bloque_i in sorted(extremos & set(range(len(fechas)))):
+        instante = fechas[bloque_i]
+        for c in range(configuraciones):
+            motivo, comentario = "OM", ""
+            # Una detención OT con SSCC y otra sin SSCC cubren las dos ramas.
+            if c == 6 and bloque_i == 96:
+                motivo, comentario = "OT", "Presta SSCC"
+            elif c == 6 and bloque_i == 193:
+                motivo = "OT"
+            # Un ciclo completo rechazado por una instrucción EP.
+            elif c == 7 and 8 <= bloque_i <= 96:
+                motivo = "EP"
+            estado = "N" if (c == 7 and 8 <= bloque_i <= 96) or (c == 6 and bloque_i == 193) else "PDO"
+            rio_rows.append({"FECHA": instante.date(), "HORA": instante.strftime("%H:%M"),
+                             "NOMBRE CONFIGURACIÓN": cfg[c], "CON": "", "MOT": motivo,
+                             "EO": estado, "COMENTARIO": comentario})
     rio_path = destino / "RIO_08_2026.xlsx"
     with pd.ExcelWriter(rio_path) as writer:
         pd.DataFrame(rio_rows).to_excel(writer, index=False, startrow=4)

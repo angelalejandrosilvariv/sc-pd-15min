@@ -965,34 +965,21 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     ``RESUMEN!PAGA``. Sin retiros, PAGA queda en 0 como en la spec 32.
     """
     reporte = Path(reporte).resolve()
-    from cache_reporte import leer_hoja_cache
-
-    xl = None
-
-    def libro():
-        nonlocal xl
-        if xl is None:
-            # calamine lee el reporte en segundos; openpyxl es el fallback compatible.
-            try:
-                xl = pd.ExcelFile(reporte, engine="calamine")
-            except (ImportError, ValueError):
-                xl = pd.ExcelFile(reporte)
-        return xl
+    # calamine lee el reporte del motor (~350k filas) en segundos; openpyxl tarda minutos
+    try:
+        xl = pd.ExcelFile(reporte, engine="calamine")
+    except (ImportError, ValueError):
+        xl = pd.ExcelFile(reporte)
 
     def leer(nombre, columnas=None):
-        df = leer_hoja_cache(reporte, nombre)
-        if df is not None:
-            pass
-        elif nombre in libro().sheet_names:
-            df = pd.read_excel(libro(), sheet_name=nombre)
-        else:
-            print(f"Aviso: el reporte no trae la hoja {nombre}; se genera vacía.")
-            return pd.DataFrame(columns=columnas or [])
-        if df is not None:
+        if nombre in xl.sheet_names:
+            df = pd.read_excel(xl, sheet_name=nombre)
             for c in df.columns:
                 if "FECHA" in str(c).upper() or str(c).startswith("Fuente_") or str(c) in ("Inicio_Ciclo", "Termino_Ciclo"):
                     df[c] = pd.to_datetime(df[c], errors="coerce")
             return df
+        print(f"Aviso: el reporte no trae la hoja {nombre}; se genera vacía.")
+        return pd.DataFrame(columns=columnas or [])
 
     ciclos = leer("Resumen_Ciclos_PD")
     detalle = leer("Detalle_15Min")
@@ -1024,7 +1011,7 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     # panel efectivo: motor + hoja Parametros_Motor del reporte + lo que pase el llamador
     panel_efectivo = interruptores_panel()
     try:
-        guardado = leer("Parametros_Motor")
+        guardado = pd.read_excel(xl, sheet_name="Parametros_Motor")
         panel_efectivo.update(dict(zip(guardado["interruptor"], guardado["valor"])))
     except (ValueError, KeyError):
         pass

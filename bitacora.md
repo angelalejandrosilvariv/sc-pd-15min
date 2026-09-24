@@ -2144,3 +2144,11 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 - **Compatibilidad del PR:** la referencia golden se conserva como JSON de
   texto sin compresión para que el revisor pueda mostrar el diff; se eliminó el
   `.json.gz` que la plataforma rechazaba como archivo binario.
+
+### 2026-09-24 — Codex (OpenAI) — Retiro del caché Parquet (spec 35)
+
+- **Tipo:** corrección de consistencia.
+- **Cambio:** se retiró el caché Parquet; la entrega CEN y el prorrateo vuelven
+  a leer siempre el XLSX del motor.
+- **Motivo:** un comentario vacío se recuperaba como `""` desde Parquet y como
+  `NaN` desde Excel, lo que podía cambiar `Presta SSCC` de 1 a 0.
