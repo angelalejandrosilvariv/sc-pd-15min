@@ -1,0 +1,178 @@
+{
+  "margen_hora": {
+    "cobertura": {
+      "cubiertos": 1,
+      "diferidos": 7,
+      "pagados": 12,
+      "rechazados": 1
+    },
+    "csv": {
+      "Central_Empresa.csv": "70542182846eea5f4077a07b41b049113dfdcd0177620813d9ef72648bb8f477",
+      "Ciclos_inconclusos.csv": "6e2c9d8f006efa37fb247e5eb317405e0a858bf0d02396c03c5e949dca41e688",
+      "Costos_de_P-D.csv": "9cc88ce9f2018c0c59bab070201000c37c0e0bf4bb02bfdf062e1096fddd05bf",
+      "Cuadro_de_pagos.csv": "1879029ed907565b8e68250a7f79a2245f998058c43654e4e9776dcecd330343",
+      "Diccionario.csv": "b0f3a1ded40aaf7fd57938d53a1b22593d6f5aa5455654a48c76f915da9eeb7b",
+      "Instrucciones_RIO.csv": "b4a2ae19453702f4de1337e2fc4beeaa28397354386bf908a6f3f268821d513e",
+      "PARTIDAS_DETENCIONES.csv": "992bd1a6710e515a9de3450652d246e8dba651f55c795842aa51e8bdfbc7396f",
+      "Prorrateo_Detalle_15min.csv": "3ddde2566331190c879431e2e191020dad3c844ac3885f308b23a945e20266c3",
+      "Pruebas.csv": "ca5f59cf67d78b83e81078df583fb8d83e39b175527a7303484ef67171ce63cb",
+      "RESUMEN.csv": "c01c1fbc9f194c90e0241490e3a2c891414175f4ad15026f233e2b3bab63cf52",
+      "Sobrecosto_Ciclo.csv": "8059bc9a0d23f4bb0f1562ee27c25c71046fc634072a942b11fe408a342f6209",
+      "Sobrecosto_PD_xHyC.csv": "7e3b94feac8e10171ba3617aefd23e3902dec5fa278a74bbc14daf9ea648401a",
+      "xHyC_mes_anterior.csv": "dc634cfb0d997d06db8a5ecd2dc517be6326078b4ea48610f37b6d65cdb51cf1"
+    },
+    "hay_sscc": true,
+    "metricas": {
+      "ciclos_pagados": 12,
+      "saldo_resumen": "-1.4901161193847656e-07",
+      "total_repartido": "2533695925.398998",
+      "total_sc_pd": "2533695925.398998"
+    },
+    "xlsx": {
+      "Auditoria_Pasos": "74be0595c64be3e9ccb3a53d4ec15ecc4170d3df4256c16c37798e4b79ea8796",
+      "Central_Empresa": "964aeb97329972bd88bca17209699011b7c7ba07ac4c8214468eec29f3d30de4",
+      "Cobertura_Instruccion_RIO": "8c5b0c44dd03ddbce1f9a60a2094aec35ba8bfb07f39176af86e1ccdf4320f2a",
+      "Costos_PD_Usados": "1be38c4f0b6ee2dbf5b2d2243cf046a84ef1434a36e51b9bf3342d1efa9051b7",
+      "Detalle_15Min": "2777389253e0b3aad66912301dec9617cfde909fac95e79f9604b0da53a61d3b",
+      "Detalle_Frontera": "a846d84884d514add4858a5f7f87e9b56cc33aa8f76f1a24f6b165d7d4d6e0e7",
+      "Guia_Lectura": "aa85cad931db60ce2dc8b7671e947e3f555df6bb67d2d62f1c20a0335584de4d",
+      "Parametros_Motor": "b7aef13fc63a5f336171246e5fcb6c3644ea54c2fc6ed5388a003cd8cc491dbf",
+      "RIO_Usado": "caf4a77b8989f7825ceed8ee4b7259bb3f9a2e0b22b6ea09235181088bdfa9b4",
+      "Resumen_Ciclos_PD": "cafff6652c93aeb23aa93ec5f3dbef80f6df01255631649d9f87b47c929dc715",
+      "SC_por_Empresa": "ce692abf462b0300af0ef11bf258dd67ef2dbf97c7903f583e51885e89db41a4",
+      "Waterfall_Costos": "91a787e5ce7998cdd78c51adb8f6059fee514e3e781a730bae7df750550ea8d3"
+    }
+  },
+  "orden_om_fallida": {
+    "cobertura": {
+      "cubiertos": 1,
+      "diferidos": 7,
+      "pagados": 12,
+      "rechazados": 1
+    },
+    "csv": {
+      "Central_Empresa.csv": "70542182846eea5f4077a07b41b049113dfdcd0177620813d9ef72648bb8f477",
+      "Ciclos_inconclusos.csv": "0bf95bfc508eaa7e33cec849e4bf51f95b504644724ed44e8f9dc69830f21c8e",
+      "Costos_de_P-D.csv": "9cc88ce9f2018c0c59bab070201000c37c0e0bf4bb02bfdf062e1096fddd05bf",
+      "Cuadro_de_pagos.csv": "a5d7b56f579a5851dacf05760685dfbd5cbebf4beb64037e0ed405e4cb6dbfac",
+      "Diccionario.csv": "b0f3a1ded40aaf7fd57938d53a1b22593d6f5aa5455654a48c76f915da9eeb7b",
+      "Instrucciones_RIO.csv": "b4a2ae19453702f4de1337e2fc4beeaa28397354386bf908a6f3f268821d513e",
+      "PARTIDAS_DETENCIONES.csv": "992bd1a6710e515a9de3450652d246e8dba651f55c795842aa51e8bdfbc7396f",
+      "Prorrateo_Detalle_15min.csv": "b82666aea7c044293227f3236e9796411db591134d4409323c1ddc1ef06e9a49",
+      "Pruebas.csv": "ca5f59cf67d78b83e81078df583fb8d83e39b175527a7303484ef67171ce63cb",
+      "RESUMEN.csv": "30ed82d27b203c76efb7cedb0ad641e205c250888deab3e8d995537fc181de60",
+      "Sobrecosto_Ciclo.csv": "1f2ecf80c87ccdc33708fe31b7174bba083803c7aebc668dc481484e4982cda7",
+      "Sobrecosto_PD_xHyC.csv": "4d3432230033e10084ad149ead08ca902b5d7ab8d707458424697e3438e44de8",
+      "xHyC_mes_anterior.csv": "dc634cfb0d997d06db8a5ecd2dc517be6326078b4ea48610f37b6d65cdb51cf1"
+    },
+    "hay_sscc": true,
+    "metricas": {
+      "ciclos_pagados": 12,
+      "saldo_resumen": "-1.0803341865539551e-07",
+      "total_repartido": "2532220106.8062134",
+      "total_sc_pd": "2532220106.8062134"
+    },
+    "xlsx": {
+      "Auditoria_Pasos": "74be0595c64be3e9ccb3a53d4ec15ecc4170d3df4256c16c37798e4b79ea8796",
+      "Central_Empresa": "964aeb97329972bd88bca17209699011b7c7ba07ac4c8214468eec29f3d30de4",
+      "Cobertura_Instruccion_RIO": "8c5b0c44dd03ddbce1f9a60a2094aec35ba8bfb07f39176af86e1ccdf4320f2a",
+      "Costos_PD_Usados": "1be38c4f0b6ee2dbf5b2d2243cf046a84ef1434a36e51b9bf3342d1efa9051b7",
+      "Detalle_15Min": "42465f3d5d8321f6ec2784039110c1adb43eb92a1e6d02389cf436552bc7c3d2",
+      "Detalle_Frontera": "a846d84884d514add4858a5f7f87e9b56cc33aa8f76f1a24f6b165d7d4d6e0e7",
+      "Guia_Lectura": "aa85cad931db60ce2dc8b7671e947e3f555df6bb67d2d62f1c20a0335584de4d",
+      "Parametros_Motor": "747d056912bb44669dd3ef98a624b4c23494f08ebb9df71b25fe4b4013509be8",
+      "RIO_Usado": "caf4a77b8989f7825ceed8ee4b7259bb3f9a2e0b22b6ea09235181088bdfa9b4",
+      "Resumen_Ciclos_PD": "5ba3153b9e403743f9d9bf4d61991e2bd0253dc63219cdf5ab0fc7013fead9bd",
+      "SC_por_Empresa": "9886a6b4c3807f744cbe06425cd1dcc8f40d0cc061491c61d13d449241637f6e",
+      "Waterfall_Costos": "015bac0d92e7544770d2e275081d26ce8c077b487d0a9c1db8e6fd112e009323"
+    }
+  },
+  "panel_por_defecto": {
+    "cobertura": {
+      "cubiertos": 1,
+      "diferidos": 7,
+      "pagados": 12,
+      "rechazados": 1
+    },
+    "csv": {
+      "Central_Empresa.csv": "70542182846eea5f4077a07b41b049113dfdcd0177620813d9ef72648bb8f477",
+      "Ciclos_inconclusos.csv": "0bf95bfc508eaa7e33cec849e4bf51f95b504644724ed44e8f9dc69830f21c8e",
+      "Costos_de_P-D.csv": "9cc88ce9f2018c0c59bab070201000c37c0e0bf4bb02bfdf062e1096fddd05bf",
+      "Cuadro_de_pagos.csv": "a5d7b56f579a5851dacf05760685dfbd5cbebf4beb64037e0ed405e4cb6dbfac",
+      "Diccionario.csv": "b0f3a1ded40aaf7fd57938d53a1b22593d6f5aa5455654a48c76f915da9eeb7b",
+      "Instrucciones_RIO.csv": "b4a2ae19453702f4de1337e2fc4beeaa28397354386bf908a6f3f268821d513e",
+      "PARTIDAS_DETENCIONES.csv": "992bd1a6710e515a9de3450652d246e8dba651f55c795842aa51e8bdfbc7396f",
+      "Prorrateo_Detalle_15min.csv": "b82666aea7c044293227f3236e9796411db591134d4409323c1ddc1ef06e9a49",
+      "Pruebas.csv": "ca5f59cf67d78b83e81078df583fb8d83e39b175527a7303484ef67171ce63cb",
+      "RESUMEN.csv": "30ed82d27b203c76efb7cedb0ad641e205c250888deab3e8d995537fc181de60",
+      "Sobrecosto_Ciclo.csv": "1f2ecf80c87ccdc33708fe31b7174bba083803c7aebc668dc481484e4982cda7",
+      "Sobrecosto_PD_xHyC.csv": "4d3432230033e10084ad149ead08ca902b5d7ab8d707458424697e3438e44de8",
+      "xHyC_mes_anterior.csv": "dc634cfb0d997d06db8a5ecd2dc517be6326078b4ea48610f37b6d65cdb51cf1"
+    },
+    "hay_sscc": true,
+    "metricas": {
+      "ciclos_pagados": 12,
+      "saldo_resumen": "-1.0803341865539551e-07",
+      "total_repartido": "2532220106.8062134",
+      "total_sc_pd": "2532220106.8062134"
+    },
+    "xlsx": {
+      "Auditoria_Pasos": "74be0595c64be3e9ccb3a53d4ec15ecc4170d3df4256c16c37798e4b79ea8796",
+      "Central_Empresa": "964aeb97329972bd88bca17209699011b7c7ba07ac4c8214468eec29f3d30de4",
+      "Cobertura_Instruccion_RIO": "8c5b0c44dd03ddbce1f9a60a2094aec35ba8bfb07f39176af86e1ccdf4320f2a",
+      "Costos_PD_Usados": "1be38c4f0b6ee2dbf5b2d2243cf046a84ef1434a36e51b9bf3342d1efa9051b7",
+      "Detalle_15Min": "42465f3d5d8321f6ec2784039110c1adb43eb92a1e6d02389cf436552bc7c3d2",
+      "Detalle_Frontera": "a846d84884d514add4858a5f7f87e9b56cc33aa8f76f1a24f6b165d7d4d6e0e7",
+      "Guia_Lectura": "aa85cad931db60ce2dc8b7671e947e3f555df6bb67d2d62f1c20a0335584de4d",
+      "Parametros_Motor": "5f261432a8b312948372112d4e6ff75cdc2f3b2eda6f9a94cf98f5b54eba2757",
+      "RIO_Usado": "caf4a77b8989f7825ceed8ee4b7259bb3f9a2e0b22b6ea09235181088bdfa9b4",
+      "Resumen_Ciclos_PD": "5ba3153b9e403743f9d9bf4d61991e2bd0253dc63219cdf5ab0fc7013fead9bd",
+      "SC_por_Empresa": "9886a6b4c3807f744cbe06425cd1dcc8f40d0cc061491c61d13d449241637f6e",
+      "Waterfall_Costos": "015bac0d92e7544770d2e275081d26ce8c077b487d0a9c1db8e6fd112e009323"
+    }
+  },
+  "sin_diferir": {
+    "cobertura": {
+      "cubiertos": 1,
+      "diferidos": 0,
+      "pagados": 19,
+      "rechazados": 1
+    },
+    "csv": {
+      "Central_Empresa.csv": "70542182846eea5f4077a07b41b049113dfdcd0177620813d9ef72648bb8f477",
+      "Ciclos_inconclusos.csv": "0bf95bfc508eaa7e33cec849e4bf51f95b504644724ed44e8f9dc69830f21c8e",
+      "Costos_de_P-D.csv": "9cc88ce9f2018c0c59bab070201000c37c0e0bf4bb02bfdf062e1096fddd05bf",
+      "Cuadro_de_pagos.csv": "e4b3bac580518928d55569573c3eec7d62b245393af0e6a5714085d4dc4c4096",
+      "Diccionario.csv": "b0f3a1ded40aaf7fd57938d53a1b22593d6f5aa5455654a48c76f915da9eeb7b",
+      "Instrucciones_RIO.csv": "b4a2ae19453702f4de1337e2fc4beeaa28397354386bf908a6f3f268821d513e",
+      "PARTIDAS_DETENCIONES.csv": "992bd1a6710e515a9de3450652d246e8dba651f55c795842aa51e8bdfbc7396f",
+      "Prorrateo_Detalle_15min.csv": "4e28810afa9679c6c650499851496b32590a988709a0c2d6264d1f8f9de9198f",
+      "Pruebas.csv": "ca5f59cf67d78b83e81078df583fb8d83e39b175527a7303484ef67171ce63cb",
+      "RESUMEN.csv": "2c728c8d47b0308e866a7a3dc4ddad82c25f947f19c58986354537b9f627ad3a",
+      "Sobrecosto_Ciclo.csv": "26b8e488a5e61fe9bc7bb0db00b4ee8e5b31ef4cc41c27af5f7b78c091214476",
+      "Sobrecosto_PD_xHyC.csv": "4d3432230033e10084ad149ead08ca902b5d7ab8d707458424697e3438e44de8",
+      "xHyC_mes_anterior.csv": "dc634cfb0d997d06db8a5ecd2dc517be6326078b4ea48610f37b6d65cdb51cf1"
+    },
+    "hay_sscc": true,
+    "metricas": {
+      "ciclos_pagados": 19,
+      "saldo_resumen": "-1035603038.6830431",
+      "total_repartido": "3567823145.4892564",
+      "total_sc_pd": "3567823145.4892564"
+    },
+    "xlsx": {
+      "Auditoria_Pasos": "74be0595c64be3e9ccb3a53d4ec15ecc4170d3df4256c16c37798e4b79ea8796",
+      "Central_Empresa": "964aeb97329972bd88bca17209699011b7c7ba07ac4c8214468eec29f3d30de4",
+      "Cobertura_Instruccion_RIO": "8c5b0c44dd03ddbce1f9a60a2094aec35ba8bfb07f39176af86e1ccdf4320f2a",
+      "Costos_PD_Usados": "1be38c4f0b6ee2dbf5b2d2243cf046a84ef1434a36e51b9bf3342d1efa9051b7",
+      "Detalle_15Min": "42465f3d5d8321f6ec2784039110c1adb43eb92a1e6d02389cf436552bc7c3d2",
+      "Detalle_Frontera": "a846d84884d514add4858a5f7f87e9b56cc33aa8f76f1a24f6b165d7d4d6e0e7",
+      "Guia_Lectura": "aa85cad931db60ce2dc8b7671e947e3f555df6bb67d2d62f1c20a0335584de4d",
+      "Parametros_Motor": "64ab429f94aab2df66bd8e90bf49cbbfbb0df7f88e380bd3d0661d63cba54cf6",
+      "RIO_Usado": "caf4a77b8989f7825ceed8ee4b7259bb3f9a2e0b22b6ea09235181088bdfa9b4",
+      "Resumen_Ciclos_PD": "7e006e7513131b5debf3e1ec365e47e63fc7ac31361fc7124a6fc592eecbcead",
+      "SC_por_Empresa": "4278208e656f5d9490be2454b72bb53c67b15c2147d3b03c0026fc165c2dadd4",
+      "Waterfall_Costos": "4c1b409ddc99cf40dd49822484cf1dbedde47319c41d685a708871dbd258c520"
+    }
+  }
+}
