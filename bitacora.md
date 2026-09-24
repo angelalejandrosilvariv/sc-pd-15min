@@ -132,6 +132,32 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-24 — Claude — Verificación de los PR #60 (caché retirado) y #61 (regresión de punta a punta)
+
+- **Tipo:** verificación.
+- **PR #60:** el caché Parquet quedó retirado por completo. Frente a 3711438 (antes del PR #59),
+  `src/`, `scripts/` y la entrega solo difieren en el `.astype('string')` del motor
+  (compatibilidad con pandas 3, no cambia valores). No queda ninguna referencia a
+  `cache_reporte`.
+- **PR #61:** `tests/test_regresion_punta_a_punta.py` corre de verdad motor → prorrateo →
+  entrega para 4 combinaciones del panel y compara huellas SHA-256 (`tests/golden/huellas.json`,
+  11 KB). Con los datos nuevos hay 12 ciclos pagados (19 sin diferir), cubiertos, diferidos y
+  rechazados, y el prorrateo reparte 2.532 MM entre 80 suministradores. Prueba puntual del caso
+  de comentario vacío con "Presta SSCC" en el bloque.
+- **Verificación independiente:** regeneré las huellas con el código de 3711438 (más el arreglo
+  de pandas 3) y dan **idénticas** a las del repo en las 4 combinaciones: la referencia
+  representa el comportamiento anterior al caché.
+- **Validación:** `pytest -q` → **157 passed** (46 s).
+- **Hallazgo aparte (anterior a estos PR, no es regresión):** con
+  `DIFERIR_CICLOS_SIN_TERMINAR = 0` la entrega CEN queda descuadrada:
+  - el motor paga los ciclos que siguen el próximo mes, pero la entrega los marca
+    "Se traspasa" (Ciclo completo = 0);
+  - RECIBE no los incluye, mientras que el prorrateo sí los reparte;
+  - resultado: `SUM(SALDO)` = −1.036 MM y `RESUMEN!CHECK` ≠ 0 en 7 empresas.
+  Con el valor por defecto (diferir = 1) cuadra.
+- **Pendientes:** tarea 3 (optimización, un cuello de botella por PR) y decidir si la entrega
+  debe soportar `DIFERIR_CICLOS_SIN_TERMINAR = 0`.
+
 ### 2026-09-23 — Claude — Verificación del PR #59 (spec 35): NO verificado, el caché cambia la entrega CEN
 
 - **Tipo:** verificación.
