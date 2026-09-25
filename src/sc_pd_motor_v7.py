@@ -106,6 +106,8 @@ import sys
 from datetime import date, datetime
 import pandas as pd
 import numpy as np
+from pandas.io.formats.excel import ExcelFormatter
+from pandas.io.excel._xlsxwriter import _XlsxStyler
 
 from fase1_integridad import (calcular_ciclos, clasificar_partida, costos_clasicos,
                               deduplicar_rio_priorizando_motivo,
@@ -1158,6 +1160,19 @@ def asignar_observaciones_liquidacion(df, ciclos_sin_terminar, activar=1):
     return df
 
 
+def crear_formato_encabezado_xlsxwriter(writer, df):
+    """Obtiene de pandas el formato de encabezado vigente, si está disponible."""
+    # Son APIs internas: pandas 2.2 expone header_style, mientras pandas 3 lo
+    # retiró. El fallback conserva justamente el comportamiento de esa versión
+    # (encabezado sin formato) y aísla aquí la única dependencia de esas APIs.
+    try:
+        estilo = ExcelFormatter(df).header_style
+        propiedades = _XlsxStyler.convert(estilo) if estilo is not None else None
+    except (AttributeError, TypeError):
+        return None
+    return writer.book.add_format(propiedades) if propiedades is not None else None
+
+
 def escribir_hoja_xlsxwriter(writer, nombre, df, formato_encabezado,
                               formato_fecha, formato_fecha_hora):
     """Escribe un DataFrame sin la capa de formateo celda a celda de pandas."""
@@ -1192,13 +1207,16 @@ def escribir_hoja_xlsxwriter(writer, nombre, df, formato_encabezado,
             ws.write_datetime(fila_excel, columna, valor, formato)
     for idx, col in enumerate(df.columns):
         serie = df.iloc[:, idx]
-        largo_datos = serie.astype(str).str.len().max() if len(df) else 0
-        if pd.isna(largo_datos):
-            # pandas 3 conserva los faltantes al convertir a str. Se replica
-            # len(str(valor)) también para una columna enteramente vacía.
-            largo_datos = (3 if (pd.api.types.is_float_dtype(serie.dtype)
-                                 or pd.api.types.is_datetime64_any_dtype(serie.dtype))
-                           else 4)
+        sin_faltantes = not serie.isna().any()
+        es_numerica_o_bool = (pd.api.types.is_numeric_dtype(serie.dtype)
+                              or pd.api.types.is_bool_dtype(serie.dtype))
+        if len(df) and es_numerica_o_bool and sin_faltantes:
+            largo_datos = serie.astype(str).str.len().max()
+        else:
+            # Para fechas, object, string y cualquier columna con faltantes,
+            # astype(str) cambia entre pandas 2.2 y 3 y no equivale a la regla
+            # histórica exacta len(str(valor)).
+            largo_datos = serie.map(lambda valor: len(str(valor))).max() if len(df) else 0
         ancho = max(int(largo_datos or 0), len(str(col))) + 2
         ws.set_column(idx, idx, min(ancho, 50))
     return ws
@@ -2869,8 +2887,8 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         if AUDITAR_INSTRUCCION_RIO == 1:
             hojas['Cobertura_Instruccion_RIO'] = cobertura_export
         wb = writer.book
-        # pandas 3 escribe el encabezado sin estilo adicional.
-        formato_encabezado = None
+        formato_encabezado = crear_formato_encabezado_xlsxwriter(
+            writer, next(iter(hojas.values())))
         formato_fecha = wb.add_format({'num_format': writer.date_format})
         formato_fecha_hora = wb.add_format({'num_format': writer.datetime_format})
         for nombre, df_h in hojas.items():

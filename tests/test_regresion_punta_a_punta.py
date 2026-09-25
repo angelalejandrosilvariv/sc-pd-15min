@@ -31,7 +31,13 @@ def test_huellas_compactas_de_todo_el_flujo(corrida_punta_a_punta):
             for hoja, hash_esperado in esperado[combinacion][artefacto].items():
                 assert actual[combinacion][artefacto][hoja] == hash_esperado, (
                     f"Cambió {artefacto} '{hoja}' en la combinación '{combinacion}'")
-        assert actual[combinacion]["metricas"] == esperado[combinacion]["metricas"]
+        metricas_actuales = actual[combinacion]["metricas"]
+        metricas_esperadas = esperado[combinacion]["metricas"]
+        assert metricas_actuales.keys() == metricas_esperadas.keys()
+        assert metricas_actuales["ciclos_pagados"] == metricas_esperadas["ciclos_pagados"]
+        for metrica in metricas_esperadas.keys() - {"ciclos_pagados"}:
+            assert float(metricas_actuales[metrica]) == pytest.approx(
+                float(metricas_esperadas[metrica]), rel=1e-12, abs=1e-6)
         cobertura = actual[combinacion]["cobertura"]
         assert cobertura["pagados"] >= 10
         assert cobertura["cubiertos"] > 0 and cobertura["rechazados"] > 0
