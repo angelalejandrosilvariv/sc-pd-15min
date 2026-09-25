@@ -132,6 +132,27 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-25 — Claude — Verificación del PR #65 (exportación compatible con pandas 2.2.3)
+
+- **Tipo:** verificación.
+- **Revisión del código:**
+  - El encabezado toma `ExcelFormatter.header_style` de la pandas instalada (negrita con borde en
+    2.2, sin formato en 3).
+  - El ancho vuelve a ser exactamente `len(str(v))`, salvo en columnas numéricas o bool sin
+    faltantes.
+  - En `test_regresion_punta_a_punta.py` las huellas siguen exactas y solo las métricas float
+    usan `approx(rel=1e-12, abs=1e-6)`. `huellas.json` no cambió.
+  - Observación menor: las dos APIs internas de pandas se importan al inicio del módulo, así que
+    el respaldo a `None` no cubre una versión futura que las elimine.
+- **Validación:**
+  - `pytest -q` → **159 passed** con pandas 2.2.3 (la versión de producción) y con pandas 3.0.6.
+  - Con pandas 2.2.3, motor anterior al PR #64 (f8007e0) contra el actual, mismo mes sintético
+    de 40 configuraciones: 12 hojas idénticas (`assert_frame_equal` exacto), mismos anchos en
+    todas las columnas y mismo encabezado.
+  - Tiempo del motor: 113 s → **70 s**.
+- **Pendientes:** verificación con datos reales de agosto y junio en la máquina del dueño
+  (cifras de referencia 939.959.962 y 1.065.608.599).
+
 ### 2026-09-25 — Claude — Verificación de los PR #63 y #64 (exportación del Excel del motor)
 
 - **Tipo:** verificación.
