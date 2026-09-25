@@ -9,7 +9,8 @@ from pandas.testing import assert_frame_equal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sc_pd_motor_v7 import escribir_hoja_xlsxwriter
+from sc_pd_motor_v7 import (crear_formato_encabezado_xlsxwriter,
+                            escribir_hoja_xlsxwriter)
 
 
 def _ajustar_anchos(ws, df):
@@ -27,6 +28,8 @@ def test_exportacion_rapida_equivale_a_to_excel_en_valores_tipos_y_anchos(tmp_pa
         "flotante": [1.5, float("nan"), -2.25, 0.0],
         "fecha_hora": pd.to_datetime([
             "2026-01-02 03:04:05", None, "2026-12-31 23:59:00", "2026-06-01"], format="mixed"),
+        "fecha_hora_cero": pd.to_datetime([
+            "2026-01-02", None, "2026-12-31", pd.NaT], format="mixed"),
         "fecha": [date(2026, 1, 2), None, date(2026, 12, 31), date(2026, 6, 1)],
     })
     referencia = tmp_path / "pandas.xlsx"
@@ -39,7 +42,7 @@ def test_exportacion_rapida_equivale_a_to_excel_en_valores_tipos_y_anchos(tmp_pa
     with pd.ExcelWriter(
             rapido, engine="xlsxwriter",
             engine_kwargs={"options": {"constant_memory": True}}) as writer:
-        encabezado = None
+        encabezado = crear_formato_encabezado_xlsxwriter(writer, df)
         fecha = writer.book.add_format({"num_format": writer.date_format})
         fecha_hora = writer.book.add_format({"num_format": writer.datetime_format})
         escribir_hoja_xlsxwriter(
@@ -53,8 +56,10 @@ def test_exportacion_rapida_equivale_a_to_excel_en_valores_tipos_y_anchos(tmp_pa
     wb_rapido = load_workbook(rapido)
     ws_referencia = wb_referencia["Datos"]
     ws_rapido = wb_rapido["Datos"]
-    assert [ws_rapido.column_dimensions[c].width for c in "ABCDEFG"] == [
-        ws_referencia.column_dimensions[c].width for c in "ABCDEFG"]
+    columnas = [celda.column_letter for celda in ws_referencia[1]]
+    assert [ws_rapido.column_dimensions[c].width for c in columnas] == [
+        ws_referencia.column_dimensions[c].width for c in columnas]
     assert ws_rapido["A1"]._style == ws_referencia["A1"]._style
     assert ws_rapido["F2"].number_format == ws_referencia["F2"].number_format
     assert ws_rapido["G2"].number_format == ws_referencia["G2"].number_format
+    assert ws_rapido["H2"].number_format == ws_referencia["H2"].number_format
