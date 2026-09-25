@@ -2212,3 +2212,18 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
   a leer siempre el XLSX del motor.
 - **Motivo:** un comentario vacío se recuperaba como `""` desde Parquet y como
   `NaN` desde Excel, lo que podía cambiar `Presta SSCC` de 1 a 0.
+
+### 2026-09-25 — Codex (OpenAI) — Compatibilidad de exportación con pandas 2.2.3
+
+- **Tipo:** corrección menor posterior al PR #64, sin cambio de valores.
+- **Cambios:** el escritor rápido toma de la propia versión instalada de pandas
+  el estilo de encabezado de `DataFrame.to_excel`, con fallback sin formato
+  para pandas 3; el ancho vuelve a calcular `len(str(valor))` exactamente en
+  fechas, objetos, strings y columnas con faltantes.
+- **Pruebas:** la equivalencia de exportación incluye una columna datetime a
+  medianoche con `NaT` y verifica los anchos de todas las columnas. La regresión
+  punta a punta conserva igualdad exacta para todas las huellas XLSX/CSV y para
+  `ciclos_pagados`; solo las métricas float aceptan `pytest.approx(rel=1e-12,
+  abs=1e-6)` por la diferencia del último bit en el orden de suma de pandas
+  2.2.3.
+- **Referencia:** `tests/golden/huellas.json` no fue regenerado ni modificado.

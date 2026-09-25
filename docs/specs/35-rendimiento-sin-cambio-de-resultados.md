@@ -90,6 +90,23 @@ con `pandas.read_excel` y exige igualdad exacta de valores/tipos, anchos de
 columna, encabezado y formatos temporales. La regresión de punta a punta sigue
 protegiendo las huellas de todas las hojas del libro real.
 
+### Compatibilidad con pandas 2.2.3 y 3
+
+El formato del encabezado no se fija a mano: se obtiene una sola vez de
+`ExcelFormatter.header_style` y se convierte mediante `_XlsxStyler`, las mismas
+API internas que usa la versión instalada de pandas. Si la versión no las
+expone (pandas 3 ya no publica `header_style`), el encabezado se escribe sin
+formato adicional, igual que `DataFrame.to_excel` en esa versión.
+
+El ancho continúa siendo exactamente `max(len(str(valor)))` por columna. La
+ruta vectorizada con `astype(str)` queda limitada a columnas numéricas o
+booleanas sin faltantes, donde es equivalente entre versiones; fechas,
+objetos, strings y columnas con faltantes usan el cálculo histórico elemento a
+elemento. Las huellas de hojas y CSV permanecen bajo igualdad exacta. Solo las
+métricas escalares de coma flotante de la regresión punta a punta admiten la
+tolerancia `rel=1e-12, abs=1e-6`, porque pandas 2.2.3 puede variar el último bit
+por el orden de suma; `ciclos_pagados` sigue comparándose de forma exacta.
+
 ## Cambio aplicado
 
 El motor continúa escribiendo exactamente el mismo XLSX y, si existe un motor
