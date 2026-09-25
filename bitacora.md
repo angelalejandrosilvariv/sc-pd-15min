@@ -132,6 +132,24 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-25 — Claude — Verificación de los PR #63 y #64 (exportación del Excel del motor)
+
+- **Tipo:** verificación.
+- **PR #63:** solo documentación (comando para reproducir la medición de la entrega). Sin código.
+- **PR #64, valores:** mismo mes sintético (40 configuraciones), motor anterior (f8007e0)
+  contra el nuevo. Las 12 hojas son idénticas (`assert_frame_equal` exacto). `pytest -q`
+  → **159 passed** (pandas 3.0.6).
+- **PR #64, tiempo del motor:** 123 s → **68 s** (1,8 veces menos).
+- **PR #64, formato (no afecta el cálculo):**
+  - Con **pandas 2.2** (la versión probable de Anaconda) el encabezado de todas las hojas deja
+    de salir en negrita y con borde: `formato_encabezado = None` copia lo que hace pandas 3. La
+    prueba nueva `test_exportacion_xlsxwriter.py` **falla con pandas 2.2.3** justo en esa
+    comparación de estilo.
+  - `RIO_Usado!A` (`FECHA_HORA_RIO`) queda con ancho 12,7 en vez de 21,7:
+    `astype(str).str.len()` no reproduce `len(str(v))` en esa columna.
+- **Pendientes:** corrección menor para Codex (encabezado según la versión de pandas y ancho
+  exacto), probada con pandas 2.2 y 3.
+
 ### 2026-09-25 — Claude — Verificación del PR #62 (fórmulas de la entrega CEN más rápidas)
 
 - **Tipo:** verificación.
