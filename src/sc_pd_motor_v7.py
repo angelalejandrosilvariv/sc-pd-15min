@@ -103,6 +103,7 @@ renumeracion es solo para el reporte y conserva la etiqueta original.
 import os
 import re
 import sys
+from datetime import date, datetime
 import pandas as pd
 import numpy as np
 
@@ -1155,6 +1156,52 @@ def asignar_observaciones_liquidacion(df, ciclos_sin_terminar, activar=1):
          'Costo nulo o anulado por filtros RIO/EP',
          'Sobrecosto validado a pago'], default='Sin Pago')
     return df
+
+
+def escribir_hoja_xlsxwriter(writer, nombre, df, formato_encabezado,
+                              formato_fecha, formato_fecha_hora):
+    """Escribe un DataFrame sin la capa de formateo celda a celda de pandas."""
+    ws = writer.book.add_worksheet(nombre)
+    writer.sheets[nombre] = ws
+    ws.write_row(0, 0, list(df.columns), formato_encabezado)
+    for fila_excel, fila in enumerate(df.itertuples(index=False, name=None), 1):
+        valores = []
+        fechas = []
+        for columna, valor in enumerate(fila):
+            if valor is None or valor is pd.NA or pd.isna(valor):
+                valores.append(None)
+            elif isinstance(valor, np.datetime64):
+                valor = pd.Timestamp(valor).to_pydatetime()
+                valores.append(valor)
+                fechas.append((columna, valor, formato_fecha_hora))
+            elif isinstance(valor, datetime):
+                valor = valor.to_pydatetime() if isinstance(valor, pd.Timestamp) else valor
+                valores.append(valor)
+                fechas.append((columna, valor, formato_fecha_hora))
+            elif isinstance(valor, date):
+                valores.append(valor)
+                fechas.append((columna, valor, formato_fecha))
+            elif isinstance(valor, np.generic):
+                valores.append(valor.item())
+            else:
+                valores.append(valor)
+        ws.write_row(fila_excel, 0, valores)
+        # write_row no acepta un formato distinto por celda. Las fechas se
+        # reescriben antes de avanzar de fila (requisito de constant_memory).
+        for columna, valor, formato in fechas:
+            ws.write_datetime(fila_excel, columna, valor, formato)
+    for idx, col in enumerate(df.columns):
+        serie = df.iloc[:, idx]
+        largo_datos = serie.astype(str).str.len().max() if len(df) else 0
+        if pd.isna(largo_datos):
+            # pandas 3 conserva los faltantes al convertir a str. Se replica
+            # len(str(valor)) también para una columna enteramente vacía.
+            largo_datos = (3 if (pd.api.types.is_float_dtype(serie.dtype)
+                                 or pd.api.types.is_datetime64_any_dtype(serie.dtype))
+                           else 4)
+        ancho = max(int(largo_datos or 0), len(str(col))) + 2
+        ws.set_column(idx, idx, min(ancho, 50))
+    return ws
 
 
 def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = False):
@@ -2798,7 +2845,13 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
         'anterior', 'actual')
     central_empresa_export = pd.DataFrame(
         list(empresa_por_relacionada.items()), columns=['Central', 'Empresa'])
-    with pd.ExcelWriter(RUTA_SALIDA, engine='xlsxwriter') as writer:
+    # El formato explicito reproduce el encabezado y las fechas que
+    # DataFrame.to_excel aplica con el motor xlsxwriter, pero evita crear una
+    # celda pandas por cada valor.  constant_memory mantiene solo una fila del
+    # XML de cada hoja en memoria.
+    with pd.ExcelWriter(
+            RUTA_SALIDA, engine='xlsxwriter',
+            engine_kwargs={'options': {'constant_memory': True}}) as writer:
         hojas = {'Guia_Lectura': crear_guia_lectura(),
                  'Parametros_Motor': pd.DataFrame(
                      [{'interruptor': n, 'valor': v} for n, v in sorted(globals().items())
@@ -2815,13 +2868,15 @@ def main(rutas: dict, panel: dict | None = None, devolver_diagnostico: bool = Fa
                  'Auditoria_Pasos': pd.DataFrame(_audit_log)}
         if AUDITAR_INSTRUCCION_RIO == 1:
             hojas['Cobertura_Instruccion_RIO'] = cobertura_export
+        wb = writer.book
+        # pandas 3 escribe el encabezado sin estilo adicional.
+        formato_encabezado = None
+        formato_fecha = wb.add_format({'num_format': writer.date_format})
+        formato_fecha_hora = wb.add_format({'num_format': writer.datetime_format})
         for nombre, df_h in hojas.items():
-            df_h.to_excel(writer, sheet_name=nombre, index=False)
-            ws = writer.sheets[nombre]
-            for idx, col in enumerate(df_h.columns):
-                largo_datos = df_h[col].map(lambda v: len(str(v))).max() if len(df_h) else 0
-                ancho = max(int(largo_datos or 0), len(str(col))) + 2
-                ws.set_column(idx, idx, min(ancho, 50))
+            escribir_hoja_xlsxwriter(
+                writer, nombre, df_h, formato_encabezado,
+                formato_fecha, formato_fecha_hora)
 
     print("Listo. Proceso finalizado.")
 
