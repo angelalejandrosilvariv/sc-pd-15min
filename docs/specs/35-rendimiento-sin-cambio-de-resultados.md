@@ -41,6 +41,13 @@ configuraciones y 31 días (357.120 bloques de entrada y 324.896 bloques en
 ciclos). Se reutilizó exactamente el mismo XLSX del motor en las dos corridas y
 se midió únicamente `generar_entrega`:
 
+```bash
+python -c 'from tests.generar_datos_volumen import generar; generar(".perf-data-120", configuraciones=120, dias=31)'
+```
+
+La llamada explícita fija el tamaño de aceptación; el valor predeterminado del
+generador se conserva para los perfiles generales de 300 configuraciones.
+
 | Entrega CEN | Tiempo (s) |
 |---|---:|
 | Antes | 2.171,670 |
