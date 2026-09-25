@@ -41,6 +41,13 @@ configuraciones y 31 días (357.120 bloques de entrada y 324.896 bloques en
 ciclos). Se reutilizó exactamente el mismo XLSX del motor en las dos corridas y
 se midió únicamente `generar_entrega`:
 
+```bash
+python -c 'from tests.generar_datos_volumen import generar; generar(".perf-data-120", configuraciones=120, dias=31)'
+```
+
+La llamada explícita fija el tamaño de aceptación; el valor predeterminado del
+generador se conserva para los perfiles generales de 300 configuraciones.
+
 | Entrega CEN | Tiempo (s) |
 |---|---:|
 | Antes | 2.171,670 |
@@ -52,6 +59,36 @@ antemano el prefijo OOXML `_xlfn.` y la hoja especializada se limita a retirar
 las llaves de fórmula matricial y el signo igual inicial. Una prueba compara
 todas las plantillas con el preprocesamiento original de XlsxWriter para que
 una futura función nueva sin prefijo no pueda omitir esa conversión.
+
+## Exportación del libro del motor
+
+La exportación de cada hoja usa ahora `Worksheet.write_row` con valores nativos
+y un `Workbook` en modo `constant_memory`. Se conservan las celdas vacías para
+`NaN`, `None`, `NaT` y `pd.NA`, los tipos booleano, entero y flotante, y los
+formatos de fecha y fecha-hora de pandas. El cálculo de ancho conserva la regla
+anterior (máximo entre datos y encabezado, dos caracteres de margen y tope 50),
+pero obtiene las longitudes con operaciones vectorizadas en vez de ejecutar una
+lambda de Python por celda.
+
+La medición se ejecutó el 2026-09-25 en el mismo contenedor y con Python 3.14.4.
+Los insumos se generaron una sola vez con semilla 35015, 120 configuraciones y
+31 días: 357.120 bloques de entrada y 324.896 bloques en ciclos. Ambas corridas
+usaron exactamente esos archivos y `HORAS_SIN_HISTORIA='nulo'`; el reloj abarca
+la llamada completa a `motor.main`.
+
+```bash
+python -c 'from tests.generar_datos_volumen import generar; generar(".perf-data-export-120", configuraciones=120, dias=31)'
+```
+
+| Motor y Excel | Tiempo (s) |
+|---|---:|
+| Antes (`DataFrame.to_excel`) | 572,000 |
+| Después (`Worksheet.write_row`) | 352,163 |
+
+La prueba dedicada escribe la misma tabla con ambos caminos, la vuelve a leer
+con `pandas.read_excel` y exige igualdad exacta de valores/tipos, anchos de
+columna, encabezado y formatos temporales. La regresión de punta a punta sigue
+protegiendo las huellas de todas las hojas del libro real.
 
 ## Cambio aplicado
 
