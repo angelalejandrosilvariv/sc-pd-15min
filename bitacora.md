@@ -132,6 +132,22 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-25 — Claude — Verificación del PR #62 (fórmulas de la entrega CEN más rápidas)
+
+- **Tipo:** verificación.
+- **Revisión del código:** `MAXIFS` va con el prefijo `_xlfn.` en sus tres plantillas;
+  `WorksheetFormulasPreparadas` solo quita la llave y el "=" como el original, y
+  `use_future_functions=False`. La prueba nueva compara todas las plantillas con el
+  `_prepare_formula` original de xlsxwriter. El Diccionario muestra las fórmulas sin prefijo,
+  igual que antes.
+- **Libro idéntico:** mismo reporte de un mes sintético (40 configuraciones), entrega con
+  retiros, código anterior (0022d9e) contra el nuevo. Todas las partes XML del .xlsx y todos los
+  CSV son idénticos byte a byte, salvo `docProps/core.xml` (fecha de creación), la hoja Menu y
+  `parametros.csv`, donde solo cambian `motor_version` y `fecha_corrida`.
+- **Tiempo de `generar_entrega`, con python-calamine:** 341 s → **99 s** (3,5 veces menos).
+- **Validación:** `pytest -q` → **158 passed**.
+- **Pendientes:** tarea 3b (exportación del Excel del motor).
+
 ### 2026-09-24 — Claude — Verificación de los PR #60 (caché retirado) y #61 (regresión de punta a punta)
 
 - **Tipo:** verificación.
