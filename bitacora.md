@@ -132,6 +132,132 @@ bitácora. Un PR de Codex no se considera verificado hasta esa entrada.
 
 ## Updates
 
+### 2026-09-25 — Claude — Verificación del PR #65 (exportación compatible con pandas 2.2.3)
+
+- **Tipo:** verificación.
+- **Revisión del código:**
+  - El encabezado toma `ExcelFormatter.header_style` de la pandas instalada (negrita con borde en
+    2.2, sin formato en 3).
+  - El ancho vuelve a ser exactamente `len(str(v))`, salvo en columnas numéricas o bool sin
+    faltantes.
+  - En `test_regresion_punta_a_punta.py` las huellas siguen exactas y solo las métricas float
+    usan `approx(rel=1e-12, abs=1e-6)`. `huellas.json` no cambió.
+  - Observación menor: las dos APIs internas de pandas se importan al inicio del módulo, así que
+    el respaldo a `None` no cubre una versión futura que las elimine.
+- **Validación:**
+  - `pytest -q` → **159 passed** con pandas 2.2.3 (la versión de producción) y con pandas 3.0.6.
+  - Con pandas 2.2.3, motor anterior al PR #64 (f8007e0) contra el actual, mismo mes sintético
+    de 40 configuraciones: 12 hojas idénticas (`assert_frame_equal` exacto), mismos anchos en
+    todas las columnas y mismo encabezado.
+  - Tiempo del motor: 113 s → **70 s**.
+- **Pendientes:** verificación con datos reales de agosto y junio en la máquina del dueño
+  (cifras de referencia 939.959.962 y 1.065.608.599).
+
+### 2026-09-25 — Claude — Verificación de los PR #63 y #64 (exportación del Excel del motor)
+
+- **Tipo:** verificación.
+- **PR #63:** solo documentación (comando para reproducir la medición de la entrega). Sin código.
+- **PR #64, valores:** mismo mes sintético (40 configuraciones), motor anterior (f8007e0)
+  contra el nuevo. Las 12 hojas son idénticas (`assert_frame_equal` exacto). `pytest -q`
+  → **159 passed** (pandas 3.0.6).
+- **PR #64, tiempo del motor:** 123 s → **68 s** (1,8 veces menos).
+- **PR #64, formato (no afecta el cálculo):**
+  - Con **pandas 2.2** (la versión probable de Anaconda) el encabezado de todas las hojas deja
+    de salir en negrita y con borde: `formato_encabezado = None` copia lo que hace pandas 3. La
+    prueba nueva `test_exportacion_xlsxwriter.py` **falla con pandas 2.2.3** justo en esa
+    comparación de estilo.
+  - `RIO_Usado!A` (`FECHA_HORA_RIO`) queda con ancho 12,7 en vez de 21,7:
+    `astype(str).str.len()` no reproduce `len(str(v))` en esa columna.
+- **Pendientes:** corrección menor para Codex (encabezado según la versión de pandas y ancho
+  exacto), probada con pandas 2.2 y 3.
+
+### 2026-09-25 — Claude — Verificación del PR #62 (fórmulas de la entrega CEN más rápidas)
+
+- **Tipo:** verificación.
+- **Revisión del código:** `MAXIFS` va con el prefijo `_xlfn.` en sus tres plantillas;
+  `WorksheetFormulasPreparadas` solo quita la llave y el "=" como el original, y
+  `use_future_functions=False`. La prueba nueva compara todas las plantillas con el
+  `_prepare_formula` original de xlsxwriter. El Diccionario muestra las fórmulas sin prefijo,
+  igual que antes.
+- **Libro idéntico:** mismo reporte de un mes sintético (40 configuraciones), entrega con
+  retiros, código anterior (0022d9e) contra el nuevo. Todas las partes XML del .xlsx y todos los
+  CSV son idénticos byte a byte, salvo `docProps/core.xml` (fecha de creación), la hoja Menu y
+  `parametros.csv`, donde solo cambian `motor_version` y `fecha_corrida`.
+- **Tiempo de `generar_entrega`, con python-calamine:** 341 s → **99 s** (3,5 veces menos).
+- **Validación:** `pytest -q` → **158 passed**.
+- **Pendientes:** tarea 3b (exportación del Excel del motor).
+
+### 2026-09-24 — Claude — Verificación de los PR #60 (caché retirado) y #61 (regresión de punta a punta)
+
+- **Tipo:** verificación.
+- **PR #60:** el caché Parquet quedó retirado por completo. Frente a 3711438 (antes del PR #59),
+  `src/`, `scripts/` y la entrega solo difieren en el `.astype('string')` del motor
+  (compatibilidad con pandas 3, no cambia valores). No queda ninguna referencia a
+  `cache_reporte`.
+- **PR #61:** `tests/test_regresion_punta_a_punta.py` corre de verdad motor → prorrateo →
+  entrega para 4 combinaciones del panel y compara huellas SHA-256 (`tests/golden/huellas.json`,
+  11 KB). Con los datos nuevos hay 12 ciclos pagados (19 sin diferir), cubiertos, diferidos y
+  rechazados, y el prorrateo reparte 2.532 MM entre 80 suministradores. Prueba puntual del caso
+  de comentario vacío con "Presta SSCC" en el bloque.
+- **Verificación independiente:** regeneré las huellas con el código de 3711438 (más el arreglo
+  de pandas 3) y dan **idénticas** a las del repo en las 4 combinaciones: la referencia
+  representa el comportamiento anterior al caché.
+- **Validación:** `pytest -q` → **157 passed** (46 s).
+- **Hallazgo aparte (anterior a estos PR, no es regresión):** con
+  `DIFERIR_CICLOS_SIN_TERMINAR = 0` la entrega CEN queda descuadrada:
+  - el motor paga los ciclos que siguen el próximo mes, pero la entrega los marca
+    "Se traspasa" (Ciclo completo = 0);
+  - RECIBE no los incluye, mientras que el prorrateo sí los reparte;
+  - resultado: `SUM(SALDO)` = −1.036 MM y `RESUMEN!CHECK` ≠ 0 en 7 empresas.
+  Con el valor por defecto (diferir = 1) cuadra.
+- **Pendientes:** tarea 3 (optimización, un cuello de botella por PR) y decidir si la entrega
+  debe soportar `DIFERIR_CICLOS_SIN_TERMINAR = 0`.
+
+### 2026-09-23 — Claude — Verificación del PR #59 (spec 35): NO verificado, el caché cambia la entrega CEN
+
+- **Tipo:** verificación.
+- **Origen:** PR #59 (`codex/optimizar-tiempo-de-ejecucion-sin-cambios-en-resultados`).
+- **Método:** datos sintéticos de `tests/generar_datos_volumen.py --rapido`. Se corrió el motor
+  con el código anterior (3711438, más el arreglo `astype('string')` de pandas 3 que trae el PR)
+  y con el nuevo, y la entrega y el prorrateo leyendo del caché Parquet y del XLSX.
+- **Resultados:**
+  - Excel del motor: idéntico hoja por hoja (`assert_frame_equal`, exacto). Prorrateo: idéntico.
+  - **Entrega CEN: distinta según lea del caché o del XLSX.** (1) `Presta SSCC` y
+    `Presta SSCC detención` cambian de 1 a 0 en tres ciclos: el XLSX devuelve NaN para un
+    comentario vacío y `extremo()` cae al comentario del bloque; el Parquet devuelve `""` y lo
+    usa tal cual. Esa columna entra en la fórmula del filtro operacional (OT + SSCC) de
+    `PARTIDAS_DETENCIONES!S/T`. (2) Floats con más dígitos (el XLSX guarda 15 cifras) y enteros
+    escritos como `36800920.0`: no cambia montos, pero la entrega deja de ser idéntica.
+  - Con pyarrow instalado (Anaconda lo trae) el caché queda activo por defecto: el riesgo aplica
+    en la máquina del dueño.
+  - Tiempos (mismo conjunto): motor 3,2 s → 4,0 s (escribe el caché); entrega 7,1 s → 6,3 s;
+    prorrateo 0,8 s → 0,3 s. Sin ganancia relevante; los puntos caros (búsqueda RIO,
+    exportación del Excel) no se tocaron.
+  - `tests/test_regresion_golden.py` no cubre el caché ni el motor: genera la entrega desde el
+    XLSX armado a mano del fixture. Los datos de volumen dan `Total SC_PD = 0` en todos los
+    ciclos, así que el prorrateo reparte 0 y no se puede juzgar ningún monto con ellos.
+  - `pytest -q` → 157 passed.
+- **Pendientes:** Codex debe quitar la lectura desde el caché (o hacerla equivalente al XLSX y
+  demostrarlo de punta a punta). Mientras tanto, borrar la carpeta
+  `Reporte_Sobrecostos_PD_Final_cache` antes de generar una entrega.
+
+### 2026-09-23 — Claude — Verificación del PR #58 de Codex (correcciones a la spec 34)
+
+- **Tipo:** verificación.
+- **Origen:** PR #58 (`codex/corrige-tres-puntos-en-la-spec-34`), que corrige las tres
+  observaciones de la revisión automática del PR #57.
+- **Revisión del código:** los tres puntos están resueltos como se pidió, sin tocar los
+  motores, la lógica del prorrateo ni pruebas existentes (salvo el fixture de `Ciclo_Mes`,
+  como se indicó). (1) Sin retiros, la entrega borra los dos CSV de pagos de una corrida
+  anterior. (2) `normalizar_etiqueta_ciclo` lleva `Etiqueta_Turbina` y la `Etiqueta` de Reglas
+  del Horario a `Etiqueta_Relacionada`, y en el detalle de Reglas la reconstruye con la
+  fórmula del motor. El conteo por empresa ya no depende de la etiqueta. (3) El mes sale de
+  `max(Inicio_Ciclo)`.
+- **Validación:** `pytest -q` → **147 passed** sobre `main` (3711438); `git diff --check`
+  limpio.
+- **Pendientes:** los de la spec 34 §5 (verificación con agosto y los retiros reales). Sigue
+  sin haber CI: los PR con automerge entran sin correr pruebas.
+
 ### 2026-09-23 — Codex (OpenAI) — Correcciones posteriores a la revisión de la spec 34
 
 - **Tipo:** corrección + pruebas.
