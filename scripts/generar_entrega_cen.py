@@ -25,6 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from xlsxwriter.utility import xl_col_to_name
+from xlsxwriter.worksheet import Worksheet
 
 RAIZ = Path(__file__).resolve().parents[1]
 if str(RAIZ / "src") not in sys.path:
@@ -128,10 +129,10 @@ FORMULAS = {
         "N": "=M{r}&\"&\"&I{r}",
         "O": "=A{r}&B{r}&M{r}",
         # solo en filas Proceso_Partida = SI
-        "S": (f"=IFERROR(MAXIFS({XH}!$U$2:$U${{N}},{XH}!$J$2:$J${{N}},N{{r}},{XH}!$G$2:$G${{N}},\"SI\")"
+        "S": (f"=IFERROR(_xlfn.MAXIFS({XH}!$U$2:$U${{N}},{XH}!$J$2:$J${{N}},N{{r}},{XH}!$G$2:$G${{N}},\"SI\")"
               "*" + _FILTRO_OP.format(P="P", Q="Q", Z="Z", r="{r}") + "*AF{r}*AG{r}*AH{r},0)"),
         # solo en filas proceso_detencion = SI; usa los filtros de la detencion (AQ..)
-        "T": (f"=IFERROR(MAXIFS({XH}!$V$2:$V${{N}},{XH}!$J$2:$J${{N}},N{{r}},{XH}!$I$2:$I${{N}},\"SI\")"
+        "T": (f"=IFERROR(_xlfn.MAXIFS({XH}!$V$2:$V${{N}},{XH}!$J$2:$J${{N}},N{{r}},{XH}!$I$2:$I${{N}},\"SI\")"
               "*" + _FILTRO_OP.format(P="AQ", Q="AR", Z="AT", r="{r}") + "*AU{r}*AV{r}*AW{r},0)"),
         "V": f"=COUNTIFS({XH}!$J$2:$J${{N}},N{{r}},{XH}!$G$2:$G${{N}},\"SI\")",
         "W": f"=SUMIFS({XH}!$U$2:$U${{N}},{XH}!$J$2:$J${{N}},N{{r}},{XH}!$G$2:$G${{N}},\"SI\")",
@@ -153,7 +154,7 @@ FORMULAS = {
         "J": "=A{r}",
         "K": "=IFERROR(VLOOKUP(I{r},RESUMEN!$A$2:$A${Z},1,0),\"Falta en cuadro de pagos\")",
         "Q": "=LEFT(A{r},FIND(\"&\",A{r},1)-1)",
-        "R": "=MAXIFS(PARTIDAS_DETENCIONES!$I$2:$I${M},PARTIDAS_DETENCIONES!$C$2:$C${M},Q{r})",
+        "R": "=_xlfn.MAXIFS(PARTIDAS_DETENCIONES!$I$2:$I${M},PARTIDAS_DETENCIONES!$C$2:$C${M},Q{r})",
         "S": f"=SUMIF({RI}!$R$2:$R${{R}},A{{r}},{RI}!$S$2:$S${{R}})",
         # los ciclos diferidos (B = 0) tienen Costo_*_Efectivo = 0 en el motor y su margen
         # no se liquida; los checks solo aplican a los ciclos completos
@@ -191,6 +192,21 @@ FORMULA_PAGA = f"=SUMIF('{HOJA_PAGOS}'!$B$2:$B${{P}},A{{r}},'{HOJA_PAGOS}'!$G$2:
 
 
 # --------------------------------------------------------------------------- utilidades
+class WorksheetFormulasPreparadas(Worksheet):
+    """Evita buscar funciones futuras: las plantillas ya usan sus prefijos OOXML."""
+
+    def _prepare_formula(self, formula, expand_future_functions=False):
+        # Es el preprocesamiento no-regex de Worksheet._prepare_formula. Mantenerlo
+        # explícito permite escribir las fórmulas sin recorrer su catálogo de funciones.
+        if formula.startswith("{"):
+            formula = formula[1:]
+        if formula.startswith("="):
+            formula = formula[1:]
+        if formula.endswith("}"):
+            formula = formula[:-1]
+        return formula
+
+
 def interruptores_panel() -> dict:
     return {n: v for n, v in vars(motor).items() if n.isupper() and not n.startswith("RUTA_")
             and n != "MINUTOS_BLOQUE" and isinstance(v, (str, int, float, bool))}
@@ -814,9 +830,14 @@ def hoja_diccionario(frames: dict[str, pd.DataFrame], formulas: dict) -> pd.Data
         f = formulas.get(hoja, {})
         for i, col in enumerate(df.columns):
             letra = _letra(i)
+            formula = f.get(letra, "valor")
+            if isinstance(formula, str):
+                # El diccionario describe la fórmula visible para el usuario; el
+                # prefijo OOXML es sólo un detalle de serialización del libro.
+                formula = formula.replace("_xlfn.", "")
             filas.append({"hoja": hoja, "columna": col, "letra": letra,
                           "significado": _SIGNIFICADOS.get(col, str(col).replace("_", " ")),
-                          "fórmula o valor": f.get(letra, "valor")})
+                          "fórmula o valor": formula})
     return pd.DataFrame(filas)
 
 
@@ -1134,7 +1155,7 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
     import xlsxwriter
     wb = xlsxwriter.Workbook(str(libro), {"constant_memory": True, "default_date_format": "yyyy-mm-dd hh:mm",
                                           "nan_inf_to_errors": True, "strings_to_formulas": False,
-                                          "use_future_functions": True})  # MAXIFS necesita _xlfn.
+                                          "use_future_functions": False})
     try:
         clp = wb.add_format({"num_format": "#,##0"})
         dec = wb.add_format({"num_format": "0.00"})
@@ -1151,7 +1172,8 @@ def generar_entrega(reporte: str | Path, carpeta_salida: str | Path | None = Non
         nombres = list(SHEETS)
         if pagos is not None:
             nombres.insert(nombres.index("RESUMEN") + 1, HOJA_PAGOS)
-        hojas = {nombre: wb.add_worksheet(nombre) for nombre in nombres}
+        hojas = {nombre: wb.add_worksheet(
+            nombre, worksheet_class=WorksheetFormulasPreparadas) for nombre in nombres}
 
         ws = hojas["Menu"]
         ws.write_row(0, 0, ["DIA", "Mes", "", "Version"])

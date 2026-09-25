@@ -33,6 +33,26 @@ de aceptación debe ejecutarse sin `--rapido`; el script queda preparado para
 ello y evita mezclar máquinas o insumos. No se proclama una mejora en entrega
 con base en ruido de esta muestra.
 
+## Escritura de fórmulas de la entrega CEN
+
+Medición del 2026-09-24 en el mismo contenedor y con Python 3.14.4. Los insumos
+se generaron con `tests/generar_datos_volumen.py`, semilla 35015, 120
+configuraciones y 31 días (357.120 bloques de entrada y 324.896 bloques en
+ciclos). Se reutilizó exactamente el mismo XLSX del motor en las dos corridas y
+se midió únicamente `generar_entrega`:
+
+| Entrega CEN | Tiempo (s) |
+|---|---:|
+| Antes | 2.171,670 |
+| Después | 599,951 |
+
+La mejora evita que XlsxWriter pruebe su catálogo completo de expresiones
+regulares para cada fórmula. Las tres plantillas que usan `MAXIFS` incluyen de
+antemano el prefijo OOXML `_xlfn.` y la hoja especializada se limita a retirar
+las llaves de fórmula matricial y el signo igual inicial. Una prueba compara
+todas las plantillas con el preprocesamiento original de XlsxWriter para que
+una futura función nueva sin prefijo no pueda omitir esa conversión.
+
 ## Cambio aplicado
 
 El motor continúa escribiendo exactamente el mismo XLSX y, si existe un motor
